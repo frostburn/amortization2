@@ -1,0 +1,1105 @@
+import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import {
+  BARRIERS,
+  BLAST_RADIUS,
+  GRAVITY,
+  GRENADE_FUSE,
+  PLAYER_SPAWNS,
+  clamp,
+  grenadeVelocity,
+  type BoxSpec,
+  type Vec2,
+  type Vec3,
+} from "../game/config";
+import type { Actor, GameEvent, Simulation } from "../game/simulation";
+
+const MINT = 0x9be6cd,
+  AMBER = 0xd3a24f,
+  ORANGE = 0xad5431;
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 10);
+const unitSphere = new THREE.IcosahedronGeometry(1, 1);
+const material = (color: number, metalness = 0, roughness = 0.8) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness });
+const metal = material(0x38464a, 0.55, 0.6);
+const dark = material(0x1e2729, 0.45, 0.7);
+const silver = material(0x7e8885, 0.65, 0.4);
+const yellow = material(AMBER, 0.1, 0.7);
+const shell = material(0x557d78, 0.4, 0.55);
+const orange = material(ORANGE, 0.25, 0.7);
+const pale = material(0xc8c5ae, 0.1, 0.8);
+const glow = new THREE.MeshBasicMaterial({ color: MINT });
+const targetPaint = new THREE.MeshBasicMaterial({ color: 0xefd3a0 });
+
+function box(
+  parent: THREE.Object3D,
+  w: number,
+  h: number,
+  d: number,
+  x: number,
+  y: number,
+  z: number,
+  mat: THREE.Material = metal,
+) {
+  const mesh = new THREE.Mesh(unitBox, mat);
+  mesh.scale.set(w, h, d);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function cylinder(
+  parent: THREE.Object3D,
+  radius: number,
+  length: number,
+  x: number,
+  y: number,
+  z: number,
+  mat: THREE.Material = metal,
+) {
+  const mesh = new THREE.Mesh(unitCylinder, mat);
+  mesh.scale.set(radius, length, radius);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function labelTexture(
+  text: string,
+  color = "#222b2c",
+  background?: string,
+  size = 80,
+) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = `800 ${size}px "Arial Narrow", sans-serif`;
+  canvas.width = Math.ceil(ctx.measureText(text).width + size * 0.4);
+  canvas.height = Math.ceil(size * 1.4);
+  if (background) {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${size}px "Arial Narrow", sans-serif`;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+function label(
+  parent: THREE.Object3D,
+  text: string,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  z: number,
+  floor = false,
+  color?: string,
+) {
+  const texture = labelTexture(text, color);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    }),
+  );
+  mesh.position.set(x, y, z);
+  if (floor) mesh.rotation.x = -Math.PI / 2;
+  parent.add(mesh);
+  return mesh;
+}
+
+type ActorVisual = {
+  root: THREE.Group;
+  torso: THREE.Group;
+  legs: THREE.Group[];
+  ring: THREE.Mesh;
+  flash: THREE.Mesh;
+  health: THREE.Sprite;
+  dead: boolean;
+};
+type Particle = {
+  p: THREE.Vector3;
+  v: THREE.Vector3;
+  life: number;
+  max: number;
+  size: number;
+  color: THREE.Color;
+  smoke: boolean;
+};
+type Trail = { mesh: THREE.Mesh; life: number };
+
+export class RangeScene {
+  renderer: THREE.WebGLRenderer;
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 180);
+  private environment = new THREE.Group();
+  private dynamic = new THREE.Group();
+  private actors = new Map<number, ActorVisual>();
+  private props = new Map<number, THREE.Group>();
+  private grenades = new Map<number, THREE.Group>();
+  private particles: Particle[] = [];
+  private particleMesh = new THREE.InstancedMesh(
+    unitSphere,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    400,
+  );
+  private trails: Trail[] = [];
+  private flashes = new Map<number, number>();
+  private blastRings: { mesh: THREE.Mesh; age: number }[] = [];
+  private bulletMarks = new THREE.InstancedMesh(
+    new THREE.CircleGeometry(0.047, 7),
+    new THREE.MeshBasicMaterial({
+      color: 0x222827,
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: false,
+    }),
+    180,
+  );
+  private markIndex = 0;
+  private dummy = new THREE.Object3D();
+  private cameraTarget = new THREE.Vector3(0, 0, -2.5);
+  private cameraOffset = new THREE.Vector3(0, 28, 38);
+  private baseHalfHeight = 12;
+  private zoom = 1;
+  private raycaster = new THREE.Raycaster();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private aiming = new THREE.Group();
+  private aimRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.22, 0.28, 32),
+    new THREE.MeshBasicMaterial({
+      color: MINT,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    }),
+  );
+  private blastPreview = new THREE.Mesh(
+    new THREE.RingGeometry(BLAST_RADIUS - 0.03, BLAST_RADIUS, 64),
+    new THREE.MeshBasicMaterial({
+      color: AMBER,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+    }),
+  );
+  private arc = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineDashedMaterial({
+      color: 0xf5c572,
+      dashSize: 0.25,
+      gapSize: 0.13,
+      transparent: true,
+      opacity: 0.85,
+    }),
+  );
+  private destination = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.48, 32),
+    new THREE.MeshBasicMaterial({
+      color: MINT,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    }),
+  );
+  private destinationAge = 99;
+  private lightFlash = new THREE.PointLight(0xffd699, 0, 8, 2);
+  reducedMotion = false;
+  private shake = 0;
+  private resizeObserver: ResizeObserver;
+
+  static async create(canvas: HTMLCanvasElement, sim: Simulation) {
+    const texture = await new THREE.TextureLoader().loadAsync(
+      `${import.meta.env.BASE_URL}textures/concrete.webp`,
+    );
+    return new RangeScene(canvas, sim, texture);
+  }
+
+  private constructor(
+    public canvas: HTMLCanvasElement,
+    public sim: Simulation,
+    texture: THREE.Texture,
+  ) {
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.03;
+    this.scene.background = new THREE.Color(0x242d30);
+    this.scene.fog = new THREE.Fog(0x242d30, 90, 145);
+    this.scene.add(new THREE.HemisphereLight(0xd4e8ec, 0x44423a, 2.0));
+    const sun = new THREE.DirectionalLight(0xffe5be, 3.2);
+    sun.position.set(-18, 38, 15);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -36;
+    sun.shadow.camera.right = 36;
+    sun.shadow.camera.top = 32;
+    sun.shadow.camera.bottom = -32;
+    sun.shadow.camera.far = 95;
+    sun.shadow.normalBias = 0.035;
+    sun.shadow.bias = -0.0002;
+    sun.shadow.radius = 3;
+    this.scene.add(
+      sun,
+      sun.target,
+      this.environment,
+      this.dynamic,
+      this.particleMesh,
+      this.bulletMarks,
+      this.lightFlash,
+    );
+    this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.particleMesh.count = 0;
+    this.bulletMarks.count = 0;
+    this.aimRing.rotation.x =
+      this.blastPreview.rotation.x =
+      this.destination.rotation.x =
+        -Math.PI / 2;
+    this.aiming.add(this.aimRing, this.blastPreview, this.arc);
+    this.scene.add(this.aiming, this.destination);
+    this.destination.visible = false;
+    this.buildEnvironment(texture);
+    this.resetDynamic();
+    this.resize();
+    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver.observe(canvas);
+  }
+
+  private buildEnvironment(tex: THREE.Texture) {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(9, 7);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x888b84,
+      map: tex,
+      roughness: 0.97,
+    });
+    const wallTex = tex.clone();
+    wallTex.repeat.set(2, 1);
+    const concrete = new THREE.MeshStandardMaterial({
+      color: 0xa7a69b,
+      map: wallTex,
+      roughness: 0.94,
+    });
+    box(this.environment, 48, 0.7, 36, 0, -0.38, -2, floorMat);
+    box(this.environment, 47, 0.3, 5.6, 0, -0.16, 11.3, material(0x707874));
+    for (const b of BARRIERS) this.makeBarrier(b, concrete);
+    for (let x = -22; x <= 22; x += 5.5) {
+      box(this.environment, 0.32, 3.9, 0.4, x, 1.95, -18.0, concrete);
+      box(this.environment, 0.55, 0.15, 1.25, x, 3.95, -18.35, metal);
+    }
+    // Back wall service pipes and vent cabinets.
+    for (const h of [2.9, 3.25]) {
+      const pipe = cylinder(this.environment, 0.12, 19, 9, h, -17.85);
+      pipe.rotation.z = Math.PI / 2;
+    }
+    for (const x of [1, 7, 13, 19])
+      box(this.environment, 0.16, 0.72, 0.3, x, 3.06, -17.75, silver);
+    for (const x of [-19, 18]) {
+      box(this.environment, 2.1, 1.2, 0.35, x, 1.7, -17.83, metal);
+      for (let i = 0; i < 7; i++)
+        box(
+          this.environment,
+          1.7,
+          0.06,
+          0.04,
+          x,
+          1.28 + i * 0.13,
+          -17.63,
+          dark,
+        );
+    }
+    label(
+      this.environment,
+      "PROVING GROUND",
+      10.5,
+      2.0,
+      -5,
+      2.6,
+      -17.92,
+      false,
+      "#283230",
+    );
+    label(
+      this.environment,
+      "FUTURES CONTRACT",
+      5,
+      0.65,
+      -5,
+      1.5,
+      -17.91,
+      false,
+      "#404841",
+    );
+    for (const x of [-20, -8, 6, 21]) {
+      for (let z = -16; z < 7; z += 1.5)
+        box(this.environment, 0.09, 0.012, 0.8, x, 0.013, z, yellow);
+    }
+    for (const z of [6.5, -1, -7, -13]) {
+      for (const x of [-19.5, -15, -10.5])
+        box(this.environment, 0.8, 0.014, 0.055, x, 0.013, z, yellow);
+    }
+    for (const [x, num, text] of [
+      [-14, "01", "BALLISTICS"],
+      [-1, "02", "DISPLACEMENT"],
+      [14, "03", "FRAGMENTS"],
+    ] as const) {
+      label(this.environment, num, 3.2, 1.8, x, 0.023, 5.7, true, "#c7994a");
+      label(this.environment, text, 8, 0.7, x, 0.026, 7.2, true, "#d8c796");
+    }
+    label(
+      this.environment,
+      "FIRING LINE",
+      6.5,
+      0.7,
+      -13.5,
+      0.035,
+      12.4,
+      true,
+      "#c5ccbc",
+    );
+    for (let x = -21; x <= 21; x += 0.7) {
+      const stripe = box(
+        this.environment,
+        0.35,
+        0.018,
+        0.55,
+        x,
+        0.025,
+        8.5,
+        yellow,
+      );
+      stripe.rotation.y = -0.5;
+    }
+    for (const x of [-7.3, 6.7]) {
+      box(this.environment, 0.42, 0.015, 31, x, 0.03, -2, dark);
+      for (let z = -17; z < 13; z += 0.22)
+        box(this.environment, 0.37, 0.035, 0.065, x, 0.046, z, silver);
+    }
+    // Subtle slab joints across the training surface.
+    const joint = material(0x5e6662);
+    for (let x = -22; x < 22; x += 5.5)
+      box(this.environment, 0.014, 0.007, 32, x, 0.007, -2, joint);
+    for (let z = -18; z < 14; z += 5.5)
+      box(this.environment, 44, 0.007, 0.014, 0, 0.007, z, joint);
+    // Range lights, guard rails, and equipment outside the walkable yard.
+    for (const x of [-23.6, 23.6])
+      for (const z of [-14, 3, 12]) {
+        cylinder(this.environment, 0.11, 5.4, x, 2.7, z);
+        box(this.environment, 0.7, 0.38, 0.4, x, 5.3, z, dark);
+        box(this.environment, 0.58, 0.24, 0.03, x, 5.28, z + 0.22, pale);
+        box(this.environment, 0.65, 0.22, 0.65, x, 0.1, z, concrete);
+      }
+    for (const x of [-23, 23]) {
+      const rail = cylinder(this.environment, 0.035, 28, x, 2.9, -2, yellow);
+      rail.rotation.x = Math.PI / 2;
+      for (let z = -16; z < 13; z += 3)
+        cylinder(this.environment, 0.03, 0.7, x, 2.58, z, yellow);
+    }
+    for (const [x, z] of [
+      [-20, 11],
+      [20, 11],
+      [-20, -15],
+    ]) {
+      const c = this.makeCrate(1.5, 1.4, 1.5);
+      c.position.set(x, 0.7, z);
+      this.environment.add(c);
+    }
+    this.batchEnvironment();
+  }
+
+  private makeBarrier(b: BoxSpec, concrete: THREE.Material) {
+    if (b.style === "crate") {
+      const crate = this.makeCrate(b.w, b.h, b.d);
+      crate.position.set(b.x, b.h / 2, b.z);
+      this.environment.add(crate);
+      return;
+    }
+    box(this.environment, b.w, b.h, b.d, b.x, b.h / 2, b.z, concrete);
+    if (b.style === "barrier") {
+      box(
+        this.environment,
+        b.w + 0.12,
+        0.14,
+        b.d + 0.12,
+        b.x,
+        b.h,
+        b.z,
+        concrete,
+      );
+      if (b.w > b.d)
+        for (let x = b.x - b.w / 2 + 0.25; x < b.x + b.w / 2 - 0.1; x += 0.55) {
+          const stripe = box(
+            this.environment,
+            0.23,
+            0.23,
+            0.025,
+            x,
+            b.h - 0.2,
+            b.z + b.d / 2 + 0.017,
+            yellow,
+          );
+          stripe.rotation.z = -0.45;
+        }
+    }
+  }
+
+  private makeCrate(w: number, h: number, d: number): THREE.Group {
+    const group = new THREE.Group();
+    box(group, w, h, d, 0, 0, 0, metal);
+    for (const x of [-w / 2, w / 2])
+      box(group, 0.1, h + 0.04, d + 0.04, x, 0, 0, silver);
+    for (const y of [-h / 2 + 0.08, h / 2 - 0.08])
+      box(group, w, 0.11, d + 0.05, 0, y, 0, silver);
+    for (const sign of [-1, 1]) {
+      const beam = box(
+        group,
+        Math.hypot(w * 0.8, h * 0.75),
+        0.065,
+        0.035,
+        0,
+        0,
+        d / 2 + 0.032,
+        dark,
+      );
+      beam.rotation.z = sign * Math.atan2(h * 0.75, w * 0.8);
+    }
+    box(group, 0.25, 0.16, 0.025, w * 0.22, h * 0.12, d / 2 + 0.04, yellow);
+    return group;
+  }
+
+  private batchEnvironment() {
+    this.environment.updateMatrixWorld(true);
+    const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    this.environment.traverse((object) => {
+      if (!(object instanceof THREE.Mesh) || Array.isArray(object.material))
+        return;
+      const geos = batches.get(object.material) ?? [];
+      const geometry = object.geometry.clone().applyMatrix4(object.matrixWorld);
+      geos.push(geometry);
+      batches.set(object.material, geos);
+    });
+    this.environment.clear();
+    for (const [mat, geometries] of batches) {
+      const merged = mergeGeometries(geometries);
+      if (merged) {
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
+        this.environment.add(mesh);
+      }
+      for (const geometry of geometries) geometry.dispose();
+    }
+  }
+
+  private makeActor(a: Actor): ActorVisual {
+    const root = new THREE.Group(),
+      model = new THREE.Group(),
+      torso = new THREE.Group();
+    root.add(model);
+    model.position.y = -0.96;
+    const legs: THREE.Group[] = [];
+    const friend = a.kind === "player";
+    const bodyMat = friend ? shell : orange;
+    if (friend || a.kind === "heavy") {
+      for (const x of [-0.24, 0.24]) {
+        const leg = new THREE.Group();
+        leg.position.set(x, 0.8, 0);
+        model.add(leg);
+        legs.push(leg);
+        box(leg, 0.25, 0.36, 0.28, 0, -0.18, 0, bodyMat);
+        box(leg, 0.2, 0.34, 0.23, 0, -0.52, 0, dark);
+        box(leg, 0.31, 0.17, 0.52, 0, -0.71, 0.09, metal);
+        const knee = cylinder(leg, 0.14, 0.28, 0, -0.37, 0.04, silver);
+        knee.rotation.z = Math.PI / 2;
+        box(leg, 0.17, 0.18, 0.045, 0, -0.5, 0.14, bodyMat);
+      }
+      box(model, 0.63, 0.27, 0.4, 0, 0.83, 0, dark);
+      torso.position.y = 1.05;
+      model.add(torso);
+      box(torso, 0.74, 0.55, 0.44, 0, 0.24, 0, bodyMat);
+      box(torso, 0.54, 0.2, 0.08, 0, 0.35, 0.25, pale);
+      box(torso, 0.4, 0.42, 0.23, 0, 0.24, -0.3, dark);
+      box(torso, 0.42, 0.3, 0.35, 0, 0.7, 0.02, bodyMat);
+      box(torso, 0.34, 0.065, 0.03, 0, 0.73, 0.207, friend ? glow : pale);
+      for (const sign of [-1, 1]) {
+        const shoulder = box(
+          torso,
+          0.27,
+          0.25,
+          0.4,
+          sign * 0.5,
+          0.39,
+          0,
+          bodyMat,
+        );
+        shoulder.rotation.z = sign * 0.16;
+        box(torso, 0.18, 0.35, 0.2, sign * 0.53, 0.14, 0.12, dark);
+        box(torso, 0.2, 0.19, 0.35, sign * 0.48, 0.02, 0.32, bodyMat);
+      }
+      if (friend) {
+        box(torso, 0.22, 0.2, 0.63, 0.28, 0.3, 0.47, dark);
+        const barrel = cylinder(torso, 0.052, 0.48, 0.28, 0.3, 0.94, silver);
+        barrel.rotation.x = Math.PI / 2;
+        box(torso, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
+        box(torso, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
+        cylinder(torso, 0.013, 0.44, -0.25, 0.87, -0.2, dark);
+      }
+    } else {
+      box(model, 1.15, 0.15, 0.8, 0, 0.075, 0, metal);
+      box(model, 0.13, 0.58, 0.16, 0, 0.43, 0, silver);
+      torso.position.y = 0.92;
+      model.add(torso);
+      box(torso, 0.8, 0.9, 0.23, 0, 0.18, 0, orange);
+      box(torso, 0.4, 0.35, 0.2, 0, 0.8, 0, orange);
+      for (const x of [-0.49, 0.49])
+        box(torso, 0.18, 0.45, 0.17, x, 0.22, 0, orange);
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.16, 0.18, 24),
+        targetPaint,
+      );
+      ring.position.set(0, 0.28, 0.124);
+      torso.add(ring);
+      box(torso, 0.04, 0.38, 0.012, 0, 0.28, 0.13, dark);
+      box(torso, 0.38, 0.04, 0.012, 0, 0.28, 0.13, dark);
+    }
+    // Keep animated joints separate; batch rigid pieces by material within each joint.
+    for (const part of [torso, ...legs, model]) this.batchRigidPart(part);
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.74, 0.79, 40),
+      new THREE.MeshBasicMaterial({
+        color: MINT,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    this.dynamic.add(ring);
+    const flash = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.2),
+      new THREE.MeshBasicMaterial({ color: 0xffdc9c }),
+    );
+    flash.scale.set(0.65, 0.65, 2);
+    flash.position.set(0.28, 0.3, 1.24);
+    torso.add(flash);
+    flash.visible = false;
+    const healthTexture = labelTexture(
+      "━━━━━━━━━━━━",
+      "#a8e6d4",
+      undefined,
+      110,
+    );
+    const health = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: healthTexture,
+        transparent: true,
+        depthTest: false,
+      }),
+    );
+    health.scale.set(1.2, 0.15, 1);
+    this.dynamic.add(health);
+    health.visible = false;
+    this.dynamic.add(root);
+    return { root, torso, legs, ring, flash, health, dead: false };
+  }
+
+  private batchRigidPart(group: THREE.Group) {
+    const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    for (const child of [...group.children]) {
+      if (!(child instanceof THREE.Mesh) || Array.isArray(child.material))
+        continue;
+      child.updateMatrix();
+      const geometries = batches.get(child.material) ?? [];
+      geometries.push(child.geometry.clone().applyMatrix4(child.matrix));
+      batches.set(child.material, geometries);
+      if (![unitBox, unitCylinder, unitSphere].includes(child.geometry))
+        child.geometry.dispose();
+      group.remove(child);
+    }
+    for (const [mat, geometries] of batches) {
+      const merged = mergeGeometries(geometries);
+      if (merged) {
+        merged.userData.owned = true;
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      }
+      for (const geometry of geometries) geometry.dispose();
+    }
+  }
+
+  resetDynamic() {
+    // Release instance-owned buffers; primitive geometry and surface materials are shared.
+    this.dynamic.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.geometry.userData.owned)
+        object.geometry.dispose();
+    });
+    for (const a of this.actors.values()) {
+      (a.health.material as THREE.SpriteMaterial).map?.dispose();
+      a.health.material.dispose();
+      a.ring.geometry.dispose();
+      (a.ring.material as THREE.Material).dispose();
+      a.flash.geometry.dispose();
+      (a.flash.material as THREE.Material).dispose();
+    }
+    this.dynamic.clear();
+    this.actors.clear();
+    this.props.clear();
+    this.grenades.clear();
+    for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
+    for (const p of this.sim.props) {
+      const group = this.makeCrate(p.w, p.h, p.d);
+      this.batchRigidPart(group);
+      this.dynamic.add(group);
+      this.props.set(p.id, group);
+    }
+    for (const trail of this.trails) {
+      this.scene.remove(trail.mesh);
+      (trail.mesh.material as THREE.Material).dispose();
+    }
+    this.trails = [];
+    for (const ring of this.blastRings) {
+      this.scene.remove(ring.mesh);
+      ring.mesh.geometry.dispose();
+      (ring.mesh.material as THREE.Material).dispose();
+    }
+    this.blastRings = [];
+    this.particles = [];
+    this.particleMesh.count = 0;
+    this.markIndex = 0;
+    this.bulletMarks.count = 0;
+    this.flashes.clear();
+    this.destinationAge = 99;
+  }
+
+  resize() {
+    const rect = this.canvas.getBoundingClientRect();
+    this.renderer.setSize(rect.width, rect.height, false);
+    const aspect = rect.width / Math.max(1, rect.height);
+    const half = Math.max(this.baseHalfHeight, 23 / aspect) / this.zoom;
+    this.camera.left = -half * aspect;
+    this.camera.right = half * aspect;
+    this.camera.top = half;
+    this.camera.bottom = -half;
+    this.camera.updateProjectionMatrix();
+    this.updateCamera();
+  }
+  private updateCamera() {
+    this.camera.position.copy(this.cameraTarget).add(this.cameraOffset);
+    this.camera.lookAt(this.cameraTarget);
+    this.camera.updateMatrixWorld();
+  }
+  zoomBy(delta: number) {
+    this.zoom = clamp(this.zoom * Math.exp(-delta * 0.001), 0.8, 2.1);
+    this.resize();
+  }
+  pan(dx: number, dz: number) {
+    this.cameraTarget.x = clamp(this.cameraTarget.x + dx, -15, 15);
+    this.cameraTarget.z = clamp(this.cameraTarget.z + dz, -12, 10);
+    this.updateCamera();
+  }
+  center() {
+    const p = this.sim.primary.body.translation();
+    this.cameraTarget.set(p.x * 0.35, 0, p.z * 0.35 - 3);
+    this.updateCamera();
+  }
+  resetCamera() {
+    this.cameraTarget.set(0, 0, -2.5);
+    this.zoom = 1;
+    this.resize();
+  }
+
+  pick(
+    clientX: number,
+    clientY: number,
+    grenade = false,
+  ): { aim: Vec3; ground: Vec3; actor?: number } | null {
+    const rect = this.canvas.getBoundingClientRect();
+    this.raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        (-(clientY - rect.top) / rect.height) * 2 + 1,
+      ),
+      this.camera,
+    );
+    const ground = new THREE.Vector3();
+    if (!this.raycaster.ray.intersectPlane(this.groundPlane, ground))
+      return null;
+    const origin = this.raycaster.ray.origin,
+      dir = this.raycaster.ray.direction;
+    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, 160));
+    const actor =
+      hit &&
+      this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
+    let aim: Vec3 = { x: ground.x, y: 1.25, z: ground.z };
+    if (!grenade && hit && actor)
+      aim = {
+        x: actor.body.translation().x,
+        y: actor.body.translation().y + 0.25,
+        z: actor.body.translation().z,
+      };
+    return { aim, ground, actor: actor?.id };
+  }
+  project(position: Vec3) {
+    const p = new THREE.Vector3(position.x, position.y, position.z).project(
+        this.camera,
+      ),
+      r = this.canvas.getBoundingClientRect();
+    return {
+      x: r.left + ((p.x + 1) * r.width) / 2,
+      y: r.top + ((1 - p.y) * r.height) / 2,
+    };
+  }
+  markDestination(p: Vec2) {
+    this.destination.position.set(p.x, 0.06, p.z);
+    this.destinationAge = 0;
+  }
+
+  updateAim(ground: Vec3, visible: boolean) {
+    this.aiming.visible = visible;
+    const grenade = this.sim.weapon === "grenade";
+    this.aimRing.position.set(ground.x, 0.07, ground.z);
+    this.aimRing.scale.setScalar(grenade ? 1.6 : 1);
+    this.blastPreview.visible = this.arc.visible = grenade;
+    if (!grenade) return;
+    const actor = this.sim.primary;
+    const from = this.sim.grenadeOrigin(actor, ground);
+    const { velocity, duration } = grenadeVelocity(from, ground);
+    const points = [new THREE.Vector3(from.x, from.y, from.z)];
+    for (
+      let t = 0.055;
+      t < Math.min(GRENADE_FUSE, duration + 0.2);
+      t += 0.055
+    ) {
+      const next = new THREE.Vector3(
+        from.x + velocity.x * t,
+        from.y + velocity.y * t - (GRAVITY * t * t) / 2,
+        from.z + velocity.z * t,
+      );
+      const last = points.at(-1)!;
+      const hit = this.sim.ray(last, next, actor.body);
+      if (hit) {
+        const direction = next.clone().sub(last).normalize();
+        points.push(last.clone().addScaledVector(direction, hit.timeOfImpact));
+        break;
+      }
+      points.push(next);
+      if (next.y <= 0.14) break;
+    }
+    this.arc.geometry.dispose();
+    this.arc.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    this.arc.computeLineDistances();
+    const end = points.at(-1)!;
+    this.blastPreview.position.set(end.x, 0.07, end.z);
+    this.aimRing.position.set(end.x, 0.08, end.z);
+  }
+
+  event(e: GameEvent) {
+    if (e.type === "shot") {
+      const from = new THREE.Vector3(e.from.x, e.from.y, e.from.z),
+        to = new THREE.Vector3(e.to.x, e.to.y, e.to.z);
+      const length = from.distanceTo(to);
+      const mesh = new THREE.Mesh(
+        unitCylinder,
+        new THREE.MeshBasicMaterial({
+          color: 0xffd17a,
+          transparent: true,
+          opacity: 0.8,
+          depthWrite: false,
+        }),
+      );
+      mesh.position.copy(from).add(to).multiplyScalar(0.5);
+      mesh.scale.set(0.013, length, 0.013);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        to.clone().sub(from).normalize(),
+      );
+      this.scene.add(mesh);
+      this.trails.push({ mesh, life: 0.055 });
+      this.flashes.set(e.actor, 0.048);
+      this.lightFlash.position.copy(from);
+      this.lightFlash.intensity = 2;
+      this.emit(
+        e.to,
+        e.material === "metal" ? 9 : 5,
+        e.material === "metal" ? 0xffc168 : 0x9e9b86,
+        2.7,
+        false,
+        0.05,
+      );
+      this.dummy.position.set(
+        e.to.x + e.normal.x * 0.013,
+        e.to.y + e.normal.y * 0.013,
+        e.to.z + e.normal.z * 0.013,
+      );
+      this.dummy.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(e.normal.x, e.normal.y, e.normal.z),
+      );
+      this.dummy.scale.setScalar(1);
+      this.dummy.updateMatrix();
+      // Decals on static concrete only: targets and crates can move.
+      if (e.material === "concrete") {
+        this.bulletMarks.setMatrixAt(this.markIndex % 180, this.dummy.matrix);
+        this.markIndex++;
+        this.bulletMarks.count = Math.min(180, this.markIndex);
+        this.bulletMarks.instanceMatrix.needsUpdate = true;
+      }
+    } else if (e.type === "explosion") {
+      this.emit(e.position, 30, 0xffb661, 11, false, 0.1);
+      this.emit(e.position, 35, 0x8e8a79, 4.2, true, 0.6);
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.96, 1, 64),
+        new THREE.MeshBasicMaterial({
+          color: 0xe5ce9c,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+        }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(e.position.x, 0.07, e.position.z);
+      this.scene.add(ring);
+      this.blastRings.push({ mesh: ring, age: 0 });
+      this.lightFlash.position.set(
+        e.position.x,
+        e.position.y + 1,
+        e.position.z,
+      );
+      this.lightFlash.intensity = 35;
+      this.shake = this.reducedMotion ? 0 : 0.11;
+    } else if (e.type === "down")
+      this.emit(e.position, 8, 0x848679, 1.8, false, 0.09);
+  }
+
+  private emit(
+    position: Vec3,
+    count: number,
+    color: number,
+    speed: number,
+    smoke: boolean,
+    size: number,
+  ) {
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= 400) this.particles.shift();
+      const angle = Math.random() * Math.PI * 2,
+        velocity = speed * (0.3 + Math.random() * 0.7),
+        life = smoke ? 0.65 + Math.random() * 0.8 : 0.13 + Math.random() * 0.32;
+      this.particles.push({
+        p: new THREE.Vector3(
+          position.x,
+          Math.max(0.08, position.y),
+          position.z,
+        ),
+        v: new THREE.Vector3(
+          Math.cos(angle) * velocity,
+          Math.random() * velocity * 0.8 + 0.5,
+          Math.sin(angle) * velocity,
+        ),
+        life,
+        max: life,
+        size: size * (0.5 + Math.random()),
+        color: new THREE.Color(color),
+        smoke,
+      });
+    }
+  }
+
+  render(alpha: number, delta: number, elapsed: number) {
+    this.updateCamera();
+    if (this.shake > 0) {
+      this.camera.position.x += (Math.random() - 0.5) * this.shake;
+      this.camera.position.y += (Math.random() - 0.5) * this.shake;
+      this.shake = Math.max(0, this.shake - delta * 0.6);
+    }
+    for (const a of this.sim.actors) {
+      const v = this.actors.get(a.id)!;
+      const p = a.body.translation();
+      v.root.position.set(
+        THREE.MathUtils.lerp(a.previous.x, p.x, alpha),
+        THREE.MathUtils.lerp(a.previous.y, p.y, alpha),
+        THREE.MathUtils.lerp(a.previous.z, p.z, alpha),
+      );
+      if (a.dead) {
+        const q = a.body.rotation();
+        v.root.quaternion
+          .set(
+            a.previousRotation.x,
+            a.previousRotation.y,
+            a.previousRotation.z,
+            a.previousRotation.w,
+          )
+          .slerp(new THREE.Quaternion(q.x, q.y, q.z, q.w), alpha);
+      } else {
+        v.root.rotation.set(0, a.yaw, 0);
+      }
+      const velocity = a.body.linvel(),
+        speed = Math.hypot(velocity.x, velocity.z);
+      const stride = a.dead || a.braced ? 0 : Math.min(0.5, speed * 0.12);
+      v.legs.forEach((leg, i) => {
+        leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
+      });
+      v.torso.rotation.x = a.dead ? 0 : a.braced ? -0.12 : -a.recoil * 0.13;
+      v.torso.rotation.z = a.dead
+        ? 0
+        : Math.sin(elapsed * 35) * (1 - a.stability) * 0.1;
+      v.ring.visible =
+        a.kind === "player" && this.sim.selected.has(a.id) && !a.dead;
+      v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
+      (v.ring.material as THREE.MeshBasicMaterial).color.set(
+        a.braced ? AMBER : MINT,
+      );
+      v.health.visible =
+        !a.dead &&
+        a.hp < a.maxHp &&
+        (this.sim.time - a.hitTime < 4 || a.kind === "player");
+      v.health.position.set(
+        v.root.position.x,
+        v.root.position.y + 1.25,
+        v.root.position.z,
+      );
+      v.health.scale.x = Math.max(0.1, (a.hp / a.maxHp) * 1.3);
+      const flash = (this.flashes.get(a.id) ?? 0) - delta;
+      this.flashes.set(a.id, flash);
+      v.flash.visible = flash > 0 && !a.dead;
+    }
+    for (const p of this.sim.props) {
+      const visual = this.props.get(p.id)!;
+      const position = p.body.translation(),
+        q = p.body.rotation();
+      visual.position.set(
+        THREE.MathUtils.lerp(p.previous.x, position.x, alpha),
+        THREE.MathUtils.lerp(p.previous.y, position.y, alpha),
+        THREE.MathUtils.lerp(p.previous.z, position.z, alpha),
+      );
+      visual.quaternion
+        .set(
+          p.previousRotation.x,
+          p.previousRotation.y,
+          p.previousRotation.z,
+          p.previousRotation.w,
+        )
+        .slerp(new THREE.Quaternion(q.x, q.y, q.z, q.w), alpha);
+    }
+    for (const [id, visual] of this.grenades)
+      if (!this.sim.grenades.some((g) => g.id === id)) {
+        this.dynamic.remove(visual);
+        this.grenades.delete(id);
+      }
+    for (const g of this.sim.grenades) {
+      if (!this.grenades.has(g.id)) {
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(unitSphere, yellow);
+        body.scale.set(0.16, 0.19, 0.16);
+        group.add(body);
+        box(group, 0.07, 0.15, 0.04, 0.02, 0.2, 0, silver);
+        const marker = new THREE.Mesh(unitSphere, glow);
+        marker.scale.setScalar(0.045);
+        marker.position.y = 0.27;
+        group.add(marker);
+        this.dynamic.add(group);
+        this.grenades.set(g.id, group);
+      }
+      const visual = this.grenades.get(g.id)!;
+      const position = g.body.translation(),
+        q = g.body.rotation();
+      visual.position.set(
+        THREE.MathUtils.lerp(g.previous.x, position.x, alpha),
+        THREE.MathUtils.lerp(g.previous.y, position.y, alpha),
+        THREE.MathUtils.lerp(g.previous.z, position.z, alpha),
+      );
+      visual.quaternion.set(q.x, q.y, q.z, q.w);
+      visual.children[2].visible =
+        Math.sin(g.fuse * (g.fuse < 0.6 ? 35 : 18)) > 0;
+    }
+    for (const t of this.trails) {
+      t.life -= delta;
+      (t.mesh.material as THREE.MeshBasicMaterial).opacity =
+        Math.max(0, t.life / 0.055) * 0.8;
+    }
+    this.trails = this.trails.filter((t) => {
+      if (t.life > 0) return true;
+      this.scene.remove(t.mesh);
+      (t.mesh.material as THREE.Material).dispose();
+      return false;
+    });
+    this.particles = this.particles.filter((p) => p.life > 0);
+    this.particleMesh.count = this.particles.length;
+    this.particles.forEach((p, i) => {
+      p.life -= delta;
+      p.p.addScaledVector(p.v, delta);
+      p.v.y -= (p.smoke ? -0.6 : 10) * delta;
+      p.v.multiplyScalar(Math.exp(-delta * (p.smoke ? 2.2 : 0.8)));
+      if (p.p.y < 0.05) {
+        p.p.y = 0.05;
+        p.v.y *= -0.2;
+        p.v.x *= 0.8;
+        p.v.z *= 0.8;
+      }
+      this.dummy.position.copy(p.p);
+      this.dummy.quaternion.identity();
+      this.dummy.scale.setScalar(
+        Math.max(
+          0.001,
+          p.size * (p.smoke ? 1.5 - p.life / p.max : p.life / p.max),
+        ),
+      );
+      this.dummy.updateMatrix();
+      this.particleMesh.setMatrixAt(i, this.dummy.matrix);
+      this.particleMesh.setColorAt(
+        i,
+        p.color
+          .clone()
+          .multiplyScalar(p.smoke ? 0.5 + (0.5 * p.life) / p.max : 1),
+      );
+    });
+    this.particleMesh.instanceMatrix.needsUpdate = true;
+    if (this.particleMesh.instanceColor)
+      this.particleMesh.instanceColor.needsUpdate = true;
+    for (const b of this.blastRings) {
+      b.age += delta;
+      b.mesh.scale.setScalar(0.2 + b.age * 15);
+      (b.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(
+        0,
+        0.5 - b.age,
+      );
+    }
+    this.blastRings = this.blastRings.filter((b) => {
+      if (b.age < 0.5) return true;
+      this.scene.remove(b.mesh);
+      b.mesh.geometry.dispose();
+      (b.mesh.material as THREE.Material).dispose();
+      return false;
+    });
+    this.destinationAge += delta;
+    this.destination.visible = this.destinationAge < 1.5;
+    (this.destination.material as THREE.MeshBasicMaterial).opacity = Math.max(
+      0,
+      1 - this.destinationAge / 1.5,
+    );
+    this.lightFlash.intensity *= Math.exp(-delta * 22);
+    this.renderer.render(this.scene, this.camera);
+  }
+}

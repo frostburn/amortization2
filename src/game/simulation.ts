@@ -1,0 +1,767 @@
+import RAPIER from "@dimforge/rapier3d-compat";
+import {
+  BARRIERS,
+  BLAST_RADIUS,
+  BOUNDS,
+  GRAVITY,
+  GRENADE_FUSE,
+  MAGAZINE,
+  PLAYER_SPAWNS,
+  PROP_SPAWNS,
+  RELOAD_SECONDS,
+  SHOT_INTERVAL,
+  STEP,
+  TARGET_SPAWNS,
+  clamp,
+  distance2,
+  grenadeVelocity,
+  type Vec2,
+  type Vec3,
+} from "./config";
+import { findPath } from "./navigation";
+
+export type ActorKind = "player" | "plate" | "heavy" | "moving" | "blast";
+export interface Actor {
+  id: number;
+  kind: ActorKind;
+  body: RAPIER.RigidBody;
+  collider: RAPIER.Collider;
+  spawn: Vec3;
+  hp: number;
+  maxHp: number;
+  stability: number;
+  yaw: number;
+  ammo: number;
+  reload: number;
+  shotWait: number;
+  firing: boolean;
+  braced: boolean;
+  path: Vec2[];
+  hitTime: number;
+  dead: boolean;
+  recoil: number;
+  previous: Vec3;
+  previousRotation: { x: number; y: number; z: number; w: number };
+  killedBy?: "gun" | "grenade";
+}
+export interface Prop {
+  id: number;
+  body: RAPIER.RigidBody;
+  w: number;
+  h: number;
+  d: number;
+  previous: Vec3;
+  previousRotation: { x: number; y: number; z: number; w: number };
+}
+export interface Grenade {
+  id: number;
+  body: RAPIER.RigidBody;
+  fuse: number;
+  owner: number;
+  previous: Vec3;
+  bounceWait: number;
+  lastVelocity: Vec3;
+}
+export type GameEvent =
+  | {
+      type: "shot";
+      actor: number;
+      from: Vec3;
+      to: Vec3;
+      hit: boolean;
+      material: "metal" | "concrete";
+      normal: Vec3;
+    }
+  | { type: "explosion"; position: Vec3; affected: number }
+  | {
+      type: "throw" | "bounce" | "reload" | "empty" | "down";
+      position: Vec3;
+      actor?: number;
+    }
+  | { type: "drill"; message: string };
+
+const vcopy = (v: Vec3): Vec3 => ({ x: v.x, y: v.y, z: v.z });
+
+export class Simulation {
+  world!: RAPIER.World;
+  actors: Actor[] = [];
+  props: Prop[] = [];
+  grenades: Grenade[] = [];
+  events: GameEvent[] = [];
+  selected = new Set([1]);
+  aim: Vec3 = { x: -14, y: 1.2, z: -8 };
+  trigger = false;
+  weapon: "gun" | "grenade" = "gun";
+  time = 0;
+  shots = 0;
+  hits = 0;
+  throws = 0;
+  grenadeHits = 0;
+  maxDisplacement = 0;
+  drill = { gun: false, impulse: false, grenade: false };
+  grenadeCooldown = 0;
+  private randomState = 1729;
+  private nextId = 100;
+
+  static async create() {
+    await RAPIER.init();
+    return new Simulation();
+  }
+  private constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.world?.free();
+    this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
+    this.world.timestep = STEP;
+    this.actors = [];
+    this.props = [];
+    this.grenades = [];
+    this.events = [];
+    this.selected = new Set([1]);
+    this.trigger = false;
+    this.weapon = "gun";
+    this.time = 0;
+    this.shots = 0;
+    this.hits = 0;
+    this.throws = 0;
+    this.grenadeHits = 0;
+    this.maxDisplacement = 0;
+    this.grenadeCooldown = 0;
+    this.randomState = 1729;
+    this.nextId = 100;
+    this.drill = { gun: false, impulse: false, grenade: false };
+    const floor = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0),
+    );
+    this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setFriction(0.8),
+      floor,
+    );
+    for (const box of BARRIERS) {
+      const body = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, box.h / 2, box.z),
+      );
+      this.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2).setFriction(
+          0.8,
+        ),
+        body,
+      );
+    }
+    PLAYER_SPAWNS.forEach((p, i) => this.addActor(i + 1, "player", p.x, p.z));
+    TARGET_SPAWNS.forEach((p, i) => this.addActor(i + 10, p.kind, p.x, p.z));
+    for (const p of PROP_SPAWNS) {
+      const body = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(p.x, p.h / 2 + 0.01, p.z)
+          .setLinearDamping(0.5)
+          .setAngularDamping(2),
+      );
+      this.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(p.w / 2, p.h / 2, p.d / 2)
+          .setMass(p.mass)
+          .setFriction(0.65)
+          .setRestitution(0.05),
+        body,
+      );
+      this.props.push({
+        id: this.nextId++,
+        body,
+        w: p.w,
+        h: p.h,
+        d: p.d,
+        previous: vcopy(body.translation()),
+        previousRotation: { ...body.rotation() },
+      });
+    }
+    // Populate scene-query acceleration structures before the first input event.
+    this.world.step();
+  }
+
+  private addActor(id: number, kind: ActorKind, x: number, z: number) {
+    const player = kind === "player";
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(x, 0.98, z)
+        .lockRotations()
+        .setLinearDamping(player ? 0.3 : 1.5)
+        .setAngularDamping(5)
+        .setCcdEnabled(true),
+    );
+    const shape = player
+      ? RAPIER.ColliderDesc.capsule(0.56, 0.37)
+      : RAPIER.ColliderDesc.cuboid(0.48, 0.96, 0.3);
+    const collider = this.world.createCollider(
+      shape
+        .setMass(player ? 90 : kind === "plate" ? 90 : 48)
+        .setFriction(player ? 0.3 : 0.42)
+        .setRestitution(0),
+      body,
+    );
+    const hp = player
+      ? 160
+      : kind === "heavy"
+        ? 420
+        : kind === "moving"
+          ? 168
+          : 84;
+    this.actors.push({
+      id,
+      kind,
+      body,
+      collider,
+      spawn: { x, y: 0.98, z },
+      hp,
+      maxHp: hp,
+      stability: 1,
+      yaw: player ? Math.PI : 0,
+      ammo: MAGAZINE,
+      reload: 0,
+      shotWait: 0,
+      firing: false,
+      braced: false,
+      path: [],
+      hitTime: -10,
+      dead: false,
+      recoil: 0,
+      previous: { x, y: 0.98, z },
+      previousRotation: { ...body.rotation() },
+    });
+  }
+
+  random() {
+    this.randomState ^= this.randomState << 13;
+    this.randomState ^= this.randomState >>> 17;
+    this.randomState ^= this.randomState << 5;
+    return (this.randomState >>> 0) / 4294967296;
+  }
+  get squad() {
+    return this.actors.filter((a) => a.kind === "player");
+  }
+  get active() {
+    return this.squad.filter((a) => this.selected.has(a.id) && !a.dead);
+  }
+  get primary() {
+    return this.active[0] ?? this.squad[0];
+  }
+  get destroyed() {
+    return this.actors.filter((a) => a.kind !== "player" && a.dead).length;
+  }
+
+  select(id: number, additive = false) {
+    if (id === 5)
+      this.selected = new Set(
+        this.squad.filter((a) => !a.dead).map((a) => a.id),
+      );
+    else if (additive) {
+      if (this.selected.has(id) && this.selected.size > 1)
+        this.selected.delete(id);
+      else this.selected.add(id);
+    } else this.selected = new Set([id]);
+    this.release();
+  }
+
+  release() {
+    this.trigger = false;
+    for (const a of this.squad) {
+      a.firing = false;
+      a.braced = false;
+    }
+  }
+  setBrace(braced: boolean) {
+    for (const a of this.active) a.braced = braced;
+  }
+  move(point: Vec2, queue = false) {
+    this.active.forEach((actor, i, active) => {
+      actor.braced = false;
+      const goal = {
+        x: clamp(
+          point.x + (i - (active.length - 1) / 2) * 1.65,
+          BOUNDS.left + 1,
+          BOUNDS.right - 1,
+        ),
+        z: clamp(point.z, BOUNDS.back + 1, BOUNDS.front - 1),
+      };
+      const start =
+        queue && actor.path.length
+          ? actor.path.at(-1)!
+          : actor.body.translation();
+      const dynamicBoxes = this.props.map((p) => ({
+        x: p.body.translation().x,
+        z: p.body.translation().z,
+        w: p.w,
+        d: p.d,
+      }));
+      const path = findPath(start, goal, [...BARRIERS, ...dynamicBoxes]);
+      actor.path = queue ? [...actor.path, ...path] : path;
+    });
+  }
+
+  reloadSelected() {
+    for (const a of this.active) this.reloadActor(a);
+  }
+  private reloadActor(a: Actor) {
+    if (a.reload > 0 || a.ammo === MAGAZINE || a.dead) return;
+    a.reload = RELOAD_SECONDS;
+    a.firing = false;
+    this.events.push({
+      type: "reload",
+      actor: a.id,
+      position: vcopy(a.body.translation()),
+    });
+  }
+
+  muzzle(a: Actor, toward: Vec3 = this.aim): Vec3 {
+    const p = a.body.translation();
+    const dx = toward.x - p.x,
+      dz = toward.z - p.z,
+      length = Math.hypot(dx, dz) || 1;
+    return {
+      x: p.x + (dx / length) * 0.86 + (dz / length) * 0.27,
+      y: p.y + 0.42,
+      z: p.z + (dz / length) * 0.86 - (dx / length) * 0.27,
+    };
+  }
+
+  ray(
+    from: Vec3,
+    to: Vec3,
+    exclude?: RAPIER.RigidBody,
+    predicate?: (collider: RAPIER.Collider) => boolean,
+  ) {
+    const length = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+    if (length < 0.001) return null;
+    return this.world.castRayAndGetNormal(
+      new RAPIER.Ray(from, {
+        x: (to.x - from.x) / length,
+        y: (to.y - from.y) / length,
+        z: (to.z - from.z) / length,
+      }),
+      length,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      exclude,
+      predicate,
+    );
+  }
+
+  shoot(a: Actor) {
+    if (a.dead || a.ammo <= 0 || a.reload > 0) return;
+    const from = this.muzzle(a);
+    const delta = {
+      x: this.aim.x - from.x,
+      y: this.aim.y - from.y,
+      z: this.aim.z - from.z,
+    };
+    const length = Math.hypot(delta.x, delta.y, delta.z) || 1;
+    const spread = a.braced
+      ? 0.005
+      : 0.008 + a.recoil * 0.011 + (a.path.length ? 0.014 : 0);
+    const dir = {
+      x: delta.x / length + (this.random() - 0.5) * spread,
+      y: delta.y / length + (this.random() - 0.5) * spread,
+      z: delta.z / length + (this.random() - 0.5) * spread,
+    };
+    const norm = Math.hypot(dir.x, dir.y, dir.z);
+    dir.x /= norm;
+    dir.y /= norm;
+    dir.z /= norm;
+    const hit = this.world.castRayAndGetNormal(
+      new RAPIER.Ray(from, dir),
+      65,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      a.body,
+    );
+    const distance = hit?.timeOfImpact ?? 55;
+    const to = {
+      x: from.x + dir.x * distance,
+      y: from.y + dir.y * distance,
+      z: from.z + dir.z * distance,
+    };
+    const target =
+      hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
+    if (target && !target.dead) {
+      this.damage(
+        target,
+        target.kind === "player" ? 6 : 14,
+        { x: dir.x * 48, y: dir.y * 12, z: dir.z * 48 },
+        to,
+        "gun",
+      );
+      if (target.kind !== "player") this.hits++;
+    } else if (hit?.collider.parent()?.isDynamic()) {
+      hit.collider
+        .parent()!
+        .applyImpulseAtPoint(
+          { x: dir.x * 18, y: dir.y * 18, z: dir.z * 18 },
+          to,
+          true,
+        );
+    }
+    a.ammo--;
+    a.recoil = Math.min(1, a.recoil + 0.15);
+    this.shots++;
+    a.body.applyImpulse(
+      { x: -dir.x * (a.braced ? 1 : 5), y: 0, z: -dir.z * (a.braced ? 1 : 5) },
+      true,
+    );
+    this.events.push({
+      type: "shot",
+      actor: a.id,
+      from,
+      to,
+      hit: !!target && target.kind !== "player",
+      material:
+        target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
+      normal: hit ? vcopy(hit.normal) : { x: 0, y: 1, z: 0 },
+    });
+  }
+
+  damage(
+    a: Actor,
+    amount: number,
+    impulse: Vec3,
+    point: Vec3,
+    source?: "gun" | "grenade",
+  ) {
+    const multiplier = a.braced ? 0.28 : 1;
+    a.body.applyImpulseAtPoint(
+      {
+        x: impulse.x * multiplier,
+        y: impulse.y * multiplier,
+        z: impulse.z * multiplier,
+      },
+      point,
+      true,
+    );
+    if (a.dead) return;
+    a.hp = Math.max(0, a.hp - amount);
+    a.hitTime = this.time;
+    a.stability = Math.max(0, a.stability - (a.braced ? 0.05 : 0.16));
+    if (a.hp <= 0) {
+      a.dead = true;
+      a.killedBy = source;
+      a.firing = false;
+      a.path = [];
+      a.body.setEnabledRotations(true, true, true, true);
+      a.body.applyTorqueImpulse(
+        { x: impulse.z * 0.28, y: 0, z: -impulse.x * 0.28 },
+        true,
+      );
+      a.body.setLinearDamping(1.2);
+      this.events.push({
+        type: "down",
+        actor: a.id,
+        position: vcopy(a.body.translation()),
+      });
+    }
+  }
+
+  grenadeOrigin(actor: Actor, point: Vec2): Vec3 {
+    const p = actor.body.translation();
+    const dx = point.x - p.x,
+      dz = point.z - p.z,
+      distance = Math.hypot(dx, dz) || 1;
+    return {
+      x: p.x + (dx / distance) * 0.7,
+      y: p.y + 0.76,
+      z: p.z + (dz / distance) * 0.7,
+    };
+  }
+
+  throwGrenade(point: Vec2): boolean {
+    if (this.grenadeCooldown > 0 || !this.active.length) return false;
+    const actor = this.primary;
+    const from = this.grenadeOrigin(actor, point);
+    const { velocity } = grenadeVelocity(from, point);
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(from.x, from.y, from.z)
+        .setLinvel(velocity.x, velocity.y, velocity.z)
+        .setAngvel({ x: 8, y: 5, z: 3 })
+        .setLinearDamping(0.02)
+        .setAngularDamping(0.6)
+        .setCcdEnabled(true),
+    );
+    this.world.createCollider(
+      RAPIER.ColliderDesc.ball(0.14)
+        .setMass(0.65)
+        .setRestitution(0.44)
+        .setFriction(0.7),
+      body,
+    );
+    this.grenades.push({
+      id: this.nextId++,
+      body,
+      fuse: GRENADE_FUSE,
+      owner: actor.id,
+      previous: from,
+      bounceWait: 0.1,
+      lastVelocity: velocity,
+    });
+    this.grenadeCooldown = 0.8;
+    this.throws++;
+    this.events.push({ type: "throw", actor: actor.id, position: from });
+    return true;
+  }
+
+  blastExposure(origin: Vec3, actor: Actor): number {
+    const p = actor.body.translation();
+    let visible = 0;
+    for (const y of [0.25, 0.75, 1.35]) {
+      const sample = { x: p.x, y: p.y - 0.96 + y, z: p.z };
+      const hit = this.ray(
+        origin,
+        sample,
+        actor.body,
+        (c) => !this.grenades.some((g) => g.body.handle === c.parent()?.handle),
+      );
+      if (!hit) visible++;
+    }
+    return visible / 3;
+  }
+
+  explode(grenade: Grenade) {
+    const origin = vcopy(grenade.body.translation());
+    origin.y = Math.max(0.18, origin.y);
+    this.world.removeRigidBody(grenade.body);
+    this.grenades = this.grenades.filter((g) => g !== grenade);
+    let affected = 0;
+    for (const a of this.actors) {
+      const p = a.body.translation();
+      const dx = p.x - origin.x,
+        dz = p.z - origin.z,
+        distance = Math.hypot(dx, p.y - origin.y, dz);
+      if (distance >= BLAST_RADIUS) continue;
+      const exposure = this.blastExposure(origin, a);
+      if (!exposure) continue;
+      const falloff = 1 - distance / BLAST_RADIUS;
+      const strength = 550 * falloff * exposure;
+      const wasAlive = !a.dead;
+      this.damage(
+        a,
+        210 * Math.sqrt(falloff) * exposure,
+        {
+          x: (dx / Math.max(0.4, distance)) * strength,
+          y: Math.min(85, strength * 0.18),
+          z: (dz / Math.max(0.4, distance)) * strength,
+        },
+        p,
+        "grenade",
+      );
+      if (a.kind !== "player" && wasAlive) {
+        affected++;
+        this.grenadeHits++;
+      }
+    }
+    for (const p of this.props) {
+      const position = p.body.translation();
+      const distance = Math.hypot(
+        position.x - origin.x,
+        position.y - origin.y,
+        position.z - origin.z,
+      );
+      if (distance >= BLAST_RADIUS || this.ray(origin, position, p.body))
+        continue;
+      const strength = 280 * (1 - distance / BLAST_RADIUS);
+      p.body.applyImpulse(
+        {
+          x: ((position.x - origin.x) / Math.max(0.4, distance)) * strength,
+          y: strength * 0.32,
+          z: ((position.z - origin.z) / Math.max(0.4, distance)) * strength,
+        },
+        true,
+      );
+      p.body.applyTorqueImpulse(
+        { x: strength * 0.1, y: 0.4, z: strength * 0.06 },
+        true,
+      );
+    }
+    this.events.push({ type: "explosion", position: origin, affected });
+  }
+
+  step() {
+    this.time += STEP;
+    this.grenadeCooldown = Math.max(0, this.grenadeCooldown - STEP);
+    for (const a of this.actors) {
+      a.previous = vcopy(a.body.translation());
+      a.previousRotation = { ...a.body.rotation() };
+      a.recoil = Math.max(0, a.recoil - STEP * 1.1);
+      a.shotWait -= STEP;
+      if (a.dead) continue;
+      if (this.time - a.hitTime > 0.35)
+        a.stability = Math.min(1, a.stability + STEP * (a.braced ? 1.5 : 0.6));
+      if (a.kind === "heavy")
+        this.maxDisplacement = Math.max(
+          this.maxDisplacement,
+          distance2(a.body.translation(), a.spawn),
+        );
+      if (a.reload > 0) {
+        a.reload -= STEP;
+        if (a.reload <= 0) {
+          a.reload = 0;
+          a.ammo = MAGAZINE;
+        }
+      }
+      if (a.kind === "player") {
+        const selected = this.selected.has(a.id);
+        const fire =
+          selected && this.trigger && this.weapon === "gun" && a.reload === 0;
+        a.firing = fire && a.ammo > 0;
+        if (fire && a.shotWait <= 0 && a.ammo > 0) {
+          this.shoot(a);
+          a.shotWait = SHOT_INTERVAL + Math.max(-STEP, a.shotWait);
+        }
+        if (fire && a.ammo === 0) this.reloadActor(a);
+        this.drive(a);
+        if (selected) {
+          const p = a.body.translation();
+          const desired = Math.atan2(this.aim.x - p.x, this.aim.z - p.z);
+          const diff = Math.atan2(
+            Math.sin(desired - a.yaw),
+            Math.cos(desired - a.yaw),
+          );
+          a.yaw += clamp(diff, -STEP * 9, STEP * 9);
+        } else if (a.path[0]) {
+          a.yaw = Math.atan2(
+            a.path[0].x - a.body.translation().x,
+            a.path[0].z - a.body.translation().z,
+          );
+        }
+      } else if (a.kind === "moving" && this.time - a.hitTime > 0.8) {
+        const p = a.body.translation(),
+          vel = a.body.linvel();
+        const desired =
+          (a.spawn.x + Math.sin(this.time * 0.75) * 2.1 - p.x) * 2.4;
+        a.body.applyImpulse(
+          {
+            x: clamp(desired - vel.x, -0.3, 0.3) * a.body.mass(),
+            y: 0,
+            z: clamp((a.spawn.z - p.z) * 2 - vel.z, -0.3, 0.3) * a.body.mass(),
+          },
+          true,
+        );
+      }
+    }
+    for (const p of this.props) {
+      p.previous = vcopy(p.body.translation());
+      p.previousRotation = { ...p.body.rotation() };
+    }
+    for (const g of this.grenades) {
+      g.previous = vcopy(g.body.translation());
+      g.lastVelocity = vcopy(g.body.linvel());
+    }
+    this.world.step();
+    for (const g of [...this.grenades]) {
+      g.fuse -= STEP;
+      g.bounceWait -= STEP;
+      const v = g.body.linvel();
+      if (
+        g.bounceWait <= 0 &&
+        g.lastVelocity.y < -0.8 &&
+        v.y > g.lastVelocity.y + 1.2
+      ) {
+        this.events.push({
+          type: "bounce",
+          position: vcopy(g.body.translation()),
+        });
+        g.bounceWait = 0.1;
+      }
+      if (g.fuse <= 0) this.explode(g);
+    }
+    this.checkDrills();
+  }
+
+  private drive(a: Actor) {
+    const p = a.body.translation(),
+      v = a.body.linvel();
+    while (a.path.length && distance2(p, a.path[0]) < 0.38) a.path.shift();
+    let dx = 0,
+      dz = 0;
+    if (a.path.length && !a.braced) {
+      const target = a.path[0],
+        distance = distance2(p, target) || 1;
+      const speed = a.firing ? 2.6 : 4.2;
+      dx = ((target.x - p.x) / distance) * speed;
+      dz = ((target.z - p.z) / distance) * speed;
+      for (const other of this.squad)
+        if (other !== a && !other.dead) {
+          const q = other.body.translation(),
+            d = distance2(p, q);
+          if (d < 1.4 && d > 0.01) {
+            dx += ((p.x - q.x) / d) * (1.4 - d) * 3;
+            dz += ((p.z - q.z) / d) * (1.4 - d) * 3;
+          }
+        }
+    }
+    // Finite acceleration preserves externally imparted velocity and permits lateral recovery.
+    const acceleration = (a.braced ? 40 : 13) * (0.35 + a.stability * 0.65);
+    const ix = dx - v.x,
+      iz = dz - v.z,
+      length = Math.hypot(ix, iz) || 1;
+    const amount = Math.min(length, acceleration * STEP) * a.body.mass();
+    if (p.y < 1.1)
+      a.body.applyImpulse(
+        { x: (ix / length) * amount, y: 0, z: (iz / length) * amount },
+        true,
+      );
+  }
+
+  private checkDrills() {
+    const checks = {
+      gun: this.actors.filter((a) => a.kind === "plate").every((a) => a.dead),
+      impulse: this.maxDisplacement >= 2,
+      grenade: this.actors
+        .filter((a) => a.kind === "blast")
+        .every((a) => a.dead && a.killedBy === "grenade"),
+    };
+    const messages = {
+      gun: "Firing drill complete. Six targets down.",
+      impulse: "Displacement drill complete. Two metres of ground gained.",
+      grenade: "Grenade bay cleared. Blast drill complete.",
+    };
+    for (const key of ["gun", "impulse", "grenade"] as const)
+      if (checks[key] && !this.drill[key]) {
+        this.drill[key] = true;
+        this.events.push({ type: "drill", message: messages[key] });
+      }
+  }
+
+  inspect() {
+    return {
+      time: this.time,
+      shots: this.shots,
+      hits: this.hits,
+      throws: this.throws,
+      grenadeHits: this.grenadeHits,
+      destroyed: this.destroyed,
+      maxDisplacement: this.maxDisplacement,
+      drills: { ...this.drill },
+      weapon: this.weapon,
+      selected: [...this.selected],
+      grenades: this.grenades.map((g) => ({
+        id: g.id,
+        fuse: g.fuse,
+        position: vcopy(g.body.translation()),
+      })),
+      actors: this.actors.map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        hp: a.hp,
+        killedBy: a.killedBy,
+        ammo: a.ammo,
+        reload: a.reload,
+        braced: a.braced,
+        position: vcopy(a.body.translation()),
+        path: a.path.map((v) => ({ ...v })),
+      })),
+    };
+  }
+}
