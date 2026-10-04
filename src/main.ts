@@ -1,6 +1,6 @@
 import "./style.css";
 import { mountUI, updateUI } from "./ui";
-import { STEP, type Vec3 } from "./game/config";
+import { STEP, clamp, distance2, type Vec2, type Vec3 } from "./game/config";
 import { RangeAudio } from "./audio/audio";
 
 const { canvas, dialog } = mountUI();
@@ -21,6 +21,15 @@ async function start() {
   let pointer = { x: 0, y: 0, inside: false },
     ground: Vec3 = { x: -14, y: 0, z: -7 };
   let middleDrag: { x: number; y: number } | null = null;
+  let selectionDrag: {
+    x: number;
+    y: number;
+    actor?: number;
+    dragged: boolean;
+  } | null = null;
+  let moveDrag: { queued: boolean; lastGoal: Vec2; lastTime: number } | null =
+    null;
+  const selectionBox = document.getElementById("selection-box")!;
   const keys = new Set<string>();
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   const toast = (message: string) => {
@@ -77,7 +86,7 @@ async function start() {
     sim.release();
     audio.stop();
     keys.clear();
-    middleDrag = null;
+    cancelDrags();
     accumulator = 0;
     document.getElementById("menu-title")!.textContent = title;
     document.getElementById("resume")!.innerHTML =
@@ -102,6 +111,8 @@ async function start() {
     canvas.focus();
   }
   function reset() {
+    cancelDrags();
+    keys.clear();
     sim.reset();
     scene.resetDynamic();
     scene.resetCamera();
@@ -132,7 +143,9 @@ async function start() {
       saveSettings();
     } catch {
       audio.failed = true;
-      toast("Audio is unavailable in this browser. The range is still playable.");
+      toast(
+        "Audio is unavailable in this browser. The range is still playable.",
+      );
     }
     updateUI(sim, audio);
   });
@@ -180,8 +193,50 @@ async function start() {
     }
     return result;
   };
-  canvas.addEventListener("pointermove", (e) => {
-    pointer = { x: e.clientX, y: e.clientY, inside: true };
+  function cancelDrags() {
+    selectionDrag = null;
+    moveDrag = null;
+    middleDrag = null;
+    selectionBox.hidden = true;
+  }
+  function updatePointer(e: MouseEvent) {
+    const rect = canvas.getBoundingClientRect();
+    pointer = {
+      x: clamp(e.clientX, rect.left, rect.right),
+      y: clamp(e.clientY, rect.top, rect.bottom),
+      inside:
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom,
+    };
+  }
+  function updateMove(force = false) {
+    if (!moveDrag || moveDrag.queued) return;
+    // Replan at most 12.5 times per second, preserving momentum between orders.
+    if (
+      !force &&
+      (sim.time - moveDrag.lastTime < 0.08 ||
+        distance2(ground, moveDrag.lastGoal) < 0.15)
+    )
+      return;
+    if (force && distance2(ground, moveDrag.lastGoal) < 0.01) return;
+    sim.move(ground);
+    scene.markDestination(ground);
+    moveDrag.lastGoal = { x: ground.x, z: ground.z };
+    moveDrag.lastTime = sim.time;
+  }
+  // Mouse events retain per-button transitions when firing and steering together.
+  window.addEventListener("mousemove", (e) => {
+    if (paused) return;
+    updatePointer(e);
+    if (!(e.buttons & 1)) {
+      sim.trigger = false;
+      selectionDrag = null;
+      selectionBox.hidden = true;
+    }
+    if (!(e.buttons & 2)) moveDrag = null;
+    if (!(e.buttons & 4)) middleDrag = null;
     if (middleDrag) {
       scene.pan(
         (middleDrag.x - e.clientX) * 0.03,
@@ -189,35 +244,99 @@ async function start() {
       );
       middleDrag = { x: e.clientX, y: e.clientY };
     }
-    if (!paused) aimAtPointer();
+    if (!pointer.inside) sim.trigger = false;
+    if (selectionDrag) {
+      const rect = canvas.getBoundingClientRect();
+      selectionDrag.dragged ||=
+        Math.hypot(pointer.x - selectionDrag.x, pointer.y - selectionDrag.y) >=
+        4;
+      selectionBox.hidden = !selectionDrag.dragged;
+      selectionBox.style.left = `${Math.min(selectionDrag.x, pointer.x) - rect.left}px`;
+      selectionBox.style.top = `${Math.min(selectionDrag.y, pointer.y) - rect.top}px`;
+      selectionBox.style.width = `${Math.abs(pointer.x - selectionDrag.x)}px`;
+      selectionBox.style.height = `${Math.abs(pointer.y - selectionDrag.y)}px`;
+    }
+    aimAtPointer();
+    if (moveDrag?.queued) scene.markDestination(ground);
   });
-  canvas.addEventListener("pointerleave", () => {
-    pointer.inside = false;
-    sim.trigger = false;
-    middleDrag = null;
-  });
-  canvas.addEventListener("pointerdown", (e) => {
+  canvas.addEventListener("mousedown", (e) => {
     if (paused) return;
     e.preventDefault();
     canvas.focus();
-    pointer = { x: e.clientX, y: e.clientY, inside: true };
+    updatePointer(e);
     const picked = aimAtPointer();
     if (e.button === 2) {
-      sim.move(ground, e.shiftKey);
+      selectionDrag = null;
+      selectionBox.hidden = true;
+      moveDrag = {
+        queued: e.shiftKey,
+        lastGoal: { x: ground.x, z: ground.z },
+        lastTime: sim.time,
+      };
+      if (!e.shiftKey) sim.move(ground);
       scene.markDestination(ground);
     } else if (e.button === 1) middleDrag = { x: e.clientX, y: e.clientY };
     else if (e.button === 0) {
-      if (sim.weapon === "grenade") {
+      if (e.shiftKey) {
+        moveDrag = null;
+        sim.release();
+        selectionDrag = {
+          x: pointer.x,
+          y: pointer.y,
+          actor: picked?.actor,
+          dragged: false,
+        };
+      } else if (sim.weapon === "grenade") {
         if (sim.throwGrenade(ground))
           toast("Grenade away. Keep clear of the blast.");
+        else if (sim.active.length)
+          toast(
+            `Grenades rearming. Ready in ${sim.grenadeCooldown.toFixed(1)} s.`,
+          );
+        updateUI(sim, audio);
       } else if (picked?.actor && picked.actor <= 4 && !e.ctrlKey)
         sim.select(picked.actor, e.shiftKey);
       else sim.trigger = true;
     }
   });
-  window.addEventListener("pointerup", (e) => {
-    if (e.button === 0) sim.trigger = false;
+  window.addEventListener("mouseup", (e) => {
+    if (paused) return;
+    updatePointer(e);
+    if (e.button === 0) {
+      sim.trigger = false;
+      if (selectionDrag?.dragged) {
+        const left = Math.min(selectionDrag.x, pointer.x),
+          right = Math.max(selectionDrag.x, pointer.x);
+        const top = Math.min(selectionDrag.y, pointer.y),
+          bottom = Math.max(selectionDrag.y, pointer.y);
+        sim.selectGroup(
+          sim.squad
+            .filter((a) => {
+              const p = scene.project(a.body.translation());
+              return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
+            })
+            .map((a) => a.id),
+        );
+      } else if (selectionDrag?.actor && selectionDrag.actor <= 4) {
+        sim.select(selectionDrag.actor, true);
+      }
+      selectionDrag = null;
+      selectionBox.hidden = true;
+      updateUI(sim, audio);
+    }
+    if (e.button === 2 && moveDrag) {
+      aimAtPointer();
+      if (moveDrag.queued) {
+        sim.move(ground, true);
+        scene.markDestination(ground);
+      } else updateMove(true);
+      moveDrag = null;
+    }
     if (e.button === 1) middleDrag = null;
+  });
+  canvas.addEventListener("pointercancel", () => {
+    cancelDrags();
+    sim.release();
   });
   const isForm = (target: EventTarget | null) =>
     target instanceof HTMLInputElement ||
@@ -310,6 +429,7 @@ async function start() {
       if (keys.has("KeyW")) scene.pan(0, -panSpeed);
       if (keys.has("KeyS")) scene.pan(0, panSpeed);
       if (pointer.inside) aimAtPointer();
+      updateMove();
       accumulator += delta;
       let steps = 0;
       while (accumulator >= STEP && steps < 6) {
@@ -318,7 +438,7 @@ async function start() {
         steps++;
       }
       if (steps === 6) accumulator = Math.min(accumulator, STEP);
-      scene.updateAim(ground, pointer.inside);
+      scene.updateAim(ground, pointer.inside && !selectionDrag);
     } else scene.updateAim(ground, false);
     for (const event of sim.events.splice(0)) {
       scene.event(event);

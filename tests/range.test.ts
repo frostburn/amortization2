@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   BARRIERS,
+  GRENADE_COOLDOWN,
   GRENADE_FUSE,
   SHOT_INTERVAL,
   STEP,
@@ -71,6 +72,73 @@ describe("proving ground simulation", () => {
     expect(
       sim.blastExposure({ x: p.x, y: 0.2, z: -10.5 }, target),
     ).toBeGreaterThan(0);
+  });
+
+  test("grenade clicks rotate through the ready squad and enforce a cooldown per robot", () => {
+    sim.select(5);
+    for (const id of [1, 2, 3, 4]) {
+      expect(sim.grenadeThrower?.id).toBe(id);
+      expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(true);
+    }
+    expect(sim.grenades.map((g) => g.owner)).toEqual([1, 2, 3, 4]);
+    expect(sim.grenadeThrower).toBeUndefined();
+    expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(false);
+    expect(sim.throws).toBe(4);
+    ticks(sim, GRENADE_COOLDOWN - 0.25);
+    expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(false);
+    ticks(sim, 0.25 + STEP);
+    expect(sim.throws).toBe(4); // Blocked clicks never queue an automatic throw.
+    expect(sim.grenadeThrower?.id).toBe(1);
+    expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(true);
+    expect(sim.grenades.at(-1)?.owner).toBe(1);
+  });
+
+  test("grenade rotation skips unavailable robots and cooldowns persist across selection changes", () => {
+    sim.throwGrenade({ x: -14, z: -14 });
+    sim.select(3);
+    expect(sim.grenadeThrower?.id).toBe(3);
+    sim.throwGrenade({ x: 4, z: -14 });
+    sim.select(5);
+    sim.damage(
+      sim.squad[1],
+      1000,
+      { x: 0, y: 0, z: 0 },
+      sim.squad[1].body.translation(),
+    );
+    expect(sim.grenadeThrower?.id).toBe(4);
+    sim.throwGrenade({ x: 14, z: -14 });
+    expect(sim.grenadeThrower).toBeUndefined();
+    sim.select(1);
+    ticks(sim, 1);
+    expect(sim.throwGrenade({ x: -14, z: -14 })).toBe(false);
+    expect(sim.squad[2].grenadeCooldown).toBeCloseTo(GRENADE_COOLDOWN - 1);
+    sim.reset();
+    sim.select(5);
+    expect(sim.grenadeThrower?.id).toBe(1);
+    expect(sim.active.every((a) => a.grenadeCooldown === 0)).toBe(true);
+  });
+
+  test("grenade kills cannot complete the machine-gun drill", () => {
+    sim.throwGrenade({ x: -17, z: 2 });
+    ticks(sim, GRENADE_FUSE + STEP);
+    const plates = sim.actors.filter((a) => a.kind === "plate");
+    expect(plates.some((a) => a.dead && a.killedBy === "grenade")).toBe(true);
+    for (const plate of plates.filter((a) => !a.dead))
+      sim.damage(
+        plate,
+        plate.hp,
+        { x: 0, y: 0, z: 0 },
+        plate.body.translation(),
+        "gun",
+      );
+    sim.step();
+    expect(plates.every((a) => a.dead)).toBe(true);
+    expect(sim.drill.gun).toBe(false);
+    expect(
+      sim.events.some(
+        (e) => e.type === "drill" && e.message.startsWith("Firing"),
+      ),
+    ).toBe(false);
   });
 
   test("bracing reduces impact displacement without cancelling a pending move order", () => {

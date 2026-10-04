@@ -16,6 +16,7 @@ export const MAGAZINE = 90;
 export const SHOT_INTERVAL = 0.7145625 / 10;
 export const RELOAD_SECONDS = 2.2;
 export const GRENADE_FUSE = 2.4;
+export const GRENADE_COOLDOWN = 4;
 export const BLAST_RADIUS = 6.5;
 export const BOUNDS = { left: -22, right: 22, back: -18, front: 14 };
 export const BARRIERS: BoxSpec[] = [

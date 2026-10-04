@@ -1,4 +1,9 @@
-import { MAGAZINE, RELOAD_SECONDS, SQUAD_NAMES } from "./game/config";
+import {
+  GRENADE_COOLDOWN,
+  GRENADE_FUSE,
+  RELOAD_SECONDS,
+  SQUAD_NAMES,
+} from "./game/config";
 import type { Simulation } from "./game/simulation";
 import type { RangeAudio } from "./audio/audio";
 
@@ -17,7 +22,7 @@ export function mountUI() {
       <nav aria-label="Range controls"><button id="reset" title="Reset the range (Shift+R)">RESET RANGE</button><button id="sound" aria-pressed="false" title="Toggle sound">SOUND ON</button><button id="help" aria-label="Help and settings">?</button></nav>
     </header>
     <main id="field">
-      <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, right click to move, G for grenade, Space to brace. Select robots with 1 to 4, or the squad with 5."></canvas>
+      <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, shift-drag to select a group, right-drag to steer, G for grenade, Space to brace. Select robots with 1 to 4, or the squad with 5."></canvas><div id="selection-box" aria-hidden="true" hidden></div>
       <aside class="drills panel" aria-label="Range drills">
         <div class="panel-heading">RANGE DRILLS <span id="drill-count">0 / 3</span></div>
         <div class="drill" id="drill-gun"><span class="check"></span><div>Machine gun<span class="detail" id="gun-progress">Clear six orange plates · 0 / 6</span></div></div>
@@ -35,7 +40,7 @@ export function mountUI() {
       <div class="weapons" aria-label="Choose weapon"><button class="weapon selected" id="gun" aria-pressed="true"><span class="weapon-icon">${gunIcon}</span><span class="weapon-name">MACHINE GUN<small>Q · 14 ROUNDS / SEC</small></span><span class="ammo"><b id="ammo">90</b><span> / 90</span></span><i id="reload-progress"></i></button><button class="weapon grenade" id="grenade" aria-pressed="false"><span class="weapon-icon">${grenadeIcon}</span><span class="weapon-name">GRENADE<small id="grenade-status">G · 2.4 SEC FUSE</small></span></button></div>
       <div class="quick-controls"><span><kbd>LMB</kbd> FIRE</span><span><kbd>RMB</kbd> MOVE</span><span><kbd>SPACE</kbd> BRACE</span><span><kbd>R</kbd> RELOAD</span></div>
     </footer>
-    <dialog id="menu"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location">AMORTIZATION II</p><h2 id="menu-title">Proving ground</h2><p id="menu-intro">Get a feel for the machinery. Test sustained fire, move heavy targets, and throw grenades over cover.</p><div class="brief-controls"><p><kbd>LMB</kbd><span>Hold to fire. In grenade mode, click to throw.</span></p><p><kbd>RMB</kbd><span>Move selected robots. Keep firing as you move.</span></p><p><kbd>1–4</kbd><span>Select a robot. <kbd>5</kbd> selects the squad.</span></p><p><kbd>G / Q</kbd><span>Grenade / machine gun. <kbd>R</kbd> reloads.</span></p><p><kbd>SPACE</kbd><span>Hold to brace. <kbd>WASD</kbd> pans. Wheel zooms.</span></p></div><div class="settings"><label>Volume <input id="volume" type="range" min="0" max="100" value="60" aria-label="Master volume" /></label><label class="motion"><input id="motion" type="checkbox" /> Reduce motion</label></div><p class="audio-credit">Sound recordings: qubodup / Freesound · CC0<br/><a href="https://github.com/frostburn/amortization2" target="_blank" rel="noreferrer">Source, credits &amp; issue reports ↗</a></p><button id="resume" class="primary">ENTER RANGE <span>↗</span></button><p class="desktop-note">Keyboard and mouse recommended. Headphones welcome.</p></div></dialog>`;
+    <dialog id="menu"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location">AMORTIZATION II</p><h2 id="menu-title">Proving ground</h2><p id="menu-intro">Get a feel for the machinery. Test sustained fire, move heavy targets, and throw grenades over cover.</p><div class="brief-controls"><p><kbd>LMB</kbd><span>Hold to fire. Grenade clicks rotate through ready robots (${GRENADE_COOLDOWN} s each).</span></p><p><kbd>RMB</kbd><span>Drag to steer selected robots. Shift-click queues a move.</span></p><p><kbd>⇧ + LMB</kbd><span>Drag a box to select a group. Shift-click toggles a robot.</span></p><p><kbd>1–4</kbd><span>Select a robot. <kbd>5</kbd> selects the squad.</span></p><p><kbd>G / Q</kbd><span>Grenade / machine gun. <kbd>R</kbd> reloads.</span></p><p><kbd>SPACE</kbd><span>Hold to brace. <kbd>WASD</kbd> pans. Wheel zooms.</span></p></div><div class="settings"><label>Volume <input id="volume" type="range" min="0" max="100" value="60" aria-label="Master volume" /></label><label class="motion"><input id="motion" type="checkbox" /> Reduce motion</label></div><p class="audio-credit">Sound recordings: qubodup / Freesound · CC0<br/><a href="https://github.com/frostburn/amortization2" target="_blank" rel="noreferrer">Source, credits &amp; issue reports ↗</a></p><button id="resume" class="primary">ENTER RANGE <span>↗</span></button><p class="desktop-note">Keyboard and mouse recommended. Headphones welcome.</p></div></dialog>`;
   return {
     canvas: document.querySelector<HTMLCanvasElement>("#range")!,
     dialog: document.querySelector<HTMLDialogElement>("#menu")!,
@@ -63,7 +68,9 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
   text("drill-count", `${Object.values(sim.drill).filter(Boolean).length} / 3`);
   text(
     "gun-progress",
-    `Clear six orange plates · ${sim.actors.filter((a) => a.kind === "plate" && a.dead).length} / 6`,
+    sim.actors.some((a) => a.kind === "plate" && a.dead && a.killedBy !== "gun")
+      ? "Reset to restore gun targets"
+      : `Clear six orange plates · ${sim.actors.filter((a) => a.kind === "plate" && a.dead && a.killedBy === "gun").length} / 6`,
   );
   text(
     "impulse-progress",
@@ -103,9 +110,15 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     el.classList.toggle("selected", selected);
     el.setAttribute("aria-pressed", String(selected));
   }
+  const thrower = sim.grenadeThrower;
+  const grenadeWait = sim.grenadeCooldown.toFixed(1);
   text(
     "grenade-status",
-    sim.grenadeCooldown > 0 ? "READYING…" : "G · 2.4 SEC FUSE",
+    thrower
+      ? `G · ${SQUAD_NAMES[thrower.id - 1]} READY`
+      : sim.active.length
+        ? `G · READY IN ${grenadeWait} s`
+        : "NO THROWER",
   );
   text(
     "sound",
@@ -120,7 +133,9 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     dead
       ? "UNIT DISABLED · SELECT ANOTHER ROBOT OR RESET"
       : sim.weapon === "grenade"
-        ? "THROWN GRENADE · LMB TO THROW · ARC ENDS AT FIRST CONTACT"
+        ? thrower
+          ? `GRENADE · ${SQUAD_NAMES[thrower.id - 1]} NEXT · ${GRENADE_FUSE} s FUSE · ${GRENADE_COOLDOWN} s COOLDOWN`
+          : `GRENADES REARMING · READY IN ${grenadeWait} s`
         : reloading
           ? "RELOADING · KEEP MOVING"
           : sim.active.some((a) => a.braced)

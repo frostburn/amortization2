@@ -18,18 +18,19 @@ Four squad members start across the apron. All lanes share one simulation, so un
 
 ## Initial tuning
 
-| Parameter                     | Value                                                      |
-| ----------------------------- | ---------------------------------------------------------- |
-| Simulation                    | Fixed 60 Hz; at most six catch-up steps per rendered frame |
-| Machine-gun cadence           | 10 shots / 0.7145625 s, matching the supplied loop         |
-| Magazine / reload             | 90 rounds / 2.2 s                                          |
-| Target damage per bullet      | 14                                                         |
-| Bullet impulse                | 48 N·s horizontally before bracing reduction               |
-| Walk / firing movement speed  | 4.2 / 2.6 m/s                                              |
-| Grenade fuse / nominal radius | 2.4 s / 6.5 m                                              |
-| Maximum throw distance        | 28 m                                                       |
-| Gravity                       | 12 m/s²                                                    |
-| Drill displacement threshold  | 2 m                                                        |
+| Parameter                     | Value                                                       |
+| ----------------------------- | ----------------------------------------------------------- |
+| Simulation                    | Fixed 60 Hz; at most six catch-up steps per rendered frame  |
+| Machine-gun cadence           | 10 shots / 0.7145625 s, matching the supplied loop          |
+| Magazine / reload             | 90 rounds / 2.2 s                                           |
+| Target damage per bullet      | 14                                                          |
+| Bullet impulse                | 48 N·s horizontally before bracing reduction                |
+| Walk / firing movement speed  | 4.2 / 2.6 m/s                                               |
+| Grenade fuse / nominal radius | 2.4 s / 6.5 m                                               |
+| Grenade cooldown              | 4 s per robot; clicks rotate through ready selected members |
+| Maximum throw distance        | 28 m                                                        |
+| Gravity                       | 12 m/s²                                                     |
+| Drill displacement threshold  | 2 m                                                         |
 
 Balance constants and authored geometry live in `src/game/config.ts`. Weapon interaction and target durability are in `src/game/simulation.ts`. These are starting values for playtesting, not a campaign balance contract.
 
@@ -39,7 +40,7 @@ Living actors have upright rigid bodies. Finite motor acceleration lets external
 
 Bullets use physics ray casts. Grenades are continuous-collision rigid bodies with an actual fuse. Blast damage and impulse fall with distance; three visibility samples per actor account for partial cover. The aim arc stops at its first predicted contact and does not predict all subsequent bounces. Loose props can shield actors and be pushed by impacts.
 
-Movement uses a small A\* grid with inflated obstacles, diagonal corner protection, and optional queued destinations. Loose props are included when a route is requested. Routes are not continuously rebuilt after a prop moves; issue another move if an altered obstacle blocks the route.
+Movement uses a small A\* grid with inflated obstacles, diagonal corner protection, and optional queued destinations. Loose props are included when a route is requested. Routes are not continuously rebuilt after a prop moves; issue another move if an altered obstacle blocks the route. Holding RMB updates the destination as the cursor moves, with route requests capped at 12.5 Hz and the final position applied on release. Shift + RMB queues one destination on release. Shift + LMB draws a group-selection box without firing or throwing; Shift-click still toggles one robot.
 
 ## Audio behavior
 
@@ -63,7 +64,7 @@ Rendering and sound consume simulation events. Visual particles never affect dam
 
 ## Verification and limits
 
-Nine automated tests cover cadence/reload, hit obstruction, displacement, grenade flight/fuse, blast cover, brace recovery, moving-target travel, route clearance, reset, and completion of all three authored drills. Browser smoke checks cover actual mouse/keyboard input, sample decoding, loop start/stop, grenade impact, movement, bracing, pause, reset, and desktop layout.
+Twelve automated tests cover cadence/reload, hit obstruction, displacement, grenade flight/fuse, blast cover, brace recovery, moving-target travel, route clearance, reset, grenade rotation and per-robot availability, correct weapon attribution for drill kills, and completion of all three authored drills. Browser smoke checks cover actual mouse/keyboard input, sample decoding, loop start/stop, grenade impact, movement, bracing, pause, reset, desktop layout, selection boxes, steering while firing, and grenade cooldown feedback.
 
 The current compatibility distribution of Rapier inlines its WebAssembly into a roughly 4.3 MB JavaScript chunk (about 1.7 MB gzip). This is the main initial-load cost; Vite reports a large-chunk warning. It is loaded as an engine chunk. Consider the external-WASM distribution when measuring production startup, rather than hiding the warning.
 

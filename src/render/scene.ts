@@ -782,9 +782,9 @@ export class RangeScene {
     const grenade = this.sim.weapon === "grenade";
     this.aimRing.position.set(ground.x, 0.07, ground.z);
     this.aimRing.scale.setScalar(grenade ? 1.6 : 1);
-    this.blastPreview.visible = this.arc.visible = grenade;
-    if (!grenade) return;
-    const actor = this.sim.primary;
+    const actor = this.sim.grenadeThrower;
+    this.blastPreview.visible = this.arc.visible = grenade && !!actor;
+    if (!grenade || !actor) return;
     const from = this.sim.grenadeOrigin(actor, ground);
     const { velocity, duration } = grenadeVelocity(from, ground);
     const points = [new THREE.Vector3(from.x, from.y, from.z)];

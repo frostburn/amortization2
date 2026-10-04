@@ -25,32 +25,33 @@ The `dist/` directory is self-contained and uses relative asset URLs. Serve it o
 
 - **Ballistics:** clear six orange plate targets with the machine gun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.
 - **Displacement:** push either of the two orange robot targets at least two metres. Impacts impart real momentum; aim follows the target under the cursor. A moving plate offers additional tracking practice.
-- **Fragments:** throw a grenade into the three-target bay behind the concrete barrier. The arc shows the first collision, not a guaranteed final resting place. Grenades bounce and explode after 2.4 seconds; cover blocks blast pressure.
+- **Fragments:** throw a grenade into the three-target bay behind the concrete barrier. The arc shows the first collision, not a guaranteed final resting place. Grenades bounce and explode after 2.4 seconds; cover blocks blast pressure. Each robot rearms for four seconds after throwing. Clicks cycle through selected, living robots whose grenades are ready; the arc follows the next thrower. A click while all selected robots are rearming does nothing and is not queued.
 
 Four robots can move and fire together. Bracing improves control and reduces knockback. Targets and loose crates react physically; disabled robots topple and settle as single rigid bodies. Range supplies are unlimited. Reset restores targets, squad integrity, ammunition, and drill progress.
 
 ## Controls
 
-| Input                       | Action                                                 |
-| --------------------------- | ------------------------------------------------------ |
-| Hold left mouse             | Fire the machine gun                                   |
-| Left click in grenade mode  | Throw one grenade from the first selected living robot |
-| Right click                 | Move selected robots                                   |
-| Shift + right click         | Queue another move                                     |
-| 1–4 / click a robot         | Select a robot                                         |
-| Shift + 1–4 / Shift + click | Add or remove a robot from selection                   |
-| 5 / ALL                     | Select the living squad                                |
-| Q / G                       | Machine gun / grenade                                  |
-| R                           | Reload selected robots                                 |
-| Hold Space                  | Brace; release to resume a pending move                |
-| WASD / middle drag          | Pan camera                                             |
-| Mouse wheel                 | Zoom                                                   |
-| F                           | Centre camera toward the selected robot                |
-| Escape / ?                  | Pause, controls, volume, and reduced motion            |
-| Shift + R / Reset range     | Restore the entire range                               |
-| Ctrl + left mouse           | Force fire when the cursor is over a squad member      |
+| Input                       | Action                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| Hold left mouse             | Fire the machine gun                                                          |
+| Left click in grenade mode  | Throw from the next ready selected robot (round-robin)                        |
+| Right click / drag          | Move selected robots / continuously steer their destination                   |
+| Shift + right click / drag  | Queue one move at the release point                                           |
+| 1–4 / click a robot         | Select a robot                                                                |
+| Shift + left drag           | Select the living robots inside the box; an empty box keeps the current group |
+| Shift + 1–4 / Shift + click | Add or remove a robot from selection                                          |
+| 5 / ALL                     | Select the living squad                                                       |
+| Q / G                       | Machine gun / grenade                                                         |
+| R                           | Reload selected robots                                                        |
+| Hold Space                  | Brace; release to resume a pending move                                       |
+| WASD / middle drag          | Pan camera                                                                    |
+| Mouse wheel                 | Zoom                                                                          |
+| F                           | Centre camera toward the selected robot                                       |
+| Escape / ?                  | Pause, controls, volume, and reduced motion                                   |
+| Shift + R / Reset range     | Restore the entire range                                                      |
+| Ctrl + left mouse           | Force fire when the cursor is over a squad member                             |
 
-The game pauses on focus loss. Sound and motion preferences are saved locally. Explosions can damage the squad; concrete also protects it. Machine-gun accuracy counts hits on living targets and excludes grenade hits. Using the gun to destroy a grenade-bay target requires a reset before that drill can be completed.
+The game pauses on focus loss. Sound and motion preferences are saved locally. Explosions can damage the squad; concrete also protects it. Machine-gun accuracy counts hits on living targets and excludes grenade hits. Destroying a drill target with the wrong weapon requires a reset before that drill can be completed. Shift-drag selection never fires or throws, including in grenade mode; ordinary left-button firing works while right-drag steering.
 
 ## Sound
 

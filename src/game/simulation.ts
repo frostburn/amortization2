@@ -4,6 +4,7 @@ import {
   BLAST_RADIUS,
   BOUNDS,
   GRAVITY,
+  GRENADE_COOLDOWN,
   GRENADE_FUSE,
   MAGAZINE,
   PLAYER_SPAWNS,
@@ -33,6 +34,7 @@ export interface Actor {
   yaw: number;
   ammo: number;
   reload: number;
+  grenadeCooldown: number;
   shotWait: number;
   firing: boolean;
   braced: boolean;
@@ -99,7 +101,7 @@ export class Simulation {
   grenadeHits = 0;
   maxDisplacement = 0;
   drill = { gun: false, impulse: false, grenade: false };
-  grenadeCooldown = 0;
+  private lastGrenadier = 0;
   private randomState = 1729;
   private nextId = 100;
 
@@ -128,7 +130,7 @@ export class Simulation {
     this.throws = 0;
     this.grenadeHits = 0;
     this.maxDisplacement = 0;
-    this.grenadeCooldown = 0;
+    this.lastGrenadier = 0;
     this.randomState = 1729;
     this.nextId = 100;
     this.drill = { gun: false, impulse: false, grenade: false };
@@ -219,6 +221,7 @@ export class Simulation {
       yaw: player ? Math.PI : 0,
       ammo: MAGAZINE,
       reload: 0,
+      grenadeCooldown: 0,
       shotWait: 0,
       firing: false,
       braced: false,
@@ -246,6 +249,16 @@ export class Simulation {
   get primary() {
     return this.active[0] ?? this.squad[0];
   }
+  get grenadeThrower(): Actor | undefined {
+    const ready = this.active.filter((a) => a.grenadeCooldown === 0);
+    return ready.find((a) => a.id > this.lastGrenadier) ?? ready[0];
+  }
+  get grenadeCooldown() {
+    const active = this.active;
+    return active.length
+      ? Math.min(...active.map((a) => a.grenadeCooldown))
+      : 0;
+  }
   get destroyed() {
     return this.actors.filter((a) => a.kind !== "player" && a.dead).length;
   }
@@ -260,6 +273,13 @@ export class Simulation {
         this.selected.delete(id);
       else this.selected.add(id);
     } else this.selected = new Set([id]);
+    this.release();
+  }
+
+  selectGroup(ids: number[]) {
+    const living = this.squad.filter((a) => !a.dead && ids.includes(a.id));
+    // An empty box leaves the current group available for the next command.
+    if (living.length) this.selected = new Set(living.map((a) => a.id));
     this.release();
   }
 
@@ -477,8 +497,8 @@ export class Simulation {
   }
 
   throwGrenade(point: Vec2): boolean {
-    if (this.grenadeCooldown > 0 || !this.active.length) return false;
-    const actor = this.primary;
+    const actor = this.grenadeThrower;
+    if (!actor) return false;
     const from = this.grenadeOrigin(actor, point);
     const { velocity } = grenadeVelocity(from, point);
     const body = this.world.createRigidBody(
@@ -506,7 +526,8 @@ export class Simulation {
       bounceWait: 0.1,
       lastVelocity: velocity,
     });
-    this.grenadeCooldown = 0.8;
+    actor.grenadeCooldown = GRENADE_COOLDOWN;
+    this.lastGrenadier = actor.id;
     this.throws++;
     this.events.push({ type: "throw", actor: actor.id, position: from });
     return true;
@@ -589,8 +610,8 @@ export class Simulation {
 
   step() {
     this.time += STEP;
-    this.grenadeCooldown = Math.max(0, this.grenadeCooldown - STEP);
     for (const a of this.actors) {
+      a.grenadeCooldown = Math.max(0, a.grenadeCooldown - STEP);
       a.previous = vcopy(a.body.translation());
       a.previousRotation = { ...a.body.rotation() };
       a.recoil = Math.max(0, a.recoil - STEP * 1.1);
@@ -716,7 +737,9 @@ export class Simulation {
 
   private checkDrills() {
     const checks = {
-      gun: this.actors.filter((a) => a.kind === "plate").every((a) => a.dead),
+      gun: this.actors
+        .filter((a) => a.kind === "plate")
+        .every((a) => a.dead && a.killedBy === "gun"),
       impulse: this.maxDisplacement >= 2,
       grenade: this.actors
         .filter((a) => a.kind === "blast")
@@ -741,6 +764,8 @@ export class Simulation {
       hits: this.hits,
       throws: this.throws,
       grenadeHits: this.grenadeHits,
+      grenadeThrower: this.grenadeThrower?.id ?? null,
+      grenadeCooldown: this.grenadeCooldown,
       destroyed: this.destroyed,
       maxDisplacement: this.maxDisplacement,
       drills: { ...this.drill },
@@ -748,6 +773,7 @@ export class Simulation {
       selected: [...this.selected],
       grenades: this.grenades.map((g) => ({
         id: g.id,
+        owner: g.owner,
         fuse: g.fuse,
         position: vcopy(g.body.translation()),
       })),
@@ -758,6 +784,7 @@ export class Simulation {
         killedBy: a.killedBy,
         ammo: a.ammo,
         reload: a.reload,
+        grenadeCooldown: a.grenadeCooldown,
         braced: a.braced,
         position: vcopy(a.body.translation()),
         path: a.path.map((v) => ({ ...v })),
