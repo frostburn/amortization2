@@ -26,6 +26,7 @@ Four squad members start across the apron. All lanes share one simulation, so un
 | Target damage per bullet      | 14                                                          |
 | Bullet impulse                | 48 N·s horizontally before bracing reduction                |
 | Walk / firing movement speed  | 4.2 / 2.6 m/s                                               |
+| Full-squad formation          | 2 × 2 square; 2.2 m between corners                         |
 | Grenade fuse / nominal radius | 2.4 s / 6.5 m                                               |
 | Grenade cooldown              | 4 s per robot; clicks rotate through ready selected members |
 | Maximum throw distance        | 28 m                                                        |
@@ -41,6 +42,8 @@ Living actors have upright rigid bodies. Finite motor acceleration lets external
 Bullets use physics ray casts. Grenades are continuous-collision rigid bodies with an actual fuse. Blast damage and impulse fall with distance; three visibility samples per actor account for partial cover. The aim arc stops at its first predicted contact and does not predict all subsequent bounces. Loose props can shield actors and be pushed by impacts.
 
 Movement uses a small A\* grid with inflated obstacles, diagonal corner protection, and optional queued destinations. Loose props are included when a route is requested. Routes are not continuously rebuilt after a prop moves; issue another move if an altered obstacle blocks the route. Holding RMB updates the destination as the cursor moves, with route requests capped at 12.5 Hz and the final position applied on release. Shift + RMB queues one destination on release. Shift + LMB draws a group-selection box without firing or throwing; Shift-click still toggles one robot.
+
+Selecting all four living robots gives move orders a square footprint. Slots stay assigned while steering, and the entire footprint shifts to nearby clear ground if cover or the yard boundary blocks it. Numbered destination rings and a faint square outline show the actual slots; queued previews are amber, committed orders mint. Markers remain readable through cover, persist during movement, and fade after arrival. Routes retain their exact final points, with a slower approach to settle precisely. Robots detour around occupied intermediate waypoints and recover their final slots if displaced. The three equipment crates inside the yard are solid navigation obstacles as well as visible scenery.
 
 ## Audio behavior
 
@@ -64,7 +67,7 @@ Rendering and sound consume simulation events. Visual particles never affect dam
 
 ## Verification and limits
 
-Twelve automated tests cover cadence/reload, hit obstruction, displacement, grenade flight/fuse, blast cover, brace recovery, moving-target travel, route clearance, reset, grenade rotation and per-robot availability, correct weapon attribution for drill kills, and completion of all three authored drills. Browser smoke checks cover actual mouse/keyboard input, sample decoding, loop start/stop, grenade impact, movement, bracing, pause, reset, desktop layout, selection boxes, steering while firing, and grenade cooldown feedback.
+Sixteen automated tests cover cadence/reload, hit obstruction, displacement, grenade flight/fuse, blast cover, brace recovery, moving-target travel, route clearance, reset, grenade rotation and per-robot availability, correct weapon attribution for drill kills, completion of all three authored drills, square arrivals, stable steering slots and queued regrouping, formation clearance near cover and yard edges, and exact destinations within a grid cell. Browser smoke checks cover actual mouse/keyboard input, sample decoding, loop start/stop, grenade impact, movement, bracing, pause, reset, desktop layout, selection boxes, steering while firing, and grenade cooldown feedback.
 
 The current compatibility distribution of Rapier inlines its WebAssembly into a roughly 4.3 MB JavaScript chunk (about 1.7 MB gzip). This is the main initial-load cost; Vite reports a large-chunk warning. It is loaded as an engine chunk. Consider the external-WASM distribution when measuring production startup, rather than hiding the warning.
 

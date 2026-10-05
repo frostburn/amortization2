@@ -8,6 +8,34 @@ const position = (id: number): Vec2 => ({
   z: BOUNDS.back + (Math.floor(id / WIDTH) + 0.5) * CELL,
 });
 
+function segmentClear(
+  a: Vec2,
+  b: Vec2,
+  boxes: Pick<BoxSpec, "x" | "z" | "w" | "d">[],
+  radius: number,
+) {
+  return boxes.every((box) => {
+    let enter = 0,
+      leave = 1;
+    for (const axis of ["x", "z"] as const) {
+      const half = (axis === "x" ? box.w : box.d) / 2 + radius;
+      const min = box[axis] - half,
+        max = box[axis] + half,
+        delta = b[axis] - a[axis];
+      if (Math.abs(delta) < 1e-9) {
+        if (a[axis] <= min || a[axis] >= max) return true;
+      } else {
+        const lo = (min - a[axis]) / delta,
+          hi = (max - a[axis]) / delta;
+        enter = Math.max(enter, Math.min(lo, hi));
+        leave = Math.min(leave, Math.max(lo, hi));
+        if (enter >= leave) return true;
+      }
+    }
+    return false;
+  });
+}
+
 /** Small range navigation grid. Inflated solids and corner checks keep robot hulls clear. */
 export function findPath(
   start: Vec2,
@@ -31,13 +59,26 @@ export function findPath(
     )
       blocked[id] = 1;
   }
-  const nearest = (p: Vec2) => {
+  const exactGoal =
+    goal.x >= BOUNDS.left + radius &&
+    goal.x <= BOUNDS.right - radius &&
+    goal.z >= BOUNDS.back + radius &&
+    goal.z <= BOUNDS.front - radius &&
+    boxes.every(
+      (b) =>
+        Math.abs(goal.x - b.x) >= b.w / 2 + radius ||
+        Math.abs(goal.z - b.z) >= b.d / 2 + radius,
+    );
+  const nearest = (p: Vec2, visible = false) => {
     let result = -1,
       best = Infinity;
     for (let id = 0; id < blocked.length; id++)
       if (!blocked[id]) {
         const d = distance2(position(id), p);
-        if (d < best) {
+        if (
+          d < best &&
+          (!visible || segmentClear(position(id), p, boxes, radius))
+        ) {
           best = d;
           result = id;
         }
@@ -45,7 +86,7 @@ export function findPath(
     return result;
   };
   const first = nearest(start),
-    last = nearest(goal);
+    last = nearest(goal, exactGoal);
   if (first < 0 || last < 0) return [];
   const open = new Set([first]);
   const closed = new Set<number>();
@@ -68,7 +109,10 @@ export function findPath(
         path.push(position(current));
         current = previous[current];
       }
-      return path.reverse();
+      path.reverse();
+      if (exactGoal && (!path.length || distance2(path.at(-1)!, goal) > 0.001))
+        path.push({ ...goal });
+      return path;
     }
     open.delete(current);
     closed.add(current);

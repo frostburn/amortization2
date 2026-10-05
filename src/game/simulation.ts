@@ -3,6 +3,7 @@ import {
   BARRIERS,
   BLAST_RADIUS,
   BOUNDS,
+  FORMATION_SPACING,
   GRAVITY,
   GRENADE_COOLDOWN,
   GRENADE_FUSE,
@@ -39,6 +40,7 @@ export interface Actor {
   firing: boolean;
   braced: boolean;
   path: Vec2[];
+  moveTarget?: Vec2;
   hitTime: number;
   dead: boolean;
   recoil: number;
@@ -83,6 +85,7 @@ export type GameEvent =
   | { type: "drill"; message: string };
 
 const vcopy = (v: Vec3): Vec3 => ({ x: v.x, y: v.y, z: v.z });
+export type MoveDestination = { actor: number; position: Vec2 };
 
 export class Simulation {
   world!: RAPIER.World;
@@ -293,30 +296,93 @@ export class Simulation {
   setBrace(braced: boolean) {
     for (const a of this.active) a.braced = braced;
   }
-  move(point: Vec2, queue = false) {
-    this.active.forEach((actor, i, active) => {
-      actor.braced = false;
-      const goal = {
-        x: clamp(
-          point.x + (i - (active.length - 1) / 2) * 1.65,
-          BOUNDS.left + 1,
-          BOUNDS.right - 1,
-        ),
-        z: clamp(point.z, BOUNDS.back + 1, BOUNDS.front - 1),
-      };
-      const start =
-        queue && actor.path.length
-          ? actor.path.at(-1)!
-          : actor.body.translation();
-      const dynamicBoxes = this.props.map((p) => ({
+  private navigationBoxes() {
+    return [
+      ...BARRIERS,
+      ...this.props.map((p) => ({
         x: p.body.translation().x,
         z: p.body.translation().z,
         w: p.w,
         d: p.d,
-      }));
-      const path = findPath(start, goal, [...BARRIERS, ...dynamicBoxes]);
+      })),
+    ];
+  }
+
+  moveDestinations(point: Vec2): MoveDestination[] {
+    const active = this.active;
+    if (!active.length) return [];
+    const half = FORMATION_SPACING / 2;
+    // Stable slots prevent robots trading places while a move is being steered.
+    const offsets =
+      active.length === 4
+        ? [
+            { x: -half, z: half },
+            { x: -half, z: -half },
+            { x: half, z: -half },
+            { x: half, z: half },
+          ]
+        : active.map((_, i) => ({
+            x: (i - (active.length - 1) / 2) * 1.65,
+            z: 0,
+          }));
+    const extentX = Math.max(...offsets.map((p) => Math.abs(p.x)));
+    const extentZ = Math.max(...offsets.map((p) => Math.abs(p.z)));
+    const minX = BOUNDS.left + 1 + extentX,
+      maxX = BOUNDS.right - 1 - extentX;
+    const minZ = BOUNDS.back + 1 + extentZ,
+      maxZ = BOUNDS.front - 1 - extentZ;
+    const requested = {
+      x: clamp(point.x, minX, maxX),
+      z: clamp(point.z, minZ, maxZ),
+    };
+    const boxes = this.navigationBoxes();
+    const free = (p: Vec2) =>
+      boxes.every(
+        (b) =>
+          Math.abs(p.x - b.x) >= b.w / 2 + extentX + 0.55 ||
+          Math.abs(p.z - b.z) >= b.d / 2 + extentZ + 0.55,
+      );
+    let center = requested;
+    if (!free(center)) {
+      // The nearest clear footprint lies on an expanded obstacle edge or corner.
+      const xs = new Set([requested.x, minX, maxX]),
+        zs = new Set([requested.z, minZ, maxZ]);
+      for (const b of boxes)
+        for (const sign of [-1, 1]) {
+          xs.add(clamp(b.x + sign * (b.w / 2 + extentX + 0.57), minX, maxX));
+          zs.add(clamp(b.z + sign * (b.d / 2 + extentZ + 0.57), minZ, maxZ));
+        }
+      let best = Infinity;
+      for (const x of xs)
+        for (const z of zs) {
+          const candidate = { x, z },
+            cost = (x - requested.x) ** 2 + (z - requested.z) ** 2;
+          if (cost < best && free(candidate)) {
+            center = candidate;
+            best = cost;
+          }
+        }
+      if (!Number.isFinite(best)) return [];
+    }
+    return active.map((actor, i) => ({
+      actor: actor.id,
+      position: { x: center.x + offsets[i].x, z: center.z + offsets[i].z },
+    }));
+  }
+
+  move(point: Vec2, queue = false) {
+    const boxes = this.navigationBoxes();
+    for (const target of this.moveDestinations(point)) {
+      const actor = this.actors.find((a) => a.id === target.actor)!;
+      const start =
+        queue && actor.path.length
+          ? actor.path.at(-1)!
+          : actor.body.translation();
+      const path = findPath(start, target.position, boxes);
+      actor.braced = false;
+      actor.moveTarget = target.position;
       actor.path = queue ? [...actor.path, ...path] : path;
-    });
+    }
   }
 
   reloadSelected() {
@@ -703,15 +769,53 @@ export class Simulation {
   private drive(a: Actor) {
     const p = a.body.translation(),
       v = a.body.linvel();
-    while (a.path.length && distance2(p, a.path[0]) < 0.38) a.path.shift();
+    // Recover the assigned corner if another hull or an impact displaces an arrival.
+    if (!a.path.length && a.moveTarget && distance2(p, a.moveTarget) > 0.15)
+      a.path = findPath(p, a.moveTarget, this.navigationBoxes());
+    if (a.path.length > 1) {
+      const occupied = this.squad
+        .filter((other) => other !== a && !other.dead)
+        .map((other) => ({
+          x: other.body.translation().x,
+          z: other.body.translation().z,
+          w: 0.9,
+          d: 0.9,
+        }));
+      const clear = (point: Vec2) =>
+        occupied.every(
+          (other) =>
+            Math.abs(point.x - other.x) >= 1 ||
+            Math.abs(point.z - other.z) >= 1,
+        );
+      if (!clear(a.path[0])) {
+        const next = a.path.findIndex(clear);
+        if (next > 0) {
+          const detour = findPath(p, a.path[next], [
+            ...this.navigationBoxes(),
+            ...occupied,
+          ]);
+          if (detour.length) a.path = [...detour, ...a.path.slice(next + 1)];
+        }
+      }
+    }
+    while (
+      a.path.length &&
+      distance2(p, a.path[0]) < (a.path.length === 1 ? 0.08 : 0.38)
+    )
+      a.path.shift();
     let dx = 0,
       dz = 0;
     if (a.path.length && !a.braced) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
-      const speed = a.firing ? 2.6 : 4.2;
-      dx = ((target.x - p.x) / distance) * speed;
-      dz = ((target.z - p.z) / distance) * speed;
+      const speed = Math.min(
+        a.firing ? 2.6 : 4.2,
+        a.path.length === 1 ? distance * 5 : Infinity,
+      );
+      const forwardX = (target.x - p.x) / distance,
+        forwardZ = (target.z - p.z) / distance;
+      dx = forwardX * speed;
+      dz = forwardZ * speed;
       for (const other of this.squad)
         if (other !== a && !other.dead) {
           const q = other.body.translation(),
@@ -721,6 +825,11 @@ export class Simulation {
             dz += ((p.z - q.z) / d) * (1.4 - d) * 3;
           }
         }
+      const desiredSpeed = Math.hypot(dx, dz);
+      if (desiredSpeed > speed) {
+        dx *= speed / desiredSpeed;
+        dz *= speed / desiredSpeed;
+      }
     }
     // Finite acceleration preserves externally imparted velocity and permits lateral recovery.
     const acceleration = (a.braced ? 40 : 13) * (0.35 + a.stability * 0.65);
@@ -788,6 +897,7 @@ export class Simulation {
         braced: a.braced,
         position: vcopy(a.body.translation()),
         path: a.path.map((v) => ({ ...v })),
+        destination: a.moveTarget ? { ...a.moveTarget } : null,
       })),
     };
   }

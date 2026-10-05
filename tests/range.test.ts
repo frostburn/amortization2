@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   BARRIERS,
+  BOUNDS,
+  FORMATION_SPACING,
   GRENADE_COOLDOWN,
   GRENADE_FUSE,
   SHOT_INTERVAL,
@@ -19,6 +21,87 @@ describe("proving ground simulation", () => {
   const ticks = (sim: Simulation, seconds: number) => {
     for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
   };
+
+  test("the full squad settles onto the four corners of its square move order", () => {
+    sim.select(5);
+    sim.move({ x: 0, z: 8 });
+    const goals = sim.active.map((a) => a.moveTarget!);
+    expect(new Set(goals.map((p) => p.x)).size).toBe(2);
+    expect(new Set(goals.map((p) => p.z)).size).toBe(2);
+    expect(
+      Math.max(...goals.map((p) => p.x)) - Math.min(...goals.map((p) => p.x)),
+    ).toBeCloseTo(FORMATION_SPACING);
+    expect(
+      Math.max(...goals.map((p) => p.z)) - Math.min(...goals.map((p) => p.z)),
+    ).toBeCloseTo(FORMATION_SPACING);
+    ticks(sim, 8);
+    for (const a of sim.active) {
+      expect(a.path).toHaveLength(0);
+      expect(distance2(a.body.translation(), a.moveTarget!)).toBeLessThan(0.15);
+    }
+  });
+
+  test("steering preserves square slots and queued moves finish in the next formation", () => {
+    sim.select(5);
+    sim.move({ x: 0, z: 8 });
+    const first = sim.active.map((a) => ({ ...a.moveTarget! }));
+    ticks(sim, 1);
+    sim.move({ x: 12, z: 8 });
+    const steered = sim.active.map((a) => ({ ...a.moveTarget! }));
+    for (let i = 0; i < first.length; i++) {
+      expect(steered[i].x - first[i].x).toBeCloseTo(12);
+      expect(steered[i].z).toBeCloseTo(first[i].z);
+    }
+    sim.move({ x: -10, z: 6 }, true);
+    for (const [i, a] of sim.active.entries()) {
+      expect(a.path).toContainEqual(steered[i]);
+      expect(a.path.at(-1)).toEqual(a.moveTarget);
+    }
+    ticks(sim, 18);
+    for (const a of sim.active) {
+      expect(a.path).toHaveLength(0);
+      expect(distance2(a.body.translation(), a.moveTarget!)).toBeLessThan(0.15);
+    }
+  });
+
+  test("cover and yard edges shift the complete footprint without collapsing its corners", () => {
+    sim.select(5);
+    for (const point of [
+      { x: -0.8, z: -6.5 },
+      { x: -22, z: 14 },
+      { x: 22, z: -18 },
+      { x: -20, z: 11 },
+    ]) {
+      const goals = sim.moveDestinations(point).map((t) => t.position);
+      expect(goals).toHaveLength(4);
+      expect(distance2(goals[0], goals[1])).toBeCloseTo(FORMATION_SPACING);
+      expect(distance2(goals[1], goals[2])).toBeCloseTo(FORMATION_SPACING);
+      for (const p of goals) {
+        expect(p.x).toBeGreaterThanOrEqual(BOUNDS.left + 1);
+        expect(p.x).toBeLessThanOrEqual(BOUNDS.right - 1);
+        expect(p.z).toBeGreaterThanOrEqual(BOUNDS.back + 1);
+        expect(p.z).toBeLessThanOrEqual(BOUNDS.front - 1);
+        expect(
+          BARRIERS.some(
+            (b) =>
+              Math.abs(p.x - b.x) < b.w / 2 + 0.55 &&
+              Math.abs(p.z - b.z) < b.d / 2 + 0.55,
+          ),
+        ).toBe(false);
+      }
+    }
+    sim.move({ x: -0.8, z: -6.5 });
+    ticks(sim, 15);
+    for (const a of sim.active) {
+      expect(a.path).toHaveLength(0);
+      expect(distance2(a.body.translation(), a.moveTarget!)).toBeLessThan(0.15);
+    }
+  });
+
+  test("navigation keeps a clear exact destination within the same grid cell", () => {
+    const goal = { x: 0.12, z: 8.2 };
+    expect(findPath({ x: 0.1, z: 8.1 }, goal, BARRIERS).at(-1)).toEqual(goal);
+  });
 
   test("continuous fire follows the supplied loop cadence and reloads a depleted magazine", () => {
     sim.aim = { x: -21, y: 2, z: -17 };

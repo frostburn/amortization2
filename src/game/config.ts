@@ -18,6 +18,7 @@ export const RELOAD_SECONDS = 2.2;
 export const GRENADE_FUSE = 2.4;
 export const GRENADE_COOLDOWN = 4;
 export const BLAST_RADIUS = 6.5;
+export const FORMATION_SPACING = 2.2;
 export const BOUNDS = { left: -22, right: 22, back: -18, front: 14 };
 export const BARRIERS: BoxSpec[] = [
   { x: 0, z: -18.5, w: 45, d: 1, h: 3.7, style: "wall" },
@@ -30,6 +31,9 @@ export const BARRIERS: BoxSpec[] = [
   { x: 17.6, z: 0.7, w: 4.7, d: 0.8, h: 1.15, style: "barrier" },
   { x: -0.8, z: -6.5, w: 2.4, d: 2, h: 2.6, style: "crate" },
   { x: 2.2, z: -11.5, w: 2.1, d: 2.1, h: 1.45, style: "crate" },
+  { x: -20, z: 11, w: 1.5, d: 1.5, h: 1.4, style: "crate" },
+  { x: 20, z: 11, w: 1.5, d: 1.5, h: 1.4, style: "crate" },
+  { x: -20, z: -15, w: 1.5, d: 1.5, h: 1.4, style: "crate" },
 ];
 export const PROP_SPAWNS = [
   { x: -3.8, z: 1, w: 1.5, h: 1.2, d: 1.5, mass: 25 },

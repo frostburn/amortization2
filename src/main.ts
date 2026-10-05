@@ -196,6 +196,7 @@ async function start() {
   function cancelDrags() {
     selectionDrag = null;
     moveDrag = null;
+    scene.cancelMovePreview();
     middleDrag = null;
     selectionBox.hidden = true;
   }
@@ -212,7 +213,7 @@ async function start() {
     };
   }
   function updateMove(force = false) {
-    if (!moveDrag || moveDrag.queued) return;
+    if (!moveDrag) return;
     // Replan at most 12.5 times per second, preserving momentum between orders.
     if (
       !force &&
@@ -221,8 +222,11 @@ async function start() {
     )
       return;
     if (force && distance2(ground, moveDrag.lastGoal) < 0.01) return;
-    sim.move(ground);
-    scene.markDestination(ground);
+    if (moveDrag.queued) scene.previewMove(sim.moveDestinations(ground));
+    else {
+      sim.move(ground);
+      scene.markMove();
+    }
     moveDrag.lastGoal = { x: ground.x, z: ground.z };
     moveDrag.lastTime = sim.time;
   }
@@ -235,7 +239,10 @@ async function start() {
       selectionDrag = null;
       selectionBox.hidden = true;
     }
-    if (!(e.buttons & 2)) moveDrag = null;
+    if (!(e.buttons & 2)) {
+      moveDrag = null;
+      scene.cancelMovePreview();
+    }
     if (!(e.buttons & 4)) middleDrag = null;
     if (middleDrag) {
       scene.pan(
@@ -257,7 +264,7 @@ async function start() {
       selectionBox.style.height = `${Math.abs(pointer.y - selectionDrag.y)}px`;
     }
     aimAtPointer();
-    if (moveDrag?.queued) scene.markDestination(ground);
+    if (moveDrag?.queued) updateMove();
   });
   canvas.addEventListener("mousedown", (e) => {
     if (paused) return;
@@ -273,12 +280,16 @@ async function start() {
         lastGoal: { x: ground.x, z: ground.z },
         lastTime: sim.time,
       };
-      if (!e.shiftKey) sim.move(ground);
-      scene.markDestination(ground);
+      if (e.shiftKey) scene.previewMove(sim.moveDestinations(ground));
+      else {
+        sim.move(ground);
+        scene.markMove();
+      }
     } else if (e.button === 1) middleDrag = { x: e.clientX, y: e.clientY };
     else if (e.button === 0) {
       if (e.shiftKey) {
         moveDrag = null;
+        scene.cancelMovePreview();
         sim.release();
         selectionDrag = {
           x: pointer.x,
@@ -328,7 +339,7 @@ async function start() {
       aimAtPointer();
       if (moveDrag.queued) {
         sim.move(ground, true);
-        scene.markDestination(ground);
+        scene.markMove();
       } else updateMove(true);
       moveDrag = null;
     }

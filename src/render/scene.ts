@@ -3,6 +3,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   BARRIERS,
   BLAST_RADIUS,
+  FORMATION_SPACING,
   GRAVITY,
   GRENADE_FUSE,
   PLAYER_SPAWNS,
@@ -12,7 +13,12 @@ import {
   type Vec2,
   type Vec3,
 } from "../game/config";
-import type { Actor, GameEvent, Simulation } from "../game/simulation";
+import type {
+  Actor,
+  GameEvent,
+  MoveDestination,
+  Simulation,
+} from "../game/simulation";
 
 const MINT = 0x9be6cd,
   AMBER = 0xd3a24f,
@@ -204,15 +210,26 @@ export class RangeScene {
       opacity: 0.85,
     }),
   );
-  private destination = new THREE.Mesh(
-    new THREE.RingGeometry(0.42, 0.48, 32),
-    new THREE.MeshBasicMaterial({
+  private destinations = new THREE.Group();
+  private destinationMarkers: {
+    root: THREE.Group;
+    ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+    number: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  }[] = [];
+  private destinationOutline = new THREE.LineLoop(
+    new THREE.BufferGeometry().setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(12), 3),
+    ),
+    new THREE.LineBasicMaterial({
       color: MINT,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.25,
       depthWrite: false,
+      depthTest: false,
     }),
   );
+  private destinationPreview: MoveDestination[] | null = null;
   private destinationAge = 99;
   private lightFlash = new THREE.PointLight(0xffd699, 0, 8, 2);
   reducedMotion = false;
@@ -270,13 +287,46 @@ export class RangeScene {
     this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.particleMesh.count = 0;
     this.bulletMarks.count = 0;
-    this.aimRing.rotation.x =
-      this.blastPreview.rotation.x =
-      this.destination.rotation.x =
-        -Math.PI / 2;
+    this.aimRing.rotation.x = this.blastPreview.rotation.x = -Math.PI / 2;
     this.aiming.add(this.aimRing, this.blastPreview, this.arc);
-    this.scene.add(this.aiming, this.destination);
-    this.destination.visible = false;
+    const ringGeometry = new THREE.RingGeometry(0.42, 0.48, 32);
+    for (let id = 1; id <= 4; id++) {
+      const root = new THREE.Group();
+      const ring = new THREE.Mesh(
+        ringGeometry,
+        new THREE.MeshBasicMaterial({
+          color: MINT,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+          depthTest: false,
+        }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.06;
+      ring.renderOrder = 10;
+      root.add(ring);
+      const number = label(
+        root,
+        String(id),
+        0.5,
+        0.58,
+        0,
+        0.075,
+        0,
+        true,
+        "#ffffff",
+      );
+      number.material.depthTest = false;
+      number.renderOrder = 11;
+      this.destinationMarkers.push({ root, ring, number });
+      this.destinations.add(root);
+    }
+    this.destinationOutline.frustumCulled = false;
+    this.destinationOutline.renderOrder = 9;
+    this.destinations.add(this.destinationOutline);
+    this.scene.add(this.aiming, this.destinations);
+    this.destinations.visible = false;
     this.buildEnvironment(texture);
     this.resetDynamic();
     this.resize();
@@ -415,15 +465,6 @@ export class RangeScene {
       rail.rotation.x = Math.PI / 2;
       for (let z = -16; z < 13; z += 3)
         cylinder(this.environment, 0.03, 0.7, x, 2.58, z, yellow);
-    }
-    for (const [x, z] of [
-      [-20, 11],
-      [20, 11],
-      [-20, -15],
-    ]) {
-      const c = this.makeCrate(1.5, 1.4, 1.5);
-      c.position.set(x, 0.7, z);
-      this.environment.add(c);
     }
     this.batchEnvironment();
   }
@@ -692,6 +733,8 @@ export class RangeScene {
     this.bulletMarks.count = 0;
     this.flashes.clear();
     this.destinationAge = 99;
+    this.destinationPreview = null;
+    this.destinations.visible = false;
   }
 
   resize() {
@@ -772,9 +815,59 @@ export class RangeScene {
       y: r.top + ((1 - p.y) * r.height) / 2,
     };
   }
-  markDestination(p: Vec2) {
-    this.destination.position.set(p.x, 0.06, p.z);
+  markMove() {
+    this.destinationPreview = null;
     this.destinationAge = 0;
+  }
+  previewMove(targets: MoveDestination[]) {
+    this.destinationPreview = targets;
+    this.destinationAge = 0;
+  }
+  cancelMovePreview() {
+    this.destinationPreview = null;
+  }
+
+  private updateDestinations(delta: number) {
+    const active = this.sim.active;
+    const targets =
+      this.destinationPreview ??
+      active.flatMap((a) =>
+        a.moveTarget ? [{ actor: a.id, position: a.moveTarget }] : [],
+      );
+    if (this.destinationPreview || active.some((a) => a.path.length))
+      this.destinationAge = 0;
+    else this.destinationAge += delta;
+    this.destinations.visible = targets.length > 0 && this.destinationAge < 1.5;
+    if (!this.destinations.visible) return;
+    const fade = Math.max(0, 1 - this.destinationAge / 1.5);
+    const color = this.destinationPreview ? AMBER : MINT;
+    for (const marker of this.destinationMarkers) marker.root.visible = false;
+    for (const target of targets) {
+      const marker = this.destinationMarkers[target.actor - 1];
+      marker.root.visible = true;
+      marker.root.position.set(target.position.x, 0, target.position.z);
+      for (const mesh of [marker.ring, marker.number]) {
+        mesh.material.color.setHex(color);
+        mesh.material.opacity = fade * 0.9;
+      }
+    }
+    const p = targets.map((t) => t.position);
+    this.destinationOutline.visible =
+      p.length === 4 &&
+      Math.abs(p[0].x - p[1].x) < 0.001 &&
+      Math.abs(p[1].z - p[2].z) < 0.001 &&
+      Math.abs(p[2].x - p[3].x) < 0.001 &&
+      Math.abs(p[3].z - p[0].z) < 0.001 &&
+      Math.abs(Math.abs(p[0].x - p[2].x) - FORMATION_SPACING) < 0.001 &&
+      Math.abs(Math.abs(p[0].z - p[2].z) - FORMATION_SPACING) < 0.001;
+    if (this.destinationOutline.visible) {
+      const positions =
+        this.destinationOutline.geometry.getAttribute("position");
+      p.forEach((point, i) => positions.setXYZ(i, point.x, 0.055, point.z));
+      positions.needsUpdate = true;
+      this.destinationOutline.material.color.setHex(color);
+      this.destinationOutline.material.opacity = fade * 0.25;
+    }
   }
 
   updateAim(ground: Vec3, visible: boolean) {
@@ -1093,12 +1186,7 @@ export class RangeScene {
       (b.mesh.material as THREE.Material).dispose();
       return false;
     });
-    this.destinationAge += delta;
-    this.destination.visible = this.destinationAge < 1.5;
-    (this.destination.material as THREE.MeshBasicMaterial).opacity = Math.max(
-      0,
-      1 - this.destinationAge / 1.5,
-    );
+    this.updateDestinations(delta);
     this.lightFlash.intensity *= Math.exp(-delta * 22);
     this.renderer.render(this.scene, this.camera);
   }
