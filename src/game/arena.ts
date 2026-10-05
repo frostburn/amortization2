@@ -172,7 +172,7 @@ export class ArenaCombat {
       // Low cover can expose a chassis's upper body; tall cover still needs a flank.
       for (const height of [0.25, 0.7]) {
         const aim = { x: q.x, y: q.y + height, z: q.z };
-        if (sim.ray(sim.muzzle(a, aim), aim, a.body)?.collider.handle === target.collider.handle) {
+        if (sim.fireRay(a, sim.muzzle(a, aim), aim)?.collider.handle === target.collider.handle) {
           brain.aim = aim;
           brain.visible = true;
           break;
@@ -236,7 +236,7 @@ export class ArenaCombat {
       const goal = { x: clamp(q.x + Math.sin(angle) * radius, b.left + 1, b.right - 1),
         z: clamp(q.z + Math.cos(angle) * radius, b.back + 1, b.front - 1) };
       if (!segmentClear(goal, goal, solids, 0.6)) continue;
-      const hit = this.sim.ray({ ...goal, y: 1.4 }, { ...q, y: q.y + 0.25 }, a.body);
+      const hit = this.sim.fireRay(a, { ...goal, y: 1.4 }, { ...q, y: q.y + 0.25 });
       const visible = hit?.collider.handle === target.collider.handle;
       const score = distance2(p, goal) + Math.abs(offset) * 2 + (visible ? 0 : 18);
       if (score < bestScore) { bestScore = score; best = goal; }

@@ -245,7 +245,7 @@ describe("long-range sniper", () => {
     sim.select(5);
     sim.chooseWeapon("rifle");
     sim.toggleSniping();
-    expect(sim.squad.slice(0, 3).every((a) => !a.braced)).toBe(true);
+    expect(sim.squad.slice(0, 3).every((a) => a.braced && !!a.cover)).toBe(true);
 
     for (const leave of [
       () => sim.chooseWeapon("pistol"),
@@ -268,6 +268,7 @@ describe("long-range sniper", () => {
       expect(sim.sniping).toBe(false);
       expect(sim.squad[3].braced).toBe(false);
       expect(sim.trigger).toBe(false);
+      expect(sim.squad.every((a) => !a.cover)).toBe(true);
     }
   });
 

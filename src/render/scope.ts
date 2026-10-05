@@ -79,7 +79,7 @@ export class SniperView {
     const direction = this.camera.getWorldDirection(new THREE.Vector3());
     const origin = this.camera.position;
     const to = origin.clone().addScaledVector(direction, RIFLE.range);
-    const hit = sim.ray(origin, to, operator.body);
+    const hit = sim.fireRay(operator, origin, to);
     sim.aim = origin
       .clone()
       .addScaledVector(direction, hit?.timeOfImpact ?? RIFLE.range);
@@ -141,7 +141,8 @@ export class SniperView {
     const range = this.camera.position.distanceTo(
       new THREE.Vector3().copy(sim.aim),
     );
-    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"}${captured ? "" : " · CLICK TO CAPTURE"}`;
+    const covering = sim.squad.filter((a) => !a.dead && a.cover).length;
+    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"} · ${covering} COVERING${captured ? "" : " · CLICK TO CAPTURE"}`;
 
     const visibility = hiddenObjects.map((o) => o.visible);
     hiddenObjects.forEach((o) => (o.visible = false));

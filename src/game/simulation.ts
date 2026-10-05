@@ -22,6 +22,7 @@ import {
 import { findPath, segmentClear } from "./navigation";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat, type EnemyBrain } from "./arena";
+import { startCoverFire, stopCoverFire, updateCoverFire, type CoverBrain } from "./cover";
 
 export type ActorKind = "player" | "enemy" | TargetKind;
 export interface Actor {
@@ -31,6 +32,7 @@ export interface Actor {
   weapon: Firearm;
   pistol: { ammo: number; reload: number; shotWait: number };
   ai?: EnemyBrain;
+  cover?: CoverBrain;
   deathTime?: number;
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
@@ -113,6 +115,8 @@ export class Simulation {
   time = 0;
   shots = 0;
   hits = 0;
+  coverShots = 0;
+  coverHits = 0;
   throws = 0;
   grenadeHits = 0;
   maxDisplacement = 0;
@@ -155,6 +159,8 @@ export class Simulation {
     this.time = 0;
     this.shots = 0;
     this.hits = 0;
+    this.coverShots = 0;
+    this.coverHits = 0;
     this.throws = 0;
     this.grenadeHits = 0;
     this.maxDisplacement = 0;
@@ -409,7 +415,7 @@ export class Simulation {
 
   release() {
     this.trigger = false;
-    this.sniping = false;
+    this.endSniping();
     for (const a of this.squad) {
       a.firing = false;
       a.braced = false;
@@ -435,12 +441,14 @@ export class Simulation {
     operator.firing = false;
     operator.braced = true;
     operator.braceTime = 0;
+    startCoverFire(this, operator);
     return true;
   }
   endSniping() {
     if (!this.sniping) return;
     this.sniping = false;
     this.trigger = false;
+    stopCoverFire(this);
     const operator = this.squad.find((a) => a.model === "sniper")!;
     operator.braced = false;
     operator.braceTime = 0;
@@ -575,7 +583,7 @@ export class Simulation {
   }
 
   actorAim(a: Actor): Vec3 {
-    return a.ai?.aim ?? this.aim;
+    return a.cover?.aim ?? a.ai?.aim ?? this.aim;
   }
   muzzle(a: Actor, toward: Vec3 = this.actorAim(a), weapon: Firearm = a.weapon): Vec3 {
     const p = a.body.translation();
@@ -595,9 +603,10 @@ export class Simulation {
   /** Nominal firearm line before spread, clipped by cover and weapon reach. */
   aimTrace(a: Actor) {
     const from = this.muzzle(a);
-    const dx = this.aim.x - from.x,
-      dy = this.aim.y - from.y,
-      dz = this.aim.z - from.z;
+    const aim = this.actorAim(a);
+    const dx = aim.x - from.x,
+      dy = aim.y - from.y,
+      dz = aim.z - from.z;
     const length = Math.hypot(dx, dy, dz) || 1;
     const reach = Math.min(length, FIREARMS[a.weapon].range);
     const end = {
@@ -605,7 +614,7 @@ export class Simulation {
       y: from.y + (dy / length) * reach,
       z: from.z + (dz / length) * reach,
     };
-    const hit = this.ray(from, end, a.body);
+    const hit = this.fireRay(a, from, end);
     const distance = hit?.timeOfImpact ?? reach;
     return {
       from,
@@ -615,6 +624,16 @@ export class Simulation {
         z: from.z + (dz / length) * distance,
       },
     };
+  }
+
+  team(a: Actor) {
+    return a.kind === "player" ? "player" : "enemy";
+  }
+
+  /** All weapon sight lines and projectiles pass through allied hulls. */
+  fireRay(a: Actor, from: Vec3, to: Vec3) {
+    const allies = new Set(this.actors.filter((other) => this.team(other) === this.team(a)).map((other) => other.collider.handle));
+    return this.ray(from, to, a.body, (collider) => !allies.has(collider.handle));
   }
 
   ray(
@@ -669,7 +688,8 @@ export class Simulation {
   shoot(a: Actor, weapon: Firearm = a.weapon) {
     const state = this.ammunition(a, weapon);
     if (a.dead || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0) return;
-    if (!this.supports(a, weapon) || (a.kind === "player" && this.weapon !== weapon)) return;
+    const covering = a.kind === "player" && this.sniping && !!a.cover;
+    if (!this.supports(a, weapon) || (a.kind === "player" && !covering && this.weapon !== weapon)) return;
     const spec = FIREARMS[weapon], rifle = weapon === "rifle", pistol = weapon === "pistol";
     const aim = this.actorAim(a);
     const from = this.muzzle(a, aim, weapon);
@@ -694,15 +714,11 @@ export class Simulation {
     dir.x /= norm;
     dir.y /= norm;
     dir.z /= norm;
-    const hit = this.world.castRayAndGetNormal(
-      new RAPIER.Ray(from, dir),
-      spec.range,
-      true,
-      undefined,
-      undefined,
-      undefined,
-      a.body,
-    );
+    const hit = this.fireRay(a, from, {
+      x: from.x + dir.x * spec.range,
+      y: from.y + dir.y * spec.range,
+      z: from.z + dir.z * spec.range,
+    });
     const distance = hit?.timeOfImpact ?? spec.range;
     const to = {
       x: from.x + dir.x * distance,
@@ -711,11 +727,11 @@ export class Simulation {
     };
     const target =
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
-    const hitOpponent = !!target && !target.dead && target.kind !== a.kind;
+    const hitOpponent = !!target && !target.dead && this.team(target) !== this.team(a);
     if (target && !target.dead) {
       this.damage(
         target,
-        target.kind === a.kind ? (rifle ? 35 : 6) : spec.damage,
+        spec.damage,
         {
           x: dir.x * (rifle ? 180 : pistol ? 24 : 48),
           y: dir.y * (rifle ? 24 : pistol ? 6 : 12),
@@ -724,7 +740,10 @@ export class Simulation {
         to,
         weapon,
       );
-      if (a.kind === "player" && target.kind !== "player") this.hits++;
+      if (a.kind === "player" && hitOpponent) {
+        if (covering) this.coverHits++;
+        else this.hits++;
+      }
     } else if (hit?.collider.parent()?.isDynamic()) {
       hit.collider
         .parent()!
@@ -741,7 +760,10 @@ export class Simulation {
       a.stability = Math.max(0, a.stability - (a.braced ? 0.04 : 0.55));
       a.braceTime = 0;
     }
-    if (a.kind === "player") this.shots++;
+    if (a.kind === "player") {
+      if (covering) this.coverShots++;
+      else this.shots++;
+    }
     else if (this.arena) this.arena.enemyShots++;
     const recoil = rifle ? (a.braced ? 12 : RIFLE.recoil) : a.braced ? 1 : pistol ? 8 : 5;
     a.body.applyImpulse({ x: -dir.x * recoil, y: 0, z: -dir.z * recoil }, true);
@@ -786,6 +808,7 @@ export class Simulation {
       if (a.kind === "enemy" && this.arena) this.arena.kills++;
       a.killedBy = source;
       a.firing = false;
+      a.cover = undefined;
       a.path = [];
       // Hand the visible facing to physics before toppling. Living robots may
       // have turned since spawning; interpolation must start from that pose too.
@@ -848,7 +871,7 @@ export class Simulation {
       body,
       fuse: GRENADE_FUSE,
       owner: actor.id,
-      team: actor.kind === "enemy" ? "enemy" : "player",
+      team: this.team(actor),
       previous: from,
       bounceWait: 0.1,
       lastVelocity: velocity,
@@ -885,6 +908,7 @@ export class Simulation {
     this.grenades = this.grenades.filter((g) => g !== grenade);
     let affected = 0;
     for (const a of this.actors) {
+      if (this.team(a) === grenade.team) continue;
       const p = a.body.translation();
       const dx = p.x - origin.x,
         dz = p.z - origin.z,
@@ -940,6 +964,7 @@ export class Simulation {
   step() {
     this.time += STEP;
     this.arena?.update();
+    updateCoverFire(this);
     for (const a of this.actors) {
       a.grenadeCooldown = Math.max(0, a.grenadeCooldown - STEP);
       a.previous = vcopy(a.body.translation());
@@ -975,6 +1000,7 @@ export class Simulation {
         const fire =
           (a.kind === "enemy"
             ? !!a.ai?.fire
+            : a.cover && this.sniping ? a.cover.fire
             : selected && this.trigger && this.weapon === a.weapon && this.supports(a, this.weapon)) &&
           state.reload === 0;
         a.firing = fire && state.ammo > 0;
@@ -983,7 +1009,7 @@ export class Simulation {
         }
         if (fire && state.ammo === 0) this.reloadActor(a);
         this.drive(a);
-        if (selected || (a.kind === "enemy" && a.ai?.target)) {
+        if (selected || a.cover || (a.kind === "enemy" && a.ai?.target)) {
           const p = a.body.translation();
           const aim = this.actorAim(a);
           const desired = Math.atan2(aim.x - p.x, aim.z - p.z);
@@ -1219,6 +1245,9 @@ export class Simulation {
       time: this.time,
       shots: this.shots,
       hits: this.hits,
+      coverShots: this.coverShots,
+      coverHits: this.coverHits,
+      friendlyFire: false,
       throws: this.throws,
       grenadeHits: this.grenadeHits,
       grenadeThrower: this.grenadeThrower?.id ?? null,
@@ -1243,6 +1272,7 @@ export class Simulation {
         weapon: a.weapon,
         pistol: { ...a.pistol, shotWait: Math.max(0, a.pistol.shotWait) },
         ai: a.ai ? { squad: a.ai.squad, state: a.ai.state, target: a.ai.target, gate: a.ai.gate, aim: { ...a.ai.aim } } : null,
+        cover: a.cover ? { state: a.cover.state, target: a.cover.target, aim: { ...a.cover.aim } } : null,
         hp: a.hp,
         maxHp: a.maxHp,
         stability: a.stability,
@@ -1251,6 +1281,7 @@ export class Simulation {
         reload: a.reload,
         grenadeCooldown: a.grenadeCooldown,
         braced: a.braced,
+        firing: a.firing,
         braceProgress: a.braceTime / RIFLE.settle,
         shotWait: Math.max(0, a.shotWait),
         position: vcopy(a.body.translation()),
