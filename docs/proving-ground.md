@@ -68,11 +68,13 @@ Rendering and sound consume simulation events. Visual particles never affect dam
 
 ## Verification and limits
 
-Twenty-one automated tests cover cadence/reload, hit obstruction, displacement, grenade flight/fuse, blast cover, brace recovery, moving-target travel, route clearance, reset, grenade rotation and per-robot availability, correct weapon attribution for drill kills, completion of all three authored drills, square and triangle arrivals, stable steering slots and queued regrouping, formation clearance near cover and yard edges, exact destinations within a grid cell, bounded local passing around a stationary teammate, arrival beside rectangular targets, head-on yielding near cover, and nine repeated squad trips through crowded bays without growing routes or leaving a straggler. Browser smoke checks cover actual mouse/keyboard input, sample decoding, loop start/stop, grenade impact, movement, bracing, pause, reset, desktop layout, selection boxes, steering while firing, and grenade cooldown feedback.
+The 21 Proving Ground tests cover cadence/reload, hit obstruction, displacement, grenade flight/fuse, blast cover, brace recovery, moving-target travel, route clearance, reset, grenade rotation and per-robot availability, correct weapon attribution for drill kills, completion of all three authored drills, square and triangle arrivals, stable steering slots and queued regrouping, formation clearance near cover and yard edges, exact destinations within a grid cell, bounded local passing around a stationary teammate, arrival beside rectangular targets, head-on yielding near cover, and nine repeated squad trips through crowded bays without growing routes or leaving a straggler. Browser smoke checks cover actual mouse/keyboard input, sample decoding, loop start/stop, grenade impact, movement, bracing, pause, reset, desktop layout, selection boxes, steering while firing, and grenade cooldown feedback.
 
 The current compatibility distribution of Rapier inlines its WebAssembly into a roughly 4.3 MB JavaScript chunk (about 1.7 MB gzip). This is the main initial-load cost; Vite reports a large-chunk warning. It is loaded as an engine chunk. Consider the external-WASM distribution when measuring production startup, rather than hiding the warning.
 
 The first browser check uses headless Chromium with a software GPU. It catches rendering and interaction faults but is not a representative hardware frame-rate benchmark. Desktop GPU measurements and Firefox/Safari checks remain open. The narrow layout avoids overflow; touch play is not implemented.
+
+The eight additional sniper checks and the new horizontal lane are described in [NEEDLE and Long Range](sniper-range.md). Robot 4 is now the light sniper model; the other three retain machine guns.
 
 ## Next combat slice
 

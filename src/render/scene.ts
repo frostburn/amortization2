@@ -6,7 +6,6 @@ import {
   FORMATION_SPACING,
   GRAVITY,
   GRENADE_FUSE,
-  PLAYER_SPAWNS,
   clamp,
   grenadeVelocity,
   type BoxSpec,
@@ -19,6 +18,7 @@ import type {
   MoveDestination,
   Simulation,
 } from "../game/simulation";
+import { SniperScope } from "./scope";
 
 const MINT = 0x9be6cd,
   AMBER = 0xd3a24f,
@@ -33,6 +33,7 @@ const dark = material(0x1e2729, 0.45, 0.7);
 const silver = material(0x7e8885, 0.65, 0.4);
 const yellow = material(AMBER, 0.1, 0.7);
 const shell = material(0x557d78, 0.4, 0.55);
+const sniperShell = material(0x97aaa0, 0.5, 0.45);
 const orange = material(ORANGE, 0.25, 0.7);
 const pale = material(0xc8c5ae, 0.1, 0.8);
 const glow = new THREE.MeshBasicMaterial({ color: MINT });
@@ -132,6 +133,7 @@ type ActorVisual = {
   ring: THREE.Mesh;
   flash: THREE.Mesh;
   health: THREE.Sprite;
+  bipod?: THREE.Group;
   dead: boolean;
 };
 type Particle = {
@@ -148,7 +150,9 @@ type Trail = { mesh: THREE.Mesh; life: number };
 export class RangeScene {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
-  camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 180);
+  camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 260);
+  scope = new SniperScope();
+  private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
@@ -246,7 +250,7 @@ export class RangeScene {
   private constructor(
     public canvas: HTMLCanvasElement,
     public sim: Simulation,
-    texture: THREE.Texture,
+    private texture: THREE.Texture,
   ) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -260,10 +264,12 @@ export class RangeScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.03;
+    this.renderer.info.autoReset = false;
     this.scene.background = new THREE.Color(0x242d30);
     this.scene.fog = new THREE.Fog(0x242d30, 90, 145);
     this.scene.add(new THREE.HemisphereLight(0xd4e8ec, 0x44423a, 2.0));
     const sun = new THREE.DirectionalLight(0xffe5be, 3.2);
+    this.sun = sun;
     sun.position.set(-18, 38, 15);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -328,7 +334,9 @@ export class RangeScene {
     this.scene.add(this.aiming, this.destinations);
     this.destinations.visible = false;
     this.buildEnvironment(texture);
+    this.configureRangeLighting();
     this.resetDynamic();
+    this.resetCamera();
     this.resize();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
@@ -351,6 +359,12 @@ export class RangeScene {
       map: wallTex,
       roughness: 0.94,
     });
+    if (this.sim.range === "long") {
+      tex.repeat.set(22, 4);
+      this.buildLongRange(floorMat, concrete);
+      this.batchEnvironment();
+      return;
+    }
     box(this.environment, 48, 0.7, 36, 0, -0.38, -2, floorMat);
     box(this.environment, 47, 0.3, 5.6, 0, -0.16, 11.3, material(0x707874));
     for (const b of BARRIERS) this.makeBarrier(b, concrete);
@@ -469,6 +483,142 @@ export class RangeScene {
     this.batchEnvironment();
   }
 
+  private buildLongRange(floor: THREE.Material, concrete: THREE.Material) {
+    box(this.environment, 108, 0.7, 20, 45, -0.38, 0, floor);
+    box(this.environment, 8, 0.3, 18, -4, -0.16, 0, material(0x707874));
+    for (const b of this.sim.layout.barriers) this.makeBarrier(b, concrete);
+    for (let x = 2; x <= 96; x += 2.5)
+      for (const z of [-6, -1.5, 1.5, 6])
+        box(this.environment, 1.1, 0.012, 0.045, x, 0.02, z, yellow);
+    for (let z = -8; z <= 8; z += 0.65) {
+      const stripe = box(
+        this.environment,
+        0.55,
+        0.018,
+        0.28,
+        0,
+        0.025,
+        z,
+        yellow,
+      );
+      stripe.rotation.y = -0.45;
+    }
+    label(
+      this.environment,
+      "04 / LONG RANGE",
+      16,
+      1.1,
+      12,
+      0.035,
+      -5,
+      true,
+      "#d8c796",
+    );
+    label(
+      this.environment,
+      "FIRING LINE",
+      7,
+      0.6,
+      -3.5,
+      0.035,
+      7,
+      true,
+      "#c5ccbc",
+    );
+    for (const [i, target] of this.sim.layout.targets.entries()) {
+      const distance = (i + 1) * 30;
+      label(
+        this.environment,
+        `${distance} m`,
+        5,
+        1.4,
+        target.x,
+        0.03,
+        7.1,
+        true,
+        "#c7994a",
+      );
+      const plate = label(
+        this.environment,
+        `${distance} m`,
+        2.8,
+        0.5,
+        target.x + 0.6,
+        2.6,
+        target.z,
+        false,
+        "#d8c796",
+      );
+      plate.rotation.y = -Math.PI / 2;
+      for (const z of [-7.8, 7.8]) {
+        cylinder(this.environment, 0.055, 2.3, target.x, 1.15, z, silver);
+        box(this.environment, 0.25, 0.08, 0.35, target.x, 2.25, z, yellow);
+      }
+    }
+    for (let x = -6; x < 98; x += 6) {
+      box(this.environment, 0.025, 0.007, 18, x, 0.009, 0, dark);
+      box(this.environment, 0.22, 3, 0.4, x, 1.5, -9.0, concrete);
+    }
+    for (const z of [-3, 3])
+      box(this.environment, 106, 0.007, 0.016, 45, 0.009, z, dark);
+    label(
+      this.environment,
+      "PRECISION / BRACE BEFORE FIRING",
+      18,
+      0.8,
+      88,
+      2.2,
+      -8.95,
+      false,
+      "#283230",
+    );
+  }
+
+  private configureRangeLighting() {
+    const long = this.sim.range === "long";
+    this.scene.fog = new THREE.Fog(0x242d30, long ? 115 : 90, long ? 180 : 145);
+    this.sun.position.set(long ? 10 : -18, long ? 70 : 38, long ? 30 : 15);
+    this.sun.target.position.set(long ? 45 : 0, 0, 0);
+    const camera = this.sun.shadow.camera;
+    camera.left = -(long ? 76 : 36);
+    camera.right = long ? 76 : 36;
+    camera.top = long ? 40 : 32;
+    camera.bottom = -(long ? 40 : 32);
+    camera.far = long ? 180 : 95;
+    camera.updateProjectionMatrix();
+  }
+
+  resetEnvironment() {
+    const shared = new Set<THREE.Material>([
+      metal,
+      dark,
+      silver,
+      yellow,
+      shell,
+      sniperShell,
+      orange,
+      pale,
+      glow,
+      targetPaint,
+    ]);
+    const materials = new Set<THREE.Material>();
+    this.environment.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      o.geometry.dispose();
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      list.forEach((m) => materials.add(m));
+    });
+    for (const m of materials)
+      if (!shared.has(m)) {
+        const map = (m as THREE.MeshStandardMaterial).map;
+        if (map && map !== this.texture) map.dispose();
+        m.dispose();
+      }
+    this.environment.clear();
+    this.buildEnvironment(this.texture);
+    this.configureRangeLighting();
+  }
+
   private makeBarrier(b: BoxSpec, concrete: THREE.Material) {
     if (b.style === "crate") {
       const crate = this.makeCrate(b.w, b.h, b.d);
@@ -561,7 +711,10 @@ export class RangeScene {
     model.position.y = -0.96;
     const legs: THREE.Group[] = [];
     const friend = a.kind === "player";
-    const bodyMat = friend ? shell : orange;
+    const sniper = a.model === "sniper";
+    const bodyMat = sniper ? sniperShell : friend ? shell : orange;
+    let bipod: THREE.Group | undefined;
+    if (sniper) model.scale.x = 0.74;
     if (friend || a.kind === "heavy") {
       for (const x of [-0.24, 0.24]) {
         const leg = new THREE.Group();
@@ -599,11 +752,51 @@ export class RangeScene {
         box(torso, 0.2, 0.19, 0.35, sign * 0.48, 0.02, 0.32, bodyMat);
       }
       if (friend) {
-        box(torso, 0.22, 0.2, 0.63, 0.28, 0.3, 0.47, dark);
-        const barrel = cylinder(torso, 0.052, 0.48, 0.28, 0.3, 0.94, silver);
+        box(
+          torso,
+          sniper ? 0.16 : 0.22,
+          sniper ? 0.17 : 0.2,
+          sniper ? 0.72 : 0.63,
+          0.28,
+          0.3,
+          sniper ? 0.61 : 0.47,
+          dark,
+        );
+        const barrel = cylinder(
+          torso,
+          sniper ? 0.043 : 0.052,
+          sniper ? 0.85 : 0.48,
+          0.28,
+          0.3,
+          sniper ? 1.28 : 0.94,
+          silver,
+        );
         barrel.rotation.x = Math.PI / 2;
-        box(torso, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
-        box(torso, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
+        if (sniper) {
+          box(torso, 0.12, 0.28, 0.2, 0.28, 0.11, 0.56, metal);
+          const optic = cylinder(torso, 0.085, 0.36, 0.28, 0.49, 0.6, dark);
+          optic.rotation.x = Math.PI / 2;
+          const lens = cylinder(torso, 0.065, 0.02, 0.28, 0.49, 0.79, glow);
+          lens.rotation.x = Math.PI / 2;
+          bipod = new THREE.Group();
+          for (const sign of [-1, 1]) {
+            const leg = cylinder(
+              bipod,
+              0.025,
+              0.38,
+              0.28 + sign * 0.12,
+              0.06,
+              1.04,
+              silver,
+            );
+            leg.rotation.z = sign * 0.5;
+          }
+          torso.add(bipod);
+          this.batchRigidPart(bipod);
+        } else {
+          box(torso, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
+          box(torso, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
+        }
         cylinder(torso, 0.013, 0.44, -0.25, 0.87, -0.2, dark);
       }
     } else {
@@ -642,7 +835,7 @@ export class RangeScene {
       new THREE.MeshBasicMaterial({ color: 0xffdc9c }),
     );
     flash.scale.set(0.65, 0.65, 2);
-    flash.position.set(0.28, 0.3, 1.24);
+    flash.position.set(0.28, 0.3, sniper ? 1.76 : 1.24);
     torso.add(flash);
     flash.visible = false;
     const healthTexture = labelTexture(
@@ -662,7 +855,7 @@ export class RangeScene {
     this.dynamic.add(health);
     health.visible = false;
     this.dynamic.add(root);
-    return { root, torso, legs, ring, flash, health, dead: false };
+    return { root, torso, legs, ring, flash, health, bipod, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -741,7 +934,11 @@ export class RangeScene {
     const rect = this.canvas.getBoundingClientRect();
     this.renderer.setSize(rect.width, rect.height, false);
     const aspect = rect.width / Math.max(1, rect.height);
-    const half = Math.max(this.baseHalfHeight, 23 / aspect) / this.zoom;
+    const half =
+      Math.max(
+        this.baseHalfHeight,
+        (this.sim.range === "long" ? 58 : 23) / aspect,
+      ) / this.zoom;
     this.camera.left = -half * aspect;
     this.camera.right = half * aspect;
     this.camera.top = half;
@@ -750,26 +947,46 @@ export class RangeScene {
     this.updateCamera();
   }
   private updateCamera() {
-    this.camera.position.copy(this.cameraTarget).add(this.cameraOffset);
+    this.camera.position
+      .copy(this.cameraOffset)
+      .multiplyScalar(1 / this.zoom)
+      .add(this.cameraTarget);
     this.camera.lookAt(this.cameraTarget);
     this.camera.updateMatrixWorld();
   }
   zoomBy(delta: number) {
-    this.zoom = clamp(this.zoom * Math.exp(-delta * 0.001), 0.8, 2.1);
+    const previous = this.zoom;
+    this.zoom = clamp(
+      this.zoom * Math.exp(-delta * 0.001),
+      0.8,
+      this.sim.range === "long" ? 5 : 2.8,
+    );
+    if (this.sim.weapon === "rifle" && previous < 1.5 && this.zoom >= 1.5)
+      this.center();
     this.resize();
   }
   pan(dx: number, dz: number) {
-    this.cameraTarget.x = clamp(this.cameraTarget.x + dx, -15, 15);
-    this.cameraTarget.z = clamp(this.cameraTarget.z + dz, -12, 10);
+    const b = this.sim.layout.bounds;
+    this.cameraTarget.x = clamp(this.cameraTarget.x + dx, b.left, b.right);
+    this.cameraTarget.z = clamp(this.cameraTarget.z + dz, b.back, b.front);
     this.updateCamera();
   }
-  center() {
-    const p = this.sim.primary.body.translation();
-    this.cameraTarget.set(p.x * 0.35, 0, p.z * 0.35 - 3);
+  center(onlyIfClose = false) {
+    if (onlyIfClose && this.zoom < 1.5) return;
+    const p = (
+      this.sim.weapon === "rifle"
+        ? (this.sim.rifleOperator ?? this.sim.primary)
+        : this.sim.primary
+    ).body.translation();
+    this.cameraTarget.set(p.x, 0, p.z);
     this.updateCamera();
   }
   resetCamera() {
-    this.cameraTarget.set(0, 0, -2.5);
+    this.cameraTarget.set(
+      this.sim.range === "long" ? 45 : 0,
+      0,
+      this.sim.range === "long" ? 0 : -2.5,
+    );
     this.zoom = 1;
     this.resize();
   }
@@ -778,8 +995,16 @@ export class RangeScene {
     clientX: number,
     clientY: number,
     grenade = false,
-  ): { aim: Vec3; ground: Vec3; actor?: number } | null {
+  ): { aim: Vec3; ground: Vec3; actor?: number; scope?: boolean } | null {
     const rect = this.canvas.getBoundingClientRect();
+    if (!grenade && this.sim.weapon === "rifle") {
+      const picked = this.scope.pick(
+        clientX - rect.left,
+        clientY - rect.top,
+        this.sim,
+      );
+      if (picked) return picked;
+    }
     this.raycaster.setFromCamera(
       new THREE.Vector2(
         ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -1031,7 +1256,8 @@ export class RangeScene {
     }
   }
 
-  render(alpha: number, delta: number, elapsed: number) {
+  render(alpha: number, delta: number, elapsed: number, paused = false) {
+    this.renderer.info.reset();
     this.updateCamera();
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
@@ -1066,6 +1292,7 @@ export class RangeScene {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
       });
       v.torso.rotation.x = a.dead ? 0 : a.braced ? -0.12 : -a.recoil * 0.13;
+      if (v.bipod) v.bipod.visible = a.braced && !a.dead;
       v.torso.rotation.z = a.dead
         ? 0
         : Math.sin(elapsed * 35) * (1 - a.stability) * 0.1;
@@ -1200,5 +1427,23 @@ export class RangeScene {
     this.updateDestinations(delta);
     this.lightFlash.intensity *= Math.exp(-delta * 22);
     this.renderer.render(this.scene, this.camera);
+    const operator = this.sim.rifleOperator;
+    const visual = operator && this.actors.get(operator.id);
+    this.scope.render(
+      this.renderer,
+      this.scene,
+      this.camera,
+      this.sim,
+      visual
+        ? [
+            visual.root,
+            visual.ring,
+            visual.health,
+            this.aiming,
+            this.destinations,
+          ]
+        : [],
+      !paused,
+    );
   }
 }

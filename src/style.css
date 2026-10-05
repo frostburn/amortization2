@@ -13,6 +13,9 @@
 * {
   box-sizing: border-box;
 }
+[hidden] {
+  display: none !important;
+}
 body {
   margin: 0;
   overflow: hidden;
@@ -97,6 +100,28 @@ button:disabled {
   border-color: transparent;
   font:
     11px ui-monospace,
+    monospace;
+  letter-spacing: 1px;
+}
+.range-title select,
+.range-choice select {
+  color: #d9e1dc;
+  background: #152124;
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+  font:
+    12px ui-monospace,
+    monospace;
+  letter-spacing: 1px;
+  max-width: 100%;
+}
+.range-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font:
+    10px ui-monospace,
     monospace;
   letter-spacing: 1px;
 }
@@ -448,13 +473,71 @@ kbd {
   margin-right: 4px;
   box-shadow: 0 1px #080e10;
 }
-#reload-progress {
+.reload-progress {
   position: absolute;
   left: 0;
   bottom: 0;
   height: 3px;
   background: var(--amber);
   width: 0;
+}
+.weapon:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.rifle .weapon-icon {
+  width: 44px;
+}
+.rifle .weapon-name small {
+  min-width: 120px;
+}
+.sniper-unit svg {
+  transform: scaleX(0.72);
+  color: #c6d4c9;
+}
+.unit-role {
+  position: absolute;
+  left: 8px;
+  bottom: 26px;
+  font:
+    7px ui-monospace,
+    monospace;
+  color: var(--amber);
+}
+#scope-label {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  text-align: center;
+  color: var(--amber);
+  background: #121b1ee8;
+  padding: 7px 4px;
+  border: 1px solid #566b63;
+  border-radius: 2px;
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 0.7px;
+}
+#scope-label[data-state="ready"] {
+  color: var(--mint);
+}
+#sight-controls {
+  margin: 15px 0 5px;
+  pointer-events: auto;
+}
+#sight-controls > div {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+}
+#sight-controls button {
+  flex: 1;
+  padding: 7px 4px;
+  font:
+    10px ui-monospace,
+    monospace;
+  color: var(--mint);
 }
 .weapon.reloading .ammo b {
   color: var(--amber);
@@ -700,7 +783,12 @@ a:hover {
     letter-spacing: 3px;
   }
   .range-title {
-    display: none;
+    display: block;
+  }
+  .range-title select {
+    font-size: 9px;
+    padding: 7px 5px;
+    letter-spacing: 0;
   }
   .topbar nav {
     min-width: 0;
@@ -732,6 +820,9 @@ a:hover {
     bottom: 7px;
     font-size: 6px;
   }
+  .unit-role {
+    display: none;
+  }
   .unit-key {
     font-size: 13px;
     left: 6px;
@@ -747,7 +838,23 @@ a:hover {
     gap: 7px;
   }
   .weapon-name {
-    font-size: 9px;
+    font-size: 8px;
+  }
+  .weapon-icon,
+  .rifle .weapon-icon {
+    width: 26px;
+  }
+  .weapon-name small {
+    font-size: 7px;
+  }
+  .rifle .weapon-name small {
+    min-width: 98px;
+  }
+  .ammo {
+    font-size: 18px;
+  }
+  .ammo span {
+    font-size: 12px;
   }
   .grenade {
     min-width: 140px;

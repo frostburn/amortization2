@@ -2,8 +2,12 @@ import startUrl from "../../sounds/854644__qubodup__machine-gun-burst-loop-start
 import loopUrl from "../../sounds/854643__qubodup__machine-gun-burst-loop-middle-10-shots.wav?url";
 import endUrl from "../../sounds/854642__qubodup__machine-gun-burst-loop-end.wav?url";
 import blastUrl from "../../sounds/855893__qubodup__blast.flac?url";
+import rifleNearUrl from "../../sounds/855602__qubodup__sniper-shot-from-wood-and-metal-post-1-ga-precision-m40a6.flac?url";
+import rifleFarUrl from "../../sounds/855606__qubodup__sniper-shot-in-field-1-m2010-enhanced-sniper-rifle-esr.flac?url";
+import rifleReloadUrl from "../../sounds/855601__qubodup__putting.flac?url";
 import { clamp, type Vec3 } from "../game/config";
 import type { GameEvent, Simulation } from "../game/simulation";
+import { rifleMix } from "./spatial";
 
 type Voice = {
   start: AudioBufferSourceNode;
@@ -24,6 +28,12 @@ export class RangeAudio {
   volume = 0.6;
   failed = false;
   ready = false;
+  private listener: Vec3 = { x: 0, y: 28, z: 35.5 };
+  private lastRifle?: ReturnType<typeof rifleMix>;
+
+  setListener(position: Vec3) {
+    this.listener = { ...position };
+  }
 
   async unlock() {
     if (this.context) {
@@ -51,6 +61,9 @@ export class RangeAudio {
         loop: loopUrl,
         end: endUrl,
         blast: blastUrl,
+        rifleNear: rifleNearUrl,
+        rifleFar: rifleFarUrl,
+        rifleReload: rifleReloadUrl,
       }).map(async ([key, url]) => {
         const response = await fetch(url);
         if (!response.ok)
@@ -91,13 +104,19 @@ export class RangeAudio {
     const amp = ctx.createGain();
     amp.gain.value = gain;
     const pan = ctx.createStereoPanner();
-    pan.pan.value = clamp(position.x / 28, -0.8, 0.8);
+    pan.pan.value = clamp((position.x - this.listener.x) / 32, -0.8, 0.8);
     amp.connect(pan);
     pan.connect(this.effects!);
     return { amp, pan };
   }
 
-  private sample(key: string, position: Vec3, gain: number, rate = 1) {
+  private sample(
+    key: string,
+    position: Vec3,
+    gain: number,
+    rate = 1,
+    offset = 0,
+  ) {
     const buffer = this.buffers.get(key);
     if (!buffer || !this.context) return;
     const { amp, pan } = this.bus(position, gain);
@@ -110,12 +129,14 @@ export class RangeAudio {
       amp.disconnect();
       pan.disconnect();
     };
-    source.start();
+    source.start(0, offset);
   }
 
   update(sim: Simulation, paused: boolean) {
     if (!this.ready || !this.context) return;
-    const firing = paused ? [] : sim.squad.filter((a) => a.firing && !a.dead);
+    const firing = paused
+      ? []
+      : sim.squad.filter((a) => a.firing && !a.dead && a.model === "assault");
     for (const id of this.voices.keys())
       if (!firing.some((a) => a.id === id))
         this.stopGun(
@@ -132,7 +153,7 @@ export class RangeAudio {
       const voice = this.voices.get(a.id);
       if (voice) {
         voice.pan.pan.setTargetAtTime(
-          clamp(position.x / 28, -0.8, 0.8),
+          clamp((position.x - this.listener.x) / 32, -0.8, 0.8),
           this.context.currentTime,
           0.05,
         );
@@ -234,6 +255,15 @@ export class RangeAudio {
   event(e: GameEvent) {
     if (!this.ready) return;
     if (e.type === "shot") {
+      if (e.weapon === "rifle") {
+        const mix = rifleMix(e.from, this.listener);
+        this.lastRifle = mix;
+        // Equal-power mix; align the recordings' attacks without cutting their tails.
+        if (mix.near > 0.001)
+          this.sample("rifleNear", e.from, mix.gain * mix.near, 1, 0.005);
+        if (mix.far > 0.001)
+          this.sample("rifleFar", e.from, mix.gain * mix.far);
+      }
       if (e.hit || Math.random() < 0.3)
         this.impact(e.to, e.material === "metal");
     } else if (e.type === "explosion") {
@@ -242,7 +272,8 @@ export class RangeAudio {
     } else if (e.type === "bounce") this.impact(e.position, true, 0.6);
     else if (e.type === "throw") this.impact(e.position, true, 0.2);
     else if (e.type === "reload") {
-      this.impact(e.position, true, 0.8);
+      if (e.weapon === "rifle") this.sample("rifleReload", e.position, 0.5);
+      else this.impact(e.position, true, 0.8);
     } else if (e.type === "down") this.tone(e.position, 155, 0.11, 0.28, 70);
   }
   inspect() {
@@ -253,6 +284,7 @@ export class RangeAudio {
       context: this.context?.state,
       buffers: [...this.buffers.keys()],
       loops: this.voices.size,
+      rifle: this.lastRifle,
     };
   }
 }

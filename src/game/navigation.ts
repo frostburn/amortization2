@@ -1,12 +1,12 @@
-import { BOUNDS, distance2, type BoxSpec, type Vec2 } from "./config";
+import {
+  BOUNDS,
+  distance2,
+  type BoxSpec,
+  type RangeBounds,
+  type Vec2,
+} from "./config";
 
 const CELL = 0.75;
-const WIDTH = Math.floor((BOUNDS.right - BOUNDS.left) / CELL);
-const HEIGHT = Math.floor((BOUNDS.front - BOUNDS.back) / CELL);
-const position = (id: number): Vec2 => ({
-  x: BOUNDS.left + ((id % WIDTH) + 0.5) * CELL,
-  z: BOUNDS.back + (Math.floor(id / WIDTH) + 0.5) * CELL,
-});
 
 export function segmentClear(
   a: Vec2,
@@ -42,15 +42,22 @@ export function findPath(
   goal: Vec2,
   boxes: Pick<BoxSpec, "x" | "z" | "w" | "d">[],
   radius = 0.55,
+  bounds: RangeBounds = BOUNDS,
 ): Vec2[] {
+  const WIDTH = Math.floor((bounds.right - bounds.left) / CELL);
+  const HEIGHT = Math.floor((bounds.front - bounds.back) / CELL);
+  const position = (id: number): Vec2 => ({
+    x: bounds.left + ((id % WIDTH) + 0.5) * CELL,
+    z: bounds.back + (Math.floor(id / WIDTH) + 0.5) * CELL,
+  });
   const blocked = new Uint8Array(WIDTH * HEIGHT);
   for (let id = 0; id < blocked.length; id++) {
     const p = position(id);
     if (
-      p.x < BOUNDS.left + radius ||
-      p.x > BOUNDS.right - radius ||
-      p.z < BOUNDS.back + radius ||
-      p.z > BOUNDS.front - radius ||
+      p.x < bounds.left + radius ||
+      p.x > bounds.right - radius ||
+      p.z < bounds.back + radius ||
+      p.z > bounds.front - radius ||
       boxes.some(
         (b) =>
           Math.abs(p.x - b.x) < b.w / 2 + radius &&
@@ -60,10 +67,10 @@ export function findPath(
       blocked[id] = 1;
   }
   const exactGoal =
-    goal.x >= BOUNDS.left + radius &&
-    goal.x <= BOUNDS.right - radius &&
-    goal.z >= BOUNDS.back + radius &&
-    goal.z <= BOUNDS.front - radius &&
+    goal.x >= bounds.left + radius &&
+    goal.x <= bounds.right - radius &&
+    goal.z >= bounds.back + radius &&
+    goal.z <= bounds.front - radius &&
     boxes.every(
       (b) =>
         Math.abs(goal.x - b.x) >= b.w / 2 + radius ||
