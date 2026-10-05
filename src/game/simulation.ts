@@ -1,16 +1,14 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
   BLAST_RADIUS,
+  FIREARMS,
   FORMATION_SPACING,
   GRAVITY,
   GRENADE_COOLDOWN,
   GRENADE_FUSE,
-  GUN_RANGE,
-  MAGAZINE,
+  PISTOL,
   RIFLE,
   ROBOT_MODELS,
-  RELOAD_SECONDS,
-  SHOT_INTERVAL,
   STEP,
   clamp,
   distance2,
@@ -19,15 +17,21 @@ import {
   type Vec3,
   type RobotModel,
   type Weapon,
+  type Firearm,
 } from "./config";
 import { findPath, segmentClear } from "./navigation";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
+import { ArenaCombat, type EnemyBrain } from "./arena";
 
-export type ActorKind = "player" | TargetKind;
+export type ActorKind = "player" | "enemy" | TargetKind;
 export interface Actor {
   id: number;
   kind: ActorKind;
   model: RobotModel | null;
+  weapon: Firearm;
+  pistol: { ammo: number; reload: number; shotWait: number };
+  ai?: EnemyBrain;
+  deathTime?: number;
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
   spawn: Vec3;
@@ -65,6 +69,7 @@ export interface Grenade {
   body: RAPIER.RigidBody;
   fuse: number;
   owner: number;
+  team: "player" | "enemy";
   previous: Vec3;
   bounceWait: number;
   lastVelocity: Vec3;
@@ -73,21 +78,21 @@ export type GameEvent =
   | {
       type: "shot";
       actor: number;
-      weapon: "gun" | "rifle";
+      weapon: Firearm;
       from: Vec3;
       to: Vec3;
       hit: boolean;
       material: "metal" | "concrete";
       normal: Vec3;
     }
-  | { type: "explosion"; position: Vec3; affected: number }
+  | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" }
   | {
       type: "throw" | "bounce" | "reload" | "empty" | "down";
       position: Vec3;
       actor?: number;
-      weapon?: "gun" | "rifle";
+      weapon?: Firearm;
     }
-  | { type: "drill"; message: string };
+  | { type: "drill" | "wave"; message: string };
 
 const vcopy = (v: Vec3): Vec3 => ({ x: v.x, y: v.y, z: v.z });
 export type MoveDestination = { actor: number; position: Vec2 };
@@ -104,6 +109,7 @@ export class Simulation {
   sniping = false;
   weapon: Weapon = "gun";
   range: RangeId;
+  arena?: ArenaCombat;
   time = 0;
   shots = 0;
   hits = 0;
@@ -137,12 +143,14 @@ export class Simulation {
     this.props = [];
     this.grenades = [];
     this.events = [];
-    this.selected = new Set([range === "long" ? 4 : 1]);
+    this.selected = new Set(range === "arena" ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
     this.trigger = false;
     this.sniping = false;
     this.weapon = range === "long" ? "rifle" : "gun";
     this.aim =
-      range === "long" ? { x: 58, y: 3.25, z: 0 } : { x: -14, y: 1.25, z: -8 };
+      range === "long" ? { x: 58, y: 3.25, z: 0 }
+        : range === "arena" ? { x: 0, y: 1.25, z: -14 }
+        : { x: -14, y: 1.25, z: -8 };
     this.rifleAim = undefined;
     this.time = 0;
     this.shots = 0;
@@ -204,6 +212,7 @@ export class Simulation {
     }
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
+    this.arena = range === "arena" ? new ArenaCombat(this) : undefined;
   }
 
   private addActor(
@@ -212,12 +221,14 @@ export class Simulation {
     x: number,
     z: number,
     elevation = 0,
+    enemyModel?: RobotModel,
   ) {
     const player = kind === "player";
-    const model: RobotModel | null = player
-      ? id === 4
+    const robot = player || kind === "enemy";
+    const model: RobotModel | null = robot
+      ? enemyModel ?? (id === 4
         ? "sniper"
-        : "assault"
+        : "assault")
       : null;
     const yaw =
       this.range === "long"
@@ -237,17 +248,17 @@ export class Simulation {
           w: Math.cos(yaw / 2),
         })
         .lockRotations()
-        .setLinearDamping(player ? 0.3 : 1.5)
+        .setLinearDamping(robot ? 0.3 : 1.5)
         .setAngularDamping(5)
         .setCcdEnabled(true),
     );
-    const shape = player
+    const shape = robot
       ? RAPIER.ColliderDesc.capsule(0.56, 0.37)
       : RAPIER.ColliderDesc.cuboid(0.48, 0.96, 0.3);
     const collider = this.world.createCollider(
       shape
         .setMass(model ? ROBOT_MODELS[model].mass : kind === "plate" ? 90 : 48)
-        .setFriction(player ? 0.3 : 0.42)
+        .setFriction(robot ? 0.3 : 0.42)
         .setRestitution(0),
       body,
     );
@@ -258,10 +269,12 @@ export class Simulation {
         : kind === "moving"
           ? 168
           : 84;
-    this.actors.push({
+    const actor: Actor = {
       id,
       kind,
       model,
+      weapon: model ? ROBOT_MODELS[model].weapon : "gun",
+      pistol: { ammo: model === "sniper" ? PISTOL.magazine : 0, reload: 0, shotWait: 0 },
       body,
       collider,
       spawn: { x, y: elevation + 0.98, z },
@@ -269,7 +282,7 @@ export class Simulation {
       maxHp: hp,
       stability: 1,
       yaw,
-      ammo: model === "sniper" ? RIFLE.magazine : MAGAZINE,
+      ammo: FIREARMS[model ? ROBOT_MODELS[model].weapon : "gun"].magazine,
       reload: 0,
       grenadeCooldown: 0,
       shotWait: 0,
@@ -282,7 +295,18 @@ export class Simulation {
       recoil: 0,
       previous: { x, y: elevation + 0.98, z },
       previousRotation: { ...body.rotation() },
-    });
+    };
+    this.actors.push(actor);
+    return actor;
+  }
+
+  addEnemy(model: RobotModel, position: Vec2) {
+    return this.addActor(this.nextId++, "enemy", position.x, position.z, 0, model);
+  }
+  retireEnemy(actor: Actor) {
+    if (actor.kind !== "enemy") return;
+    this.world.removeRigidBody(actor.body);
+    this.actors = this.actors.filter((a) => a !== actor);
   }
 
   random() {
@@ -303,17 +327,29 @@ export class Simulation {
   get rifleOperator() {
     return this.active.find((a) => a.model === "sniper");
   }
-  magazine(a: Actor) {
-    return a.model === "sniper" ? RIFLE.magazine : MAGAZINE;
+  ammunition(a: Actor, weapon: Firearm = a.weapon) {
+    return weapon === "pistol" ? a.pistol : a;
   }
-  reloadDuration(a: Actor) {
-    return a.model === "sniper" ? RIFLE.reload : RELOAD_SECONDS;
+  magazine(a: Actor, weapon: Firearm = a.weapon) {
+    return FIREARMS[weapon].magazine;
+  }
+  reloadDuration(a: Actor, weapon: Firearm = a.weapon) {
+    return FIREARMS[weapon].reload;
+  }
+  supports(a: Actor, weapon: Weapon) {
+    return !!a.model && (ROBOT_MODELS[a.model].weapons as readonly Weapon[]).includes(weapon);
+  }
+  get closeWeapon(): Firearm {
+    if (this.weapon === "pistol" && this.canUse("pistol")) return "pistol";
+    return this.active.some((a) => a.model === "assault") ? "gun" : "pistol";
+  }
+  get nextCloseWeapon(): Firearm {
+    if (this.weapon === "gun" && this.canUse("pistol")) return "pistol";
+    if (this.weapon === "pistol" && this.canUse("gun")) return "gun";
+    return this.closeWeapon;
   }
   canUse(weapon: Weapon) {
-    return (
-      weapon === "grenade" ||
-      this.active.some((a) => ROBOT_MODELS[a.model!].weapon === weapon)
-    );
+    return this.active.some((a) => this.supports(a, weapon));
   }
   chooseWeapon(weapon: Weapon) {
     if (!this.canUse(weapon)) return false;
@@ -321,24 +357,26 @@ export class Simulation {
     if (this.weapon === "rifle") this.rifleAim = vcopy(this.aim);
     if (weapon === "rifle" && this.rifleAim) this.aim = vcopy(this.rifleAim);
     this.weapon = weapon;
+    if (weapon !== "grenade")
+      for (const a of this.active)
+        if (this.supports(a, weapon)) a.weapon = weapon;
     this.trigger = false;
     for (const a of this.squad) a.firing = false;
     return true;
   }
   private matchWeapon() {
     if (
-      this.weapon !== "grenade" &&
       !this.canUse(this.weapon) &&
       this.active.length
     )
       this.chooseWeapon(ROBOT_MODELS[this.primary.model!].weapon);
   }
   get grenadeThrower(): Actor | undefined {
-    const ready = this.active.filter((a) => a.grenadeCooldown === 0);
+    const ready = this.active.filter((a) => this.supports(a, "grenade") && a.grenadeCooldown === 0);
     return ready.find((a) => a.id > this.lastGrenadier) ?? ready[0];
   }
   get grenadeCooldown() {
-    const active = this.active;
+    const active = this.active.filter((a) => this.supports(a, "grenade"));
     return active.length
       ? Math.min(...active.map((a) => a.grenadeCooldown))
       : 0;
@@ -420,7 +458,7 @@ export class Simulation {
       })),
       ...(includeTargets
         ? this.actors
-            .filter((a) => a.kind !== "player" && !a.dead)
+            .filter((a) => !a.model && !a.dead)
             .map((a) => ({
               x: a.body.translation().x,
               z: a.body.translation().z,
@@ -503,48 +541,48 @@ export class Simulation {
 
   move(point: Vec2, queue = false) {
     this.endSniping();
-    const boxes = this.navigationBoxes();
     for (const target of this.moveDestinations(point)) {
       const actor = this.actors.find((a) => a.id === target.actor)!;
-      const start =
-        queue && actor.path.length
-          ? actor.path.at(-1)!
-          : actor.body.translation();
-      const path = findPath(
-        start,
-        target.position,
-        boxes,
-        0.55,
-        this.layout.bounds,
-      );
       actor.braced = false;
       actor.braceTime = 0;
-      actor.moveTarget = target.position;
-      actor.path = queue ? [...actor.path, ...path] : path;
+      this.navigate(actor, target.position, queue);
     }
+  }
+  navigate(actor: Actor, point: Vec2, queue = false) {
+    const start = queue && actor.path.length ? actor.path.at(-1)! : actor.body.translation();
+    const path = findPath(start, point, this.navigationBoxes(), 0.55, this.layout.bounds);
+    actor.moveTarget = path.at(-1);
+    actor.path = queue ? [...actor.path, ...path] : path;
   }
 
   reloadSelected() {
-    for (const a of this.active) this.reloadActor(a);
+    for (const a of this.active) {
+      const weapon = this.weapon === "grenade" ? a.weapon : this.weapon;
+      if (this.supports(a, weapon)) this.reloadActor(a, weapon);
+    }
   }
-  private reloadActor(a: Actor) {
-    if (a.reload > 0 || a.ammo === this.magazine(a) || a.dead) return;
-    a.reload = this.reloadDuration(a);
+  reloadActor(a: Actor, weapon: Firearm = a.weapon) {
+    const state = this.ammunition(a, weapon);
+    if (state.reload > 0 || state.ammo === this.magazine(a, weapon) || a.dead) return;
+    state.reload = this.reloadDuration(a, weapon);
     a.firing = false;
     this.events.push({
       type: "reload",
       actor: a.id,
-      weapon: a.model === "sniper" ? "rifle" : "gun",
+      weapon,
       position: vcopy(a.body.translation()),
     });
   }
 
-  muzzle(a: Actor, toward: Vec3 = this.aim): Vec3 {
+  actorAim(a: Actor): Vec3 {
+    return a.ai?.aim ?? this.aim;
+  }
+  muzzle(a: Actor, toward: Vec3 = this.actorAim(a), weapon: Firearm = a.weapon): Vec3 {
     const p = a.body.translation();
     const dx = toward.x - p.x,
       dz = toward.z - p.z,
       length = Math.hypot(dx, dz) || 1;
-    const reach = a.model === "sniper" ? 1.65 : 0.86;
+    const reach = FIREARMS[weapon].muzzle;
     const dy = toward.y - p.y - 0.42;
     const pitchedLength = Math.hypot(dx, dy, dz) || 1;
     return {
@@ -561,7 +599,7 @@ export class Simulation {
       dy = this.aim.y - from.y,
       dz = this.aim.z - from.z;
     const length = Math.hypot(dx, dy, dz) || 1;
-    const reach = Math.min(length, a.model === "sniper" ? RIFLE.range : GUN_RANGE);
+    const reach = Math.min(length, FIREARMS[a.weapon].range);
     const end = {
       x: from.x + (dx / length) * reach,
       y: from.y + (dy / length) * reach,
@@ -610,11 +648,11 @@ export class Simulation {
   }
 
   // Settling, recoil and stability affect the shot around the fixed sight line.
-  rifleDirection(a: Actor): Vec3 {
+  rifleDirection(a: Actor, toward: Vec3 = this.actorAim(a)): Vec3 {
     const from = this.muzzle(a),
-      dx = this.aim.x - from.x,
-      dy = this.aim.y - from.y,
-      dz = this.aim.z - from.z;
+      dx = toward.x - from.x,
+      dy = toward.y - from.y,
+      dz = toward.z - from.z;
     const length = Math.hypot(dx, dy, dz) || 1,
       horizontal = Math.hypot(dx, dz) || 1,
       spread = this.rifleSpread(a),
@@ -628,21 +666,23 @@ export class Simulation {
     return { x: dir.x / norm, y: dir.y / norm, z: dir.z / norm };
   }
 
-  shoot(a: Actor) {
-    if (a.dead || a.ammo <= 0 || a.reload > 0) return;
-    const rifle = a.model === "sniper";
-    if (a.kind !== "player" || this.weapon !== (rifle ? "rifle" : "gun"))
-      return;
-    const from = this.muzzle(a);
+  shoot(a: Actor, weapon: Firearm = a.weapon) {
+    const state = this.ammunition(a, weapon);
+    if (a.dead || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0) return;
+    if (!this.supports(a, weapon) || (a.kind === "player" && this.weapon !== weapon)) return;
+    const spec = FIREARMS[weapon], rifle = weapon === "rifle", pistol = weapon === "pistol";
+    const aim = this.actorAim(a);
+    const from = this.muzzle(a, aim, weapon);
     const delta = {
-      x: this.aim.x - from.x,
-      y: this.aim.y - from.y,
-      z: this.aim.z - from.z,
+      x: aim.x - from.x,
+      y: aim.y - from.y,
+      z: aim.z - from.z,
     };
     const length = Math.hypot(delta.x, delta.y, delta.z) || 1;
-    const spread = a.braced
+    const spread = (a.braced
       ? 0.005
-      : 0.008 + a.recoil * 0.011 + (a.path.length ? 0.014 : 0);
+      : 0.008 + a.recoil * 0.011 + (a.path.length ? 0.014 : 0))
+      + (a.kind === "enemy" ? 0.02 : pistol ? 0.007 : 0);
     const dir = rifle
       ? this.rifleDirection(a)
       : {
@@ -656,14 +696,14 @@ export class Simulation {
     dir.z /= norm;
     const hit = this.world.castRayAndGetNormal(
       new RAPIER.Ray(from, dir),
-      rifle ? RIFLE.range : GUN_RANGE,
+      spec.range,
       true,
       undefined,
       undefined,
       undefined,
       a.body,
     );
-    const distance = hit?.timeOfImpact ?? (rifle ? RIFLE.range : GUN_RANGE);
+    const distance = hit?.timeOfImpact ?? spec.range;
     const to = {
       x: from.x + dir.x * distance,
       y: from.y + dir.y * distance,
@@ -671,19 +711,20 @@ export class Simulation {
     };
     const target =
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
+    const hitOpponent = !!target && !target.dead && target.kind !== a.kind;
     if (target && !target.dead) {
       this.damage(
         target,
-        target.kind === "player" ? (rifle ? 35 : 6) : rifle ? RIFLE.damage : 14,
+        target.kind === a.kind ? (rifle ? 35 : 6) : spec.damage,
         {
-          x: dir.x * (rifle ? 180 : 48),
-          y: dir.y * (rifle ? 24 : 12),
-          z: dir.z * (rifle ? 180 : 48),
+          x: dir.x * (rifle ? 180 : pistol ? 24 : 48),
+          y: dir.y * (rifle ? 24 : pistol ? 6 : 12),
+          z: dir.z * (rifle ? 180 : pistol ? 24 : 48),
         },
         to,
-        rifle ? "rifle" : "gun",
+        weapon,
       );
-      if (target.kind !== "player") this.hits++;
+      if (a.kind === "player" && target.kind !== "player") this.hits++;
     } else if (hit?.collider.parent()?.isDynamic()) {
       hit.collider
         .parent()!
@@ -693,22 +734,24 @@ export class Simulation {
           true,
         );
     }
-    a.ammo--;
+    state.ammo--;
+    state.shotWait = spec.interval + Math.max(-STEP, state.shotWait);
     a.recoil = Math.min(1, a.recoil + (rifle && !a.braced ? 1 : 0.15));
     if (rifle) {
       a.stability = Math.max(0, a.stability - (a.braced ? 0.04 : 0.55));
       a.braceTime = 0;
     }
-    this.shots++;
-    const recoil = rifle ? (a.braced ? 12 : RIFLE.recoil) : a.braced ? 1 : 5;
+    if (a.kind === "player") this.shots++;
+    else if (this.arena) this.arena.enemyShots++;
+    const recoil = rifle ? (a.braced ? 12 : RIFLE.recoil) : a.braced ? 1 : pistol ? 8 : 5;
     a.body.applyImpulse({ x: -dir.x * recoil, y: 0, z: -dir.z * recoil }, true);
     this.events.push({
       type: "shot",
       actor: a.id,
-      weapon: rifle ? "rifle" : "gun",
+      weapon,
       from,
       to,
-      hit: !!target && target.kind !== "player",
+      hit: hitOpponent,
       material:
         target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
       normal: hit ? vcopy(hit.normal) : { x: 0, y: 1, z: 0 },
@@ -737,8 +780,10 @@ export class Simulation {
     a.hitTime = this.time;
     a.stability = Math.max(0, a.stability - (a.braced ? 0.05 : 0.16));
     if (a.hp <= 0) {
-      if (a.model === "sniper") this.endSniping();
+      if (a.kind === "player" && a.model === "sniper") this.endSniping();
       a.dead = true;
+      a.deathTime = this.time;
+      if (a.kind === "enemy" && this.arena) this.arena.kills++;
       a.killedBy = source;
       a.firing = false;
       a.path = [];
@@ -778,9 +823,8 @@ export class Simulation {
     };
   }
 
-  throwGrenade(point: Vec2): boolean {
-    const actor = this.grenadeThrower;
-    if (!actor) return false;
+  throwGrenade(point: Vec2, actor = this.grenadeThrower): boolean {
+    if (!actor || actor.dead || actor.grenadeCooldown > 0 || !this.supports(actor, "grenade")) return false;
     const from = this.grenadeOrigin(actor, point);
     const { velocity } = grenadeVelocity(from, point);
     const body = this.world.createRigidBody(
@@ -804,13 +848,16 @@ export class Simulation {
       body,
       fuse: GRENADE_FUSE,
       owner: actor.id,
+      team: actor.kind === "enemy" ? "enemy" : "player",
       previous: from,
       bounceWait: 0.1,
       lastVelocity: velocity,
     });
     actor.grenadeCooldown = GRENADE_COOLDOWN;
-    this.lastGrenadier = actor.id;
-    this.throws++;
+    if (actor.kind === "player") {
+      this.lastGrenadier = actor.id;
+      this.throws++;
+    }
     this.events.push({ type: "throw", actor: actor.id, position: from });
     return true;
   }
@@ -859,9 +906,9 @@ export class Simulation {
         p,
         "grenade",
       );
-      if (a.kind !== "player" && wasAlive) {
+      if (wasAlive && (grenade.team === "player" ? a.kind !== "player" : a.kind === "player")) {
         affected++;
-        this.grenadeHits++;
+        if (grenade.team === "player") this.grenadeHits++;
       }
     }
     for (const p of this.props) {
@@ -887,17 +934,19 @@ export class Simulation {
         true,
       );
     }
-    this.events.push({ type: "explosion", position: origin, affected });
+    this.events.push({ type: "explosion", position: origin, affected, team: grenade.team });
   }
 
   step() {
     this.time += STEP;
+    this.arena?.update();
     for (const a of this.actors) {
       a.grenadeCooldown = Math.max(0, a.grenadeCooldown - STEP);
       a.previous = vcopy(a.body.translation());
       a.previousRotation = { ...a.body.rotation() };
       a.recoil = Math.max(0, a.recoil - STEP * 1.1);
-      a.shotWait -= STEP;
+      a.shotWait = Math.max(-STEP, a.shotWait - STEP);
+      a.pistol.shotWait = Math.max(-STEP, a.pistol.shotWait - STEP);
       if (a.dead) continue;
       const velocity = a.body.linvel();
       a.braceTime =
@@ -913,32 +962,31 @@ export class Simulation {
           this.maxDisplacement,
           distance2(a.body.translation(), a.spawn),
         );
-      if (a.reload > 0) {
-        a.reload -= STEP;
-        if (a.reload <= 0) {
-          a.reload = 0;
-          a.ammo = this.magazine(a);
+      for (const weapon of [a.model === "sniper" ? "rifle" : "gun", "pistol"] as const) {
+        const state = this.ammunition(a, weapon);
+        if (state.reload > 0) {
+          state.reload = Math.max(0, state.reload - STEP);
+          if (state.reload === 0) state.ammo = this.magazine(a, weapon);
         }
       }
-      if (a.kind === "player") {
-        const selected = this.selected.has(a.id);
+      if (a.kind === "player" || a.kind === "enemy") {
+        const selected = a.kind === "player" && this.selected.has(a.id);
+        const state = this.ammunition(a);
         const fire =
-          selected &&
-          this.trigger &&
-          this.weapon === ROBOT_MODELS[a.model!].weapon &&
-          a.reload === 0;
-        a.firing = fire && a.ammo > 0;
-        if (fire && a.shotWait <= 0 && a.ammo > 0) {
+          (a.kind === "enemy"
+            ? !!a.ai?.fire
+            : selected && this.trigger && this.weapon === a.weapon && this.supports(a, this.weapon)) &&
+          state.reload === 0;
+        a.firing = fire && state.ammo > 0;
+        if (fire && state.shotWait <= 0 && state.ammo > 0) {
           this.shoot(a);
-          a.shotWait =
-            (a.model === "sniper" ? RIFLE.interval : SHOT_INTERVAL) +
-            Math.max(-STEP, a.shotWait);
         }
-        if (fire && a.ammo === 0) this.reloadActor(a);
+        if (fire && state.ammo === 0) this.reloadActor(a);
         this.drive(a);
-        if (selected) {
+        if (selected || (a.kind === "enemy" && a.ai?.target)) {
           const p = a.body.translation();
-          const desired = Math.atan2(this.aim.x - p.x, this.aim.z - p.z);
+          const aim = this.actorAim(a);
+          const desired = Math.atan2(aim.x - p.x, aim.z - p.z);
           const diff = Math.atan2(
             Math.sin(desired - a.yaw),
             Math.cos(desired - a.yaw),
@@ -1052,7 +1100,7 @@ export class Simulation {
       .map((other) => ({
         p: other.body.translation(),
         v: other.body.linvel(),
-        player: other.kind === "player",
+        player: !!other.model,
       }));
     if (!neighbours.length) return preferred;
     const boxes = this.navigationBoxes(false);
@@ -1082,10 +1130,10 @@ export class Simulation {
           z: p.z + candidate.z * Math.min(0.5, horizon),
         };
         if (
-          next.x < BOUNDS.left + 0.37 ||
-          next.x > BOUNDS.right - 0.37 ||
-          next.z < BOUNDS.back + 0.37 ||
-          next.z > BOUNDS.front - 0.37 ||
+          (next.x < BOUNDS.left + 0.37 && next.x <= p.x) ||
+          (next.x > BOUNDS.right - 0.37 && next.x >= p.x) ||
+          (next.z < BOUNDS.back + 0.37 && next.z <= p.z) ||
+          (next.z > BOUNDS.front - 0.37 && next.z >= p.z) ||
           !segmentClear(p, next, boxes, 0.36)
         )
           continue;
@@ -1166,6 +1214,7 @@ export class Simulation {
   inspect() {
     return {
       range: this.range,
+      arena: this.arena?.inspect() ?? null,
       aim: vcopy(this.aim),
       time: this.time,
       shots: this.shots,
@@ -1183,6 +1232,7 @@ export class Simulation {
       grenades: this.grenades.map((g) => ({
         id: g.id,
         owner: g.owner,
+        team: g.team,
         fuse: g.fuse,
         position: vcopy(g.body.translation()),
       })),
@@ -1190,6 +1240,9 @@ export class Simulation {
         id: a.id,
         kind: a.kind,
         model: a.model,
+        weapon: a.weapon,
+        pistol: { ...a.pistol, shotWait: Math.max(0, a.pistol.shotWait) },
+        ai: a.ai ? { squad: a.ai.squad, state: a.ai.state, target: a.ai.target, gate: a.ai.gate, aim: { ...a.ai.aim } } : null,
         hp: a.hp,
         maxHp: a.maxHp,
         stability: a.stability,

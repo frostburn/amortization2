@@ -200,7 +200,7 @@ describe("long-range sniper", () => {
     expect(target.hp).toBe(target.maxHp);
     ticks(sim, RIFLE.interval);
     const sight = { ...sim.aim };
-    sim.chooseWeapon("grenade");
+    sim.chooseWeapon("pistol");
     sim.aim = { x: 5, y: 1.25, z: -3 };
     sim.chooseWeapon("rifle");
     expect(sim.aim).toEqual(sight);
@@ -248,7 +248,7 @@ describe("long-range sniper", () => {
     expect(sim.squad.slice(0, 3).every((a) => !a.braced)).toBe(true);
 
     for (const leave of [
-      () => sim.chooseWeapon("grenade"),
+      () => sim.chooseWeapon("pistol"),
       () => sim.select(1),
       () => sim.move({ x: 3, z: 0 }),
       () => sim.release(),

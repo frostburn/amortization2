@@ -238,7 +238,7 @@ describe("proving ground simulation", () => {
       0.02,
     );
     const protectedTarget = sim.actors.find((a) => a.kind === "blast")!;
-    sim.select(4);
+    sim.select(3);
     sim.aim = { ...protectedTarget.body.translation(), y: 1.1 };
     sim.trigger = true;
     ticks(sim, 0.6);
@@ -246,7 +246,7 @@ describe("proving ground simulation", () => {
   });
 
   test("grenades leave the thrower, travel ballistically, and detonate on their fuse", () => {
-    sim.select(4);
+    sim.select(3);
     const before = sim.primary.body.translation();
     expect(sim.throwGrenade({ x: 14, z: -9 })).toBe(true);
     ticks(sim, 0.5);
@@ -269,18 +269,18 @@ describe("proving ground simulation", () => {
 
   test("grenade clicks rotate through the ready squad and enforce a cooldown per robot", () => {
     sim.select(5);
-    for (const id of [1, 2, 3, 4]) {
+    for (const id of [1, 2, 3]) {
       expect(sim.grenadeThrower?.id).toBe(id);
       expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(true);
     }
-    expect(sim.grenades.map((g) => g.owner)).toEqual([1, 2, 3, 4]);
+    expect(sim.grenades.map((g) => g.owner)).toEqual([1, 2, 3]);
     expect(sim.grenadeThrower).toBeUndefined();
     expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(false);
-    expect(sim.throws).toBe(4);
+    expect(sim.throws).toBe(3);
     ticks(sim, GRENADE_COOLDOWN - 0.25);
     expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(false);
     ticks(sim, 0.25 + STEP);
-    expect(sim.throws).toBe(4); // Blocked clicks never queue an automatic throw.
+    expect(sim.throws).toBe(3); // Blocked clicks never queue an automatic throw.
     expect(sim.grenadeThrower?.id).toBe(1);
     expect(sim.throwGrenade({ x: 0, z: -15 })).toBe(true);
     expect(sim.grenades.at(-1)?.owner).toBe(1);
@@ -298,9 +298,8 @@ describe("proving ground simulation", () => {
       { x: 0, y: 0, z: 0 },
       sim.squad[1].body.translation(),
     );
-    expect(sim.grenadeThrower?.id).toBe(4);
-    sim.throwGrenade({ x: 14, z: -14 });
     expect(sim.grenadeThrower).toBeUndefined();
+    expect(sim.throwGrenade({ x: 14, z: -14 })).toBe(false); // NEEDLE cannot fill in.
     sim.select(1);
     ticks(sim, 1);
     expect(sim.throwGrenade({ x: -14, z: -14 })).toBe(false);
@@ -391,7 +390,7 @@ describe("proving ground simulation", () => {
       sim.step();
     }
     expect(sim.maxDisplacement).toBeGreaterThanOrEqual(2);
-    sim.select(4);
+    sim.select(3);
     sim.throwGrenade({ x: 13, z: -9.8 });
     ticks(sim, 2.5);
     expect(sim.drill).toEqual({

@@ -150,7 +150,7 @@ async function start() {
     scene.updateAim(ground, false);
     audio.stop();
     accumulator = 0;
-    toast("Range reset. Targets and supplies restored.");
+    toast(sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
@@ -158,7 +158,11 @@ async function start() {
       toast(
         weapon === "rifle"
           ? "Select NEEDLE (4) to use the sniper rifle."
-          : "Select an assault robot to use the machine gun.",
+          : weapon === "pistol"
+            ? "Select NEEDLE (4) to use its pistol."
+            : weapon === "grenade"
+              ? "Assault robots carry grenades. NEEDLE does not."
+              : "Select an assault robot to use the machine gun.",
       );
       return;
     }
@@ -178,9 +182,11 @@ async function start() {
     scene.resetCamera();
     accumulator = 0;
     document.getElementById("menu-title")!.textContent =
-      range === "long" ? "Long range" : "Proving ground";
+      range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent =
-      range === "long"
+      range === "arena"
+        ? "Survive incoming robot squads. Watch the marked entrances, move around cover, and interrupt enemy bursts. Survivors are repaired and rearmed between waves; disabled robots stay down. Shift+R restarts."
+        : range === "long"
         ? "NEEDLE trades armour for a powerful rifle. Sight a target and press Space to enter braced first-person sniping. Aim above the raised platforms before firing."
         : "Test sustained fire, move heavy targets, and throw grenades over cover.";
     updateUI(sim, audio);
@@ -224,6 +230,7 @@ async function start() {
     .getElementById("help")!
     .addEventListener("click", () => pause("Controls & settings"));
   document.getElementById("reset")!.addEventListener("click", reset);
+  document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
   document.getElementById("sound")!.addEventListener("click", async () => {
     try {
       await audio.unlock();
@@ -239,7 +246,7 @@ async function start() {
   });
   document
     .getElementById("gun")!
-    .addEventListener("click", () => chooseWeapon("gun"));
+    .addEventListener("click", () => chooseWeapon(sim.nextCloseWeapon));
   document
     .getElementById("rifle")!
     .addEventListener("click", () => chooseWeapon("rifle"));
@@ -564,7 +571,7 @@ async function start() {
     if (/^Digit[1-5]$/.test(e.code))
       sim.select(Number(e.code.at(-1)), e.shiftKey);
     else if (e.code === "KeyG") chooseWeapon("grenade");
-    else if (e.code === "KeyQ") chooseWeapon("gun");
+    else if (e.code === "KeyQ") chooseWeapon(sim.nextCloseWeapon);
     else if (e.code === "KeyE") chooseWeapon("rifle");
     else if (e.code === "KeyR") {
       if (e.shiftKey) reset();
@@ -679,10 +686,13 @@ async function start() {
     for (const event of sim.events.splice(0)) {
       scene.event(event);
       audio.event(event);
-      if (event.type === "drill") toast(event.message);
+      if (event.type === "drill" || event.type === "wave") toast(event.message);
+      if (event.type === "throw" && sim.actors.find((a) => a.id === event.actor)?.kind === "enemy")
+        toast("Incoming grenade. Move or take cover.");
       if (event.type === "explosion")
         toast(
-          event.affected
+          event.team === "enemy" ? "Incoming grenade detonated."
+          : event.affected
             ? `Blast hit ${event.affected} target${event.affected === 1 ? "" : "s"}.`
             : "Blast contained. Try a different landing point.",
         );

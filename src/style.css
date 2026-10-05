@@ -160,6 +160,38 @@ button:disabled {
   padding: 15px 15px 12px;
   pointer-events: none;
 }
+.arena-panel {
+  left: 20px;
+  width: 260px;
+  padding: 15px;
+  pointer-events: none;
+}
+.arena-tally {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.arena-tally strong, .arena-tally span { display: block; }
+.arena-tally strong { font: 25px ui-monospace, monospace; color: var(--amber); }
+.arena-tally span { font: 8px ui-monospace, monospace; color: var(--muted); margin-top: 5px; }
+#arena-phase { font: 10px ui-monospace, monospace; color: #d5b67f; line-height: 1.6; margin: 14px 0 7px; }
+#wave-timer { height: 3px; background: #34413e; }
+#wave-timer i { display: block; height: 100%; background: var(--amber); }
+#arena-defeat {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 90%);
+  padding: 30px;
+  text-align: center;
+  background: #121d20ed;
+  border: 1px solid #a26a49;
+}
+#arena-defeat > p:first-child { font: 12px ui-monospace, monospace; letter-spacing: 3px; color: var(--amber); }
+#arena-defeat h2 { font: 32px ui-monospace, monospace; margin: 18px 0; }
+#arena-score { font: 11px ui-monospace, monospace; color: #a1afa6; line-height: 1.6; }
+#arena-restart { display: flex; justify-content: space-between; gap: 20px; width: 100%; padding: 14px; margin-top: 22px; color: var(--mint); }
+#arena-restart span { color: var(--muted); font-size: 10px; }
 .panel-heading {
   display: flex;
   justify-content: space-between;
@@ -813,6 +845,8 @@ a:hover {
   }
 }
 @media (max-width: 760px) {
+  .arena-panel { left: 8px; top: 8px; width: 200px; padding: 10px; }
+  .arena-tally strong { font-size: 20px; }
   #app {
     grid-template-rows: 58px minmax(0, 1fr) 135px;
   }

@@ -2,7 +2,7 @@
 
 ## Sound recordings
 
-The seven recordings below were supplied in this repository. Their entries in [`sounds/_readme_and_license.txt`](sounds/_readme_and_license.txt) identify **qubodup** as uploader/author and **Creative Commons 0** as the license. The original manifest also describes source recordings and editing. No original sample or license file has been modified.
+The eight recordings below were supplied in this repository. Their entries in [`sounds/_readme_and_license.txt`](sounds/_readme_and_license.txt) identify **qubodup** as uploader/author and **Creative Commons 0** as the license. The original manifest also describes source recordings and editing. No original sample or license file has been modified.
 
 | File                                                                              | Source                          | Use                   |
 | --------------------------------------------------------------------------------- | ------------------------------- | --------------------- |
@@ -12,6 +12,7 @@ The seven recordings below were supplied in this repository. Their entries in [`
 | `855893__qubodup__blast.flac`                                                     | https://freesound.org/s/855893/ | Grenade blast         |
 | `855602__qubodup__sniper-shot-from-wood-and-metal-post-1-ga-precision-m40a6.flac` | https://freesound.org/s/855602/ | Close rifle shot      |
 | `855606__qubodup__sniper-shot-in-field-1-m2010-enhanced-sniper-rifle-esr.flac`    | https://freesound.org/s/855606/ | Distant rifle shot    |
+| `854226__qubodup__m4a1-rifle-shot-5.wav`                                         | https://freesound.org/s/854226/ | Pistol stand-in        |
 | `855601__qubodup__putting.flac`                                                   | https://freesound.org/s/855601/ | Rifle reload          |
 
 CC0: https://creativecommons.org/publicdomain/zero/1.0/

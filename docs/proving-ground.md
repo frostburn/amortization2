@@ -14,7 +14,7 @@ The playable yard is approximately 44 × 32 metres, viewed through a panning, zo
 | 02 / Displacement | Two reinforced robot targets, one moving plate, crates | Can a stream of hits move a target without making it unreadable? |
 | 03 / Fragments    | Three targets in a concrete bay, loose props           | Can a thrown grenade exploit a route that direct fire cannot?    |
 
-Four squad members start across the apron. All lanes share one simulation, so units can cross between drills. Completion records persist until reset. There is no score pressure or limited ammunition reserve in this range.
+Four squad members start across the apron. LATCH now starts at the grenade bay; NEEDLE carries a rifle and pistol and has no grenades. All lanes share one simulation, so units can cross between drills. Completion records persist until reset. There is no score pressure or limited ammunition reserve in this range.
 
 ## Initial tuning
 
@@ -29,7 +29,7 @@ Four squad members start across the apron. All lanes share one simulation, so un
 | Full-squad formation          | 2 × 2 square; 2.2 m between corners                         |
 | Three-member formation        | Equilateral triangle; 2.2 m between corners                 |
 | Grenade fuse / nominal radius | 2.4 s / 6.5 m                                               |
-| Grenade cooldown              | 4 s per robot; clicks rotate through ready selected members |
+| Grenade cooldown              | 4 s per assault robot; clicks rotate through ready assault members |
 | Maximum throw distance        | 28 m                                                        |
 | Gravity                       | 12 m/s²                                                     |
 | Drill displacement threshold  | 2 m                                                         |
@@ -78,6 +78,6 @@ The first browser check uses headless Chromium with a software GPU. It catches r
 
 The ten additional sniper checks and the new horizontal lane are described in [NEEDLE and Long Range](sniper-range.md). Robot 4 is now the light sniper model; the other three retain machine guns.
 
-## Next combat slice
+## Live combat
 
-Add a single hostile firing lane with a telegraphed burst, cover, and a retreat route. This will test the intended volley → displacement → regroup loop under pressure. Tune impact strength and recovery against that encounter before adding more weapons or progression.
+[Endless Arena](arena.md) provides incoming AI squads, burst acquisition, suppression, flanking, enemy snipers, grenade pressure and wave resets for refining the volley → displacement → regroup loop before mission authoring.

@@ -28,13 +28,31 @@ export const RIFLE = {
   damage: 140,
   settle: 0.6,
   recoil: 180,
+  muzzle: 1.65,
 };
+export const PISTOL = {
+  magazine: 12,
+  interval: 0.35,
+  reload: 1.6,
+  range: 28,
+  damage: 22,
+  muzzle: 0.66,
+};
+export const FIREARMS = {
+  gun: {
+    magazine: MAGAZINE, interval: SHOT_INTERVAL, reload: RELOAD_SECONDS,
+    range: GUN_RANGE, damage: 14, muzzle: 0.86,
+  },
+  rifle: RIFLE,
+  pistol: PISTOL,
+};
+export type Firearm = keyof typeof FIREARMS;
+export type Weapon = Firearm | "grenade";
 export const ROBOT_MODELS = {
-  assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun" },
-  sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle" },
+  assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun", weapons: ["gun", "grenade"] },
+  sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },
 } as const;
 export type RobotModel = keyof typeof ROBOT_MODELS;
-export type Weapon = "gun" | "rifle" | "grenade";
 export type RangeBounds = {
   left: number;
   right: number;
@@ -83,8 +101,9 @@ export const SQUAD_NAMES = ["ANCHOR", "ROOK", "LATCH", "NEEDLE"];
 export const PLAYER_SPAWNS = [
   { x: -14, z: 10 },
   { x: -4, z: 10 },
-  { x: 4, z: 10 },
+  // LATCH takes the grenade bay now that NEEDLE carries no explosives.
   { x: 14, z: 10 },
+  { x: 4, z: 10 },
 ];
 export const clamp = (v: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, v));

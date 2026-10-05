@@ -5,6 +5,7 @@ import blastUrl from "../../sounds/855893__qubodup__blast.flac?url";
 import rifleNearUrl from "../../sounds/855602__qubodup__sniper-shot-from-wood-and-metal-post-1-ga-precision-m40a6.flac?url";
 import rifleFarUrl from "../../sounds/855606__qubodup__sniper-shot-in-field-1-m2010-enhanced-sniper-rifle-esr.flac?url";
 import rifleReloadUrl from "../../sounds/855601__qubodup__putting.flac?url";
+import pistolUrl from "../../sounds/854226__qubodup__m4a1-rifle-shot-5.wav?url";
 import { clamp, type Vec3 } from "../game/config";
 import type { GameEvent, Simulation } from "../game/simulation";
 import { rifleMix } from "./spatial";
@@ -30,6 +31,7 @@ export class RangeAudio {
   ready = false;
   private listener: Vec3 = { x: 0, y: 28, z: 35.5 };
   private lastRifle?: ReturnType<typeof rifleMix>;
+  private pistolShots = 0;
 
   setListener(position: Vec3) {
     this.listener = { ...position };
@@ -64,6 +66,7 @@ export class RangeAudio {
         rifleNear: rifleNearUrl,
         rifleFar: rifleFarUrl,
         rifleReload: rifleReloadUrl,
+        pistol: pistolUrl,
       }).map(async ([key, url]) => {
         const response = await fetch(url);
         if (!response.ok)
@@ -136,12 +139,12 @@ export class RangeAudio {
     if (!this.ready || !this.context) return;
     const firing = paused
       ? []
-      : sim.squad.filter((a) => a.firing && !a.dead && a.model === "assault");
+      : sim.actors.filter((a) => a.firing && !a.dead && a.weapon === "gun" && !!a.model);
     for (const id of this.voices.keys())
       if (!firing.some((a) => a.id === id))
         this.stopGun(
           id,
-          sim.squad.find((a) => a.id === id)?.body.translation() ?? {
+          sim.actors.find((a) => a.id === id)?.body.translation() ?? {
             x: 0,
             y: 0,
             z: 0,
@@ -158,7 +161,7 @@ export class RangeAudio {
           0.05,
         );
         voice.gain.gain.setTargetAtTime(
-          0.42 / Math.sqrt(firing.length),
+          0.42 / Math.sqrt(firing.length) * this.distanceGain(position),
           this.context.currentTime,
           0.02,
         );
@@ -168,7 +171,7 @@ export class RangeAudio {
 
   private startGun(id: number, position: Vec3) {
     const ctx = this.context!;
-    const { amp, pan } = this.bus(position, 0.42);
+    const { amp, pan } = this.bus(position, 0.42 * this.distanceGain(position));
     const start = ctx.createBufferSource();
     start.buffer = this.buffers.get("start")!;
     const loop = ctx.createBufferSource();
@@ -199,6 +202,10 @@ export class RangeAudio {
   }
   stop() {
     for (const id of this.voices.keys()) this.stopGun(id, { x: 0, y: 0, z: 0 });
+  }
+  private distanceGain(position: Vec3) {
+    const distance = Math.hypot(position.x - this.listener.x, position.y - this.listener.y, position.z - this.listener.z);
+    return Math.pow(16 / Math.max(16, distance), 0.45);
   }
 
   private impact(position: Vec3, metal: boolean, strength = 1) {
@@ -263,6 +270,10 @@ export class RangeAudio {
           this.sample("rifleNear", e.from, mix.gain * mix.near, 1, 0.005);
         if (mix.far > 0.001)
           this.sample("rifleFar", e.from, mix.gain * mix.far);
+      } else if (e.weapon === "pistol") {
+        // The supplied softer M4A1 one-shot stands in for the pistol recording.
+        this.sample("pistol", e.from, 0.5 * this.distanceGain(e.from));
+        this.pistolShots++;
       }
       if (e.hit || Math.random() < 0.3)
         this.impact(e.to, e.material === "metal");
@@ -285,6 +296,7 @@ export class RangeAudio {
       buffers: [...this.buffers.keys()],
       loops: this.voices.size,
       rifle: this.lastRifle,
+      pistolShots: this.pistolShots,
     };
   }
 }

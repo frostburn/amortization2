@@ -4,6 +4,7 @@ import {
   BARRIERS,
   BLAST_RADIUS,
   FORMATION_SPACING,
+  FIREARMS,
   GRAVITY,
   GRENADE_FUSE,
   clamp,
@@ -19,6 +20,7 @@ import type {
   Simulation,
 } from "../game/simulation";
 import { SniperView } from "./scope";
+import { ARENA_ENTRIES } from "../game/ranges";
 
 const MINT = 0x9be6cd,
   AMBER = 0xd3a24f,
@@ -134,6 +136,8 @@ type ActorVisual = {
   flash: THREE.Mesh;
   health: THREE.Sprite;
   bipod?: THREE.Group;
+  primaryGun?: THREE.Group;
+  pistol?: THREE.Group;
   dead: boolean;
 };
 type Particle = {
@@ -158,6 +162,8 @@ export class RangeScene {
   private actors = new Map<number, ActorVisual>();
   private props = new Map<number, THREE.Group>();
   private grenades = new Map<number, THREE.Group>();
+  private grenadeHazards = new Map<number, THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>>();
+  private entryMarkers = new Map<number, THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>>();
   private particles: Particle[] = [];
   private particleMesh = new THREE.InstancedMesh(
     unitSphere,
@@ -407,6 +413,11 @@ export class RangeScene {
       this.batchEnvironment();
       return;
     }
+    if (this.sim.range === "arena") {
+      tex.repeat.set(13, 9);
+      this.buildArena(floorMat, concrete);
+      return;
+    }
     box(this.environment, 48, 0.7, 36, 0, -0.38, -2, floorMat);
     box(this.environment, 47, 0.3, 5.6, 0, -0.16, 11.3, material(0x707874));
     for (const b of BARRIERS) this.makeBarrier(b, concrete);
@@ -641,14 +652,44 @@ export class RangeScene {
     );
   }
 
+  private buildArena(floorMat: THREE.Material, concrete: THREE.Material) {
+    box(this.environment, 70, 0.7, 49, 0, -0.38, 0, floorMat);
+    for (const b of this.sim.layout.barriers) this.makeBarrier(b, concrete);
+    for (let x = -30; x <= 30; x += 6)
+      box(this.environment, 0.02, 0.006, 44, x, 0.012, 0, dark);
+    for (let z = -18; z <= 18; z += 6)
+      box(this.environment, 64, 0.006, 0.02, 0, 0.012, z, dark);
+    label(this.environment, "ARENA / LIVE FIRE", 13, 0.9, 0, 0.032, 15.8, true, "#d2bd8e");
+    for (const gate of ARENA_ENTRIES) {
+      label(this.environment, gate.name, 5, 0.7,
+        gate.x + gate.dx * 2.4, 0.032, gate.z + gate.dz * 2.4, true, "#c99b5b");
+      for (const side of [-1, 1]) {
+        const x = gate.x + gate.dz * side * 4.8,
+          z = gate.z - gate.dx * side * 4.8;
+        cylinder(this.environment, 0.1, 2.2, x, 1.1, z, metal);
+        box(this.environment, 0.24, 0.12, 0.24, x, 2.2, z, yellow);
+      }
+    }
+    this.batchEnvironment();
+    // Keep the entrance pulse separate from the static geometry batches.
+    ARENA_ENTRIES.forEach((gate, i) => {
+      const marker = new THREE.Mesh(new THREE.RingGeometry(2.8, 2.94, 48),
+        new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.25, depthWrite: false }));
+      marker.rotation.x = -Math.PI / 2;
+      marker.position.set(gate.x, 0.043, gate.z);
+      this.environment.add(marker);
+      this.entryMarkers.set(i, marker);
+    });
+  }
+
   private configureRangeLighting() {
     const long = this.sim.range === "long";
     this.scene.fog = new THREE.Fog(0x242d30, long ? 115 : 90, long ? 180 : 145);
     this.sun.position.set(long ? 10 : -18, long ? 70 : 38, long ? 30 : 15);
     this.sun.target.position.set(long ? 45 : 0, 0, 0);
     const camera = this.sun.shadow.camera;
-    camera.left = -(long ? 76 : 36);
-    camera.right = long ? 76 : 36;
+    camera.left = -(long ? 76 : this.sim.range === "arena" ? 46 : 36);
+    camera.right = long ? 76 : this.sim.range === "arena" ? 46 : 36;
     camera.top = long ? 40 : 32;
     camera.bottom = -(long ? 40 : 32);
     camera.far = long ? 180 : 95;
@@ -682,6 +723,7 @@ export class RangeScene {
         m.dispose();
       }
     this.environment.clear();
+    this.entryMarkers.clear();
     this.buildEnvironment(this.texture);
     this.configureRangeLighting();
   }
@@ -779,10 +821,11 @@ export class RangeScene {
     const legs: THREE.Group[] = [];
     const friend = a.kind === "player";
     const sniper = a.model === "sniper";
-    const bodyMat = sniper ? sniperShell : friend ? shell : orange;
+    const bodyMat = friend ? sniper ? sniperShell : shell : orange;
     let bipod: THREE.Group | undefined;
+    let primaryGun: THREE.Group | undefined, pistol: THREE.Group | undefined;
     if (sniper) model.scale.x = 0.74;
-    if (friend || a.kind === "heavy") {
+    if (a.model || a.kind === "heavy") {
       for (const x of [-0.24, 0.24]) {
         const leg = new THREE.Group();
         leg.position.set(x, 0.8, 0);
@@ -818,9 +861,11 @@ export class RangeScene {
         box(torso, 0.18, 0.35, 0.2, sign * 0.53, 0.14, 0.12, dark);
         box(torso, 0.2, 0.19, 0.35, sign * 0.48, 0.02, 0.32, bodyMat);
       }
-      if (friend) {
+      if (a.model) {
+        primaryGun = new THREE.Group();
+        torso.add(primaryGun);
         box(
-          torso,
+          primaryGun,
           sniper ? 0.16 : 0.22,
           sniper ? 0.17 : 0.2,
           sniper ? 0.72 : 0.63,
@@ -830,20 +875,20 @@ export class RangeScene {
           dark,
         );
         const barrel = cylinder(
-          torso,
+          primaryGun,
           sniper ? 0.043 : 0.052,
-          sniper ? 0.85 : 0.48,
+          sniper ? 0.85 : 0.4,
           0.28,
           0.3,
-          sniper ? 1.28 : 0.94,
+          sniper ? 1.28 : 0.66,
           silver,
         );
         barrel.rotation.x = Math.PI / 2;
         if (sniper) {
-          box(torso, 0.12, 0.28, 0.2, 0.28, 0.11, 0.56, metal);
-          const optic = cylinder(torso, 0.085, 0.36, 0.28, 0.49, 0.6, dark);
+          box(primaryGun, 0.12, 0.28, 0.2, 0.28, 0.11, 0.56, metal);
+          const optic = cylinder(primaryGun, 0.085, 0.36, 0.28, 0.49, 0.6, dark);
           optic.rotation.x = Math.PI / 2;
-          const lens = cylinder(torso, 0.065, 0.02, 0.28, 0.49, 0.79, glow);
+          const lens = cylinder(primaryGun, 0.065, 0.02, 0.28, 0.49, 0.79, friend ? glow : targetPaint);
           lens.rotation.x = Math.PI / 2;
           bipod = new THREE.Group();
           for (const sign of [-1, 1]) {
@@ -858,12 +903,20 @@ export class RangeScene {
             );
             leg.rotation.z = sign * 0.5;
           }
-          torso.add(bipod);
+          primaryGun.add(bipod);
           this.batchRigidPart(bipod);
+          pistol = new THREE.Group();
+          torso.add(pistol);
+          box(pistol, 0.16, 0.15, 0.35, 0.28, 0.3, 0.46, dark);
+          box(pistol, 0.12, 0.23, 0.13, 0.28, 0.14, 0.35, metal);
+          const tip = cylinder(pistol, 0.027, 0.12, 0.28, 0.3, 0.6, silver);
+          tip.rotation.x = Math.PI / 2;
+          this.batchRigidPart(pistol);
         } else {
-          box(torso, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
-          box(torso, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
+          box(primaryGun, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
+          box(primaryGun, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
         }
+        this.batchRigidPart(primaryGun);
         cylinder(torso, 0.013, 0.44, -0.25, 0.87, -0.2, dark);
       }
     } else {
@@ -907,7 +960,7 @@ export class RangeScene {
     flash.visible = false;
     const healthTexture = labelTexture(
       "━━━━━━━━━━━━",
-      "#a8e6d4",
+      friend ? "#a8e6d4" : "#e3a078",
       undefined,
       110,
     );
@@ -922,7 +975,7 @@ export class RangeScene {
     this.dynamic.add(health);
     health.visible = false;
     this.dynamic.add(root);
-    return { root, torso, legs, ring, flash, health, bipod, dead: false };
+    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -951,24 +1004,36 @@ export class RangeScene {
     }
   }
 
-  resetDynamic() {
-    // Release instance-owned buffers; primitive geometry and surface materials are shared.
-    this.dynamic.traverse((object) => {
-      if (object instanceof THREE.Mesh && object.geometry.userData.owned)
-        object.geometry.dispose();
+  private disposeActor(visual: ActorVisual) {
+    visual.root.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.geometry.userData.owned) object.geometry.dispose();
     });
-    for (const a of this.actors.values()) {
-      (a.health.material as THREE.SpriteMaterial).map?.dispose();
-      a.health.material.dispose();
-      a.ring.geometry.dispose();
-      (a.ring.material as THREE.Material).dispose();
-      a.flash.geometry.dispose();
-      (a.flash.material as THREE.Material).dispose();
-    }
+    visual.health.material.map?.dispose();
+    visual.health.material.dispose();
+    visual.ring.geometry.dispose();
+    (visual.ring.material as THREE.Material).dispose();
+    visual.flash.geometry.dispose();
+    (visual.flash.material as THREE.Material).dispose();
+    visual.root.removeFromParent();
+    visual.ring.removeFromParent();
+    visual.health.removeFromParent();
+  }
+
+  resetDynamic() {
+    for (const visual of this.actors.values()) this.disposeActor(visual);
+    // Props retain their shared primitive geometry and materials.
+    this.dynamic.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.geometry.userData.owned) object.geometry.dispose();
+    });
     this.dynamic.clear();
     this.actors.clear();
     this.props.clear();
     this.grenades.clear();
+    for (const marker of this.grenadeHazards.values()) {
+      marker.geometry.dispose();
+      marker.material.dispose();
+    }
+    this.grenadeHazards.clear();
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
       const group = this.makeCrate(p.w, p.h, p.d);
@@ -1004,7 +1069,8 @@ export class RangeScene {
     const half =
       Math.max(
         this.baseHalfHeight,
-        (this.sim.range === "long" ? 58 : 23) / aspect,
+        (this.sim.range === "long" ? 58 : this.sim.range === "arena" ? 36 : 23) / aspect,
+        this.sim.range === "arena" ? 18 : 0,
       ) / this.zoom;
     this.camera.left = -half * aspect;
     this.camera.right = half * aspect;
@@ -1053,7 +1119,7 @@ export class RangeScene {
     this.cameraTarget.set(
       this.sim.range === "long" ? 45 : 0,
       0,
-      this.sim.range === "long" ? 0 : -2.5,
+      this.sim.range === "proving" ? -2.5 : 0,
     );
     this.zoom = 1;
     this.resize();
@@ -1084,11 +1150,8 @@ export class RangeScene {
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
     let aim: Vec3 = { x: ground.x, y: 1.25, z: ground.z };
     if (!grenade && hit && actor)
-      aim = {
-        x: actor.body.translation().x,
-        y: actor.body.translation().y + 0.25,
-        z: actor.body.translation().z,
-      };
+      // Preserve the height under the cursor so upper-body aim can clear low cover.
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.weapon === "rifle")
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     return { aim, ground, actor: actor?.id };
@@ -1198,8 +1261,7 @@ export class RangeScene {
       let count = 0;
       for (const operator of this.sim.active) {
         if (
-          (this.sim.weapon === "gun" && operator.model !== "assault") ||
-          (this.sim.weapon === "rifle" && operator.model !== "sniper")
+          !this.sim.supports(operator, this.sim.weapon)
         )
           continue;
         const { from, to } = this.sim.aimTrace(operator);
@@ -1270,7 +1332,7 @@ export class RangeScene {
       const mesh = new THREE.Mesh(
         unitCylinder,
         new THREE.MeshBasicMaterial({
-          color: 0xffd17a,
+          color: this.sim.actors.find((a) => a.id === e.actor)?.kind === "enemy" ? 0xf59a68 : 0xffd17a,
           transparent: true,
           opacity: 0.8,
           depthWrite: false,
@@ -1381,7 +1443,19 @@ export class RangeScene {
       this.camera.position.y += (Math.random() - 0.5) * this.shake;
       this.shake = Math.max(0, this.shake - delta * 0.6);
     }
+    for (const [id, visual] of this.actors)
+      if (!this.sim.actors.some((a) => a.id === id)) {
+        this.disposeActor(visual);
+        this.actors.delete(id);
+        this.flashes.delete(id);
+      }
+    for (const [id, marker] of this.entryMarkers) {
+      const pending = this.sim.arena && this.sim.arena.phase !== "active" && this.sim.arena.phase !== "defeat";
+      marker.material.opacity = pending && this.sim.arena!.entries.includes(id)
+        ? 0.45 + Math.sin(elapsed * 6) * 0.25 : 0.12;
+    }
     for (const a of this.sim.actors) {
+      if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;
       const p = a.body.translation();
       v.root.position.set(
@@ -1408,7 +1482,8 @@ export class RangeScene {
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
       });
-      const aimingFirearm = a.model === "sniper" || (
+      const aim = this.sim.actorAim(a);
+      const aimingFirearm = a.model === "sniper" || a.kind === "enemy" || (
         a.model === "assault" && this.sim.selected.has(a.id) &&
         this.sim.weapon === "gun"
       );
@@ -1416,27 +1491,31 @@ export class RangeScene {
         ? 0
         : aimingFirearm
           ? -Math.atan2(
-              this.sim.aim.y - p.y - 0.42,
-              Math.hypot(this.sim.aim.x - p.x, this.sim.aim.z - p.z),
+              aim.y - p.y - 0.42,
+              Math.hypot(aim.x - p.x, aim.z - p.z),
             ) -
             a.recoil * 0.13
           : a.braced
             ? -0.12
             : -a.recoil * 0.13;
-      if (v.bipod) v.bipod.visible = a.braced && !a.dead;
+      if (v.primaryGun) v.primaryGun.visible = a.weapon !== "pistol";
+      if (v.pistol) v.pistol.visible = a.weapon === "pistol";
+      if (v.bipod) v.bipod.visible = a.braced && a.weapon === "rifle" && !a.dead;
+      v.flash.position.z = FIREARMS[a.weapon].muzzle;
       v.torso.rotation.z = a.dead
         ? 0
         : Math.sin(elapsed * 35) * (1 - a.stability) * 0.1;
       v.ring.visible =
-        a.kind === "player" && this.sim.selected.has(a.id) && !a.dead;
+        !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)));
       v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
-        a.braced ? AMBER : MINT,
+        a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced ? AMBER : MINT,
       );
+      v.ring.scale.setScalar(a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
       v.health.visible =
         !a.dead &&
-        a.hp < a.maxHp &&
-        (this.sim.time - a.hitTime < 4 || a.kind === "player");
+        (a.kind === "enemy" || (a.hp < a.maxHp &&
+        (this.sim.time - a.hitTime < 4 || a.kind === "player")));
       v.health.position.set(
         v.root.position.x,
         v.root.position.y + 1.25,
@@ -1469,6 +1548,13 @@ export class RangeScene {
       if (!this.sim.grenades.some((g) => g.id === id)) {
         this.dynamic.remove(visual);
         this.grenades.delete(id);
+        const hazard = this.grenadeHazards.get(id);
+        if (hazard) {
+          hazard.removeFromParent();
+          hazard.geometry.dispose();
+          hazard.material.dispose();
+          this.grenadeHazards.delete(id);
+        }
       }
     for (const g of this.sim.grenades) {
       if (!this.grenades.has(g.id)) {
@@ -1483,6 +1569,13 @@ export class RangeScene {
         group.add(marker);
         this.dynamic.add(group);
         this.grenades.set(g.id, group);
+        if (g.team === "enemy") {
+          const hazard = new THREE.Mesh(new THREE.RingGeometry(BLAST_RADIUS - 0.07, BLAST_RADIUS, 64),
+            new THREE.MeshBasicMaterial({ color: 0xef9a64, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false }));
+          hazard.rotation.x = -Math.PI / 2;
+          this.dynamic.add(hazard);
+          this.grenadeHazards.set(g.id, hazard);
+        }
       }
       const visual = this.grenades.get(g.id)!;
       const position = g.body.translation(),
@@ -1495,6 +1588,11 @@ export class RangeScene {
       visual.quaternion.set(q.x, q.y, q.z, q.w);
       visual.children[2].visible =
         Math.sin(g.fuse * (g.fuse < 0.6 ? 35 : 18)) > 0;
+      const hazard = this.grenadeHazards.get(g.id);
+      if (hazard) {
+        hazard.position.set(position.x, 0.075, position.z);
+        hazard.material.opacity = 0.45 + Math.sin(g.fuse * 14) * 0.2;
+      }
     }
     for (const t of this.trails) {
       t.life -= delta;
