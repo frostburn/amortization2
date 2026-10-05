@@ -48,6 +48,9 @@ export const FIREARMS = {
 };
 export type Firearm = keyof typeof FIREARMS;
 export type Weapon = Firearm | "grenade";
+export const FRIENDLY_FIRE = {
+  gun: false, pistol: false, rifle: true, grenade: true,
+} as const;
 export const ROBOT_MODELS = {
   assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun", weapons: ["gun", "grenade"] },
   sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },

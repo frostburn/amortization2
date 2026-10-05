@@ -8,7 +8,6 @@ import {
   GRAVITY,
   GRENADE_FUSE,
   clamp,
-  distance2,
   grenadeVelocity,
   type BoxSpec,
   type Vec2,
@@ -1658,21 +1657,16 @@ export class RangeScene {
     this.lightFlash.intensity *= Math.exp(-delta * 22);
     const operator = this.sim.rifleOperator;
     const visual = operator && this.actors.get(operator.id);
-    // Formation mates beside the optic must not fill the field with a shoulder.
-    // Restore their ordinary visibility after the scoped render pass.
-    const nearbyAllies = operator ? this.sim.squad
-      .filter((a) => distance2(a.body.translation(), operator.body.translation()) < 5)
-      .flatMap((a) => {
-        const ally = this.actors.get(a.id);
-        return ally ? [ally.root, ally.ring, ally.health] : [];
-      }) : [];
+    // Allies can intercept rifle shots, so only the operator is hidden in scope.
     const sniping = this.scope.render(
       this.renderer,
       this.scene,
       this.sim,
       visual
         ? [
-            ...nearbyAllies,
+            visual.root,
+            visual.ring,
+            visual.health,
             this.aiming,
             this.destinations,
           ]

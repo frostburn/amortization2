@@ -40,7 +40,7 @@ Balance constants and authored geometry live in `src/game/config.ts`. Weapon int
 
 Living actors have upright rigid bodies. Finite motor acceleration lets external impulses move a robot before it recovers and continues its route. Bracing reduces incoming impulse and increases recovery authority. Death unlocks rigid-body rotation; damping and restrained vertical blast force keep the outcome compact. There are no skeletal ragdolls.
 
-Friendly fire is off for both teams. Weapon rays and guides ignore teammates; friendly grenades cause no damage, suppression or blast impulse. Hostile shots and explosives still affect robots, while loose props retain their physical reactions.
+Friendly fire is enabled for grenades and sniper shots on both teams. Rifle rays and guides stop at teammates; grenades can damage, suppress and displace the thrower and allies, with ordinary distance and cover protection. Machine gun and pistol rays ignore teammates. Loose props retain their physical reactions.
 
 Bullets use physics ray casts. Grenades are continuous-collision rigid bodies with an actual fuse. Blast damage and impulse fall with distance; three visibility samples per actor account for partial cover. The aim arc stops at its first predicted contact and does not predict all subsequent bounces. Loose props can shield actors and be pushed by impacts.
 
@@ -63,7 +63,7 @@ The audio bus currently pans from world X. It has no physical propagation delay,
 | `src/main.ts`                | Startup, input, pause, fixed-step loop, preferences        |
 | `src/game/config.ts`         | Units, layout, shared tuning, throw solution               |
 | `src/game/simulation.ts`     | Physics, weapons, damage, squad, drill state               |
-| `src/game/cover.ts`          | Stationary squad support during first-person sniping       |
+| `src/game/cover.ts`          | Squad cover fire alongside movement during first-person sniping       |
 | `src/game/navigation.ts`     | Grid route finding                                         |
 | `src/render/scene.ts`        | Geometry, lighting, camera, aiming, effects, interpolation |
 | `src/audio/audio.ts`         | Sample scheduling and procedural audio layers              |

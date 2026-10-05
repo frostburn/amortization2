@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import {
   BLAST_RADIUS,
   FIREARMS,
+  FRIENDLY_FIRE,
   FORMATION_SPACING,
   GRAVITY,
   GRENADE_COOLDOWN,
@@ -630,8 +631,9 @@ export class Simulation {
     return a.kind === "player" ? "player" : "enemy";
   }
 
-  /** All weapon sight lines and projectiles pass through allied hulls. */
-  fireRay(a: Actor, from: Vec3, to: Vec3) {
+  /** Preview, optical aim and shots share the equipped weapon's friendly-fire policy. */
+  fireRay(a: Actor, from: Vec3, to: Vec3, weapon: Firearm = a.weapon) {
+    if (FRIENDLY_FIRE[weapon]) return this.ray(from, to, a.body);
     const allies = new Set(this.actors.filter((other) => this.team(other) === this.team(a)).map((other) => other.collider.handle));
     return this.ray(from, to, a.body, (collider) => !allies.has(collider.handle));
   }
@@ -718,7 +720,7 @@ export class Simulation {
       x: from.x + dir.x * spec.range,
       y: from.y + dir.y * spec.range,
       z: from.z + dir.z * spec.range,
-    });
+    }, weapon);
     const distance = hit?.timeOfImpact ?? spec.range;
     const to = {
       x: from.x + dir.x * distance,
@@ -908,7 +910,7 @@ export class Simulation {
     this.grenades = this.grenades.filter((g) => g !== grenade);
     let affected = 0;
     for (const a of this.actors) {
-      if (this.team(a) === grenade.team) continue;
+      if (!FRIENDLY_FIRE.grenade && this.team(a) === grenade.team) continue;
       const p = a.body.translation();
       const dx = p.x - origin.x,
         dz = p.z - origin.z,
@@ -1247,7 +1249,7 @@ export class Simulation {
       hits: this.hits,
       coverShots: this.coverShots,
       coverHits: this.coverHits,
-      friendlyFire: false,
+      friendlyFire: { ...FRIENDLY_FIRE },
       throws: this.throws,
       grenadeHits: this.grenadeHits,
       grenadeThrower: this.grenadeThrower?.id ?? null,

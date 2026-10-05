@@ -477,7 +477,7 @@ async function start() {
         };
       } else if (sim.weapon === "grenade") {
         if (sim.throwGrenade(ground))
-          toast("Grenade away.");
+          toast("Grenade away. Keep clear of the blast.");
         else if (sim.active.length)
           toast(
             `Grenades rearming. Ready in ${sim.grenadeCooldown.toFixed(1)} s.`,

@@ -62,7 +62,7 @@ describe("centred sniper sight", () => {
     expect(sim.actors.find(a => a.id === 11)!.killedBy).toBe("rifle");
   });
 
-  test("a teammate crossing the optic does not shorten the sight line or absorb the rifle shot", () => {
+  test("a teammate crossing the fixed optic intercepts its aim ray and actual rifle shot", () => {
     const ally = sim.squad[0], target = sim.actors.find(a => a.id === 11)!;
     ally.body.setTranslation({ x: 4, y: 0.98, z: 0 }, true);
     sim.world.step();
@@ -72,13 +72,15 @@ describe("centred sniper sight", () => {
       sight.aim(sim);
       sim.step();
     }
-    expect(sim.aim.x).toBeGreaterThan(57);
+    expect(sim.aim.x).toBeGreaterThan(3);
+    expect(sim.aim.x).toBeLessThan(4);
     expect(sight.inspect().yaw).toBe(yaw);
     expect(sight.inspect().pitch).toBe(pitch);
     sim.shoot(sim.primary);
-    expect(ally.hp).toBe(ally.maxHp);
-    expect(ally.stability).toBe(1);
-    expect(target.killedBy).toBe("rifle");
+    expect(ally.hp).toBe(ally.maxHp - RIFLE.damage);
+    expect(ally.stability).toBeLessThan(1);
+    expect(target.hp).toBe(target.maxHp);
     expect(sim.shots).toBe(1);
+    expect(sim.hits).toBe(0);
   });
 });

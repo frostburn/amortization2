@@ -1,8 +1,7 @@
-import { FIREARMS, RIFLE, distance2, type Vec3 } from "./config";
+import { FIREARMS, distance2, type Vec3 } from "./config";
 import type { Actor, Simulation } from "./simulation";
 
 export type CoverBrain = {
-  wasBraced: boolean;
   aim: Vec3;
   target: number | null;
   nextThink: number;
@@ -12,20 +11,17 @@ export type CoverBrain = {
   state: "watching" | "aiming" | "firing" | "suppressed" | "reloading";
 };
 
-/** Temporary stationary support, without changing selection or pending orders. */
+/** Temporary support, without changing selection, stance or movement orders. */
 export function startCoverFire(sim: Simulation, operator: Actor) {
   for (const a of sim.squad) {
     if (a === operator || a.dead) continue;
     const p = a.body.translation();
     a.cover = {
-      wasBraced: a.braced,
       aim: { x: p.x + Math.sin(a.yaw) * 20, y: p.y + 0.42, z: p.z + Math.cos(a.yaw) * 20 },
       target: null, nextThink: sim.time,
       nextAttack: sim.time + 0.35 + (a.id - 1) * 0.08,
       burstUntil: 0, fire: false, state: "watching",
     };
-    if (!a.braced) a.braceTime = 0;
-    a.braced = true;
     a.firing = false;
   }
 }
@@ -33,8 +29,6 @@ export function startCoverFire(sim: Simulation, operator: Actor) {
 export function stopCoverFire(sim: Simulation) {
   for (const a of sim.squad) {
     if (!a.cover) continue;
-    a.braced = !a.dead && a.cover.wasBraced;
-    a.braceTime = 0;
     a.firing = false;
     a.cover = undefined;
   }
@@ -47,7 +41,6 @@ export function updateCoverFire(sim: Simulation) {
     const brain = a.cover;
     if (!brain || a.dead) continue;
     brain.fire = false;
-    a.braced = true;
     if (sim.time >= brain.nextThink) {
       brain.nextThink = sim.time + 0.15;
       const p = a.body.translation();
@@ -89,7 +82,7 @@ export function updateCoverFire(sim: Simulation) {
       brain.nextAttack = Math.max(brain.nextAttack, sim.time + 0.4);
       continue;
     }
-    if (sim.time >= brain.nextAttack && a.braceTime >= (a.weapon === "rifle" ? RIFLE.settle : 0.15)) {
+    if (sim.time >= brain.nextAttack) {
       brain.burstUntil = sim.time + (a.weapon === "gun" ? 0.26 : 0.06);
       brain.nextAttack = sim.time + (a.weapon === "rifle" ? 2.4 : 0.9);
     }

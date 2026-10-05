@@ -19,7 +19,7 @@ describe("friendly fire and sniper support", () => {
   test.each([
     ["player", "gun"], ["player", "rifle"], ["player", "pistol"],
     ["enemy", "gun"], ["enemy", "rifle"], ["enemy", "pistol"],
-  ] as const)("%s %s shots and their preview pass allies and hit an opponent", (team, weapon) => {
+  ] as const)("%s %s preview and actual shots follow the weapon's friendly-fire policy", (team, weapon) => {
     const model = weapon === "gun" ? "assault" : "sniper";
     const shooter = team === "player"
       ? sim.squad[weapon === "gun" ? 0 : 3]
@@ -38,22 +38,34 @@ describe("friendly fire and sniper support", () => {
     const velocity = { ...ally.body.linvel() }, lastHit = ally.hitTime;
     const muzzle = sim.muzzle(shooter);
     expect(sim.ray(muzzle, sim.aim, shooter.body)?.collider.handle).toBe(ally.collider.handle);
-    expect(sim.fireRay(shooter, muzzle, sim.aim)?.collider.handle).toBe(opponent.collider.handle);
-    expect(sim.aimTrace(shooter).to.z).toBeLessThan(-9);
+    const friendlyFire = weapon === "rifle";
+    expect(sim.fireRay(shooter, muzzle, sim.aim)?.collider.handle).toBe((friendlyFire ? ally : opponent).collider.handle);
+    if (friendlyFire) expect(sim.aimTrace(shooter).to.z).toBeGreaterThan(4);
+    else expect(sim.aimTrace(shooter).to.z).toBeLessThan(-9);
     sim.shoot(shooter);
-    expect(ally.hp).toBe(ally.maxHp);
-    expect(ally.stability).toBe(1);
-    expect(ally.hitTime).toBe(lastHit);
-    expect(ally.body.linvel()).toEqual(velocity);
-    expect(opponent.hp).toBe(opponent.maxHp - FIREARMS[weapon].damage);
-    expect(sim.events.some((e) => e.type === "shot" && e.hit && e.to.z < -9)).toBe(true);
+    if (friendlyFire) {
+      expect(ally.hp).toBe(ally.maxHp - FIREARMS.rifle.damage);
+      expect(ally.stability).toBeLessThan(1);
+      expect(ally.hitTime).toBe(sim.time);
+      expect(ally.body.linvel().z).toBeLessThan(velocity.z - 1);
+      expect(opponent.hp).toBe(opponent.maxHp);
+      expect(sim.hits).toBe(0);
+      expect(sim.events.some((e) => e.type === "shot" && !e.hit && e.to.z > 4)).toBe(true);
+    } else {
+      expect(ally.hp).toBe(ally.maxHp);
+      expect(ally.stability).toBe(1);
+      expect(ally.hitTime).toBe(lastHit);
+      expect(ally.body.linvel()).toEqual(velocity);
+      expect(opponent.hp).toBe(opponent.maxHp - FIREARMS[weapon].damage);
+      expect(sim.events.some((e) => e.type === "shot" && e.hit && e.to.z < -9)).toBe(true);
+    }
   });
 
-  test.each(["player", "enemy"] as const)("%s grenades spare their owner and allies but damage opponents", (team) => {
+  test.each(["player", "enemy"] as const)("%s grenades damage and displace their owner, allies and opponents", (team) => {
     const owner = team === "player" ? sim.squad[0] : sim.addEnemy("assault", { x: -7, z: 10 });
     const ally = team === "player" ? sim.squad[1] : sim.addEnemy("assault", { x: -7, z: 8 });
     const opponent = team === "player" ? sim.addEnemy("assault", { x: -7, z: 4 }) : sim.squad[0];
-    owner.body.setTranslation({ x: -7, y: 0.98, z: 10 }, true);
+    owner.body.setTranslation({ x: -10, y: 0.98, z: 9 }, true);
     ally.body.setTranslation({ x: -7, y: 0.98, z: 8 }, true);
     opponent.body.setTranslation({ x: -7, y: 0.98, z: 4 }, true);
     sim.world.step();
@@ -65,30 +77,34 @@ describe("friendly fire and sniper support", () => {
     const velocities = [owner, ally].map((a) => ({ ...a.body.linvel() }));
     sim.explode(grenade);
     for (const [i, a] of [owner, ally].entries()) {
-      expect(a.hp).toBe(a.maxHp);
-      expect(a.stability).toBe(1);
-      expect(a.hitTime).toBe(-10);
-      expect(a.body.linvel()).toEqual(velocities[i]);
+      expect(a.hp).toBeLessThan(a.maxHp);
+      expect(a.stability).toBeLessThan(1);
+      expect(a.hitTime).toBe(sim.time);
+      expect(a.body.linvel().z).toBeGreaterThan(velocities[i].z + 0.1);
     }
     expect(opponent.hp).toBeLessThan(opponent.maxHp);
     expect(sim.events.some((e) => e.type === "explosion" && e.team === team && e.affected === 1)).toBe(true);
+    expect(sim.grenadeHits).toBe(team === "player" ? 1 : 0);
   });
 
-  test("unselected teammates hold their pending orders and cover independently of the sniper's trigger and aim", () => {
+  test("unselected teammates follow queued orders while firing independently of the sniper's trigger and aim", () => {
     sim.reset("arena");
     sim.arena!.countdown = 100;
+    sim.selectGroup([1, 2, 3]);
     sim.move({ x: -12, z: 8 });
-    const orders = sim.squad.map((a) => ({ path: [...a.path], destination: a.moveTarget }));
+    sim.move({ x: -12, z: 3 }, true);
+    const destinations = sim.squad.map((a) => a.moveTarget);
     sim.select(4);
     sim.chooseWeapon("rifle");
-    sim.squad[0].braced = true;
     const start = sim.squad.map((a) => ({ ...a.body.translation() }));
     const enemy = sim.addEnemy("assault", { x: -7, z: -10 });
+    enemy.hp = enemy.maxHp = 10000;
     sim.world.step();
     const sight = { ...sim.aim };
     sim.toggleSniping();
     ticks(sim, 1.3);
-    expect(sim.squad.slice(0, 3).every((a) => a.cover && a.braced)).toBe(true);
+    expect(sim.squad.slice(0, 3).every((a) => a.cover && !a.braced)).toBe(true);
+    expect(sim.primary.braced).toBe(true);
     expect(enemy.hp).toBeLessThan(enemy.maxHp);
     expect(sim.coverShots).toBeGreaterThan(0);
     expect(sim.coverHits).toBeGreaterThan(0);
@@ -98,19 +114,34 @@ describe("friendly fire and sniper support", () => {
     expect(sim.aim).toEqual(sight);
     expect([...sim.selected]).toEqual([4]);
     expect(sim.weapon).toBe("rifle");
-    sim.squad.forEach((a, i) => {
-      expect(distance2(a.body.translation(), start[i])).toBeLessThan(0.15);
-      expect(a.path).toEqual(orders[i].path);
-      expect(a.moveTarget).toEqual(orders[i].destination);
+    sim.squad.slice(0, 3).forEach((a, i) => {
+      expect(distance2(a.body.translation(), start[i])).toBeGreaterThan(2);
+      expect(a.moveTarget).toEqual(destinations[i]);
+    });
+    expect(distance2(sim.primary.body.translation(), start[3])).toBeLessThan(0.15);
+    const moving = sim.squad.slice(0, 3).map((a) => ({ ...a.body.translation() }));
+    const pausedCoverShots = sim.coverShots;
+    sim.endSniping();
+    ticks(sim, 0.7);
+    expect(sim.coverShots).toBe(pausedCoverShots);
+    sim.squad.slice(0, 3).forEach((a, i) => {
+      expect(a.cover).toBeUndefined();
+      expect(a.firing).toBe(false);
+      expect(distance2(a.body.translation(), moving[i])).toBeGreaterThan(1);
+      expect(a.moveTarget).toEqual(destinations[i]);
+    });
+    sim.toggleSniping();
+    ticks(sim, 5);
+    sim.squad.slice(0, 3).forEach((a, i) => {
+      expect(distance2(a.body.translation(), destinations[i]!)).toBeLessThan(0.15);
+      expect(a.moveTarget).toEqual(destinations[i]);
     });
     const coverShots = sim.coverShots;
     sim.endSniping();
     expect(sim.squad.every((a) => !a.cover && !a.firing)).toBe(true);
-    expect(sim.squad.slice(0, 3).map((a) => a.braced)).toEqual([true, false, false]);
+    expect(sim.squad.slice(0, 3).every((a) => !a.braced)).toBe(true);
     ticks(sim, 1);
     expect(sim.coverShots).toBe(coverShots);
-    expect(distance2(sim.squad[1].body.translation(), start[1])).toBeGreaterThan(1);
-    expect(distance2(sim.squad[0].body.translation(), start[0])).toBeLessThan(0.15);
   });
 
   test("support respects tall cover, then acquires an exposed enemy without advancing", () => {
