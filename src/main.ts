@@ -91,6 +91,7 @@ async function start() {
 
   function pause(title = "Range paused") {
     paused = true;
+    exitSniping();
     sim.release();
     audio.stop();
     keys.clear();
@@ -119,6 +120,7 @@ async function start() {
     canvas.focus();
   }
   function reset() {
+    exitSniping();
     cancelDrags();
     keys.clear();
     sim.reset();
@@ -145,6 +147,7 @@ async function start() {
     canvas.focus();
   }
   function switchRange(range: RangeId) {
+    exitSniping();
     cancelDrags();
     keys.clear();
     pointer.inside = false;
@@ -158,7 +161,7 @@ async function start() {
       range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent =
       range === "long"
-        ? "NEEDLE trades armour for a powerful rifle. Sight a target, zoom to the robot, and brace before firing. The bubble shows the rifle's first-person view."
+        ? "NEEDLE trades armour for a powerful rifle. Sight a target and press Space to enter braced first-person sniping. Aim above the raised platforms before firing."
         : "Test sustained fire, move heavy targets, and throw grenades over cover.";
     updateUI(sim, audio);
     if (!paused) canvas.focus();
@@ -177,15 +180,19 @@ async function start() {
         Number(button.dataset.sight) / 30 - 1
       ];
       if (!target || sim.squad[3].dead) return;
+      const wasSniping = sim.sniping;
       sim.select(4);
       sim.chooseWeapon("rifle");
-      sim.setBrace(keys.has("Space"));
       sim.aim = {
         ...target.body.translation(),
         y: target.body.translation().y + 0.25,
       };
+      if (wasSniping) {
+        scene.scope.resetSight();
+        sim.toggleSniping();
+      }
       pointer.inside = false;
-      scene.center(true);
+      if (!wasSniping) scene.center(true);
       updateUI(sim, audio);
       canvas.focus();
     });
@@ -249,6 +256,17 @@ async function start() {
     { passive: false },
   );
   const aimAtPointer = (groundOnly = false) => {
+    if (sim.sniping) {
+      const rect = canvas.getBoundingClientRect();
+      scene.scope.aim(
+        pointer.x - rect.left,
+        pointer.y - rect.top,
+        sim,
+        rect.width,
+        rect.height,
+      );
+      return null;
+    }
     const result = scene.pick(
       pointer.x,
       pointer.y,
@@ -266,6 +284,11 @@ async function start() {
     scene.cancelMovePreview();
     middleDrag = null;
     selectionBox.hidden = true;
+  }
+  function exitSniping() {
+    sim.endSniping();
+    scene.scope.resetSight();
+    pointer.inside = false;
   }
   function updatePointer(e: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
@@ -301,6 +324,20 @@ async function start() {
   window.addEventListener("mousemove", (e) => {
     if (paused) return;
     updatePointer(e);
+    if (sim.sniping) {
+      if (middleDrag && e.buttons & 4) {
+        scene.scope.look(
+          e.clientX - middleDrag.x,
+          e.clientY - middleDrag.y,
+          sim,
+          canvas.clientHeight,
+        );
+        middleDrag = { x: e.clientX, y: e.clientY };
+      } else middleDrag = null;
+      if (pointer.inside) aimAtPointer();
+      else sim.trigger = false;
+      return;
+    }
     if (!(e.buttons & 1)) {
       sim.trigger = false;
       selectionDrag = null;
@@ -337,6 +374,15 @@ async function start() {
     if (paused) return;
     e.preventDefault();
     canvas.focus();
+    if (sim.sniping) {
+      updatePointer(e);
+      if (e.button === 2) exitSniping();
+      else if (e.button === 0) {
+        aimAtPointer();
+        sim.trigger = true;
+      } else if (e.button === 1) middleDrag = { x: e.clientX, y: e.clientY };
+      return;
+    }
     updatePointer(e);
     const picked = aimAtPointer(e.button === 2 || e.shiftKey);
     if (e.button === 2) {
@@ -372,18 +418,18 @@ async function start() {
             `Grenades rearming. Ready in ${sim.grenadeCooldown.toFixed(1)} s.`,
           );
         updateUI(sim, audio);
-      } else if (
-        picked?.actor &&
-        picked.actor <= 4 &&
-        !picked.scope &&
-        !e.ctrlKey
-      )
+      } else if (picked?.actor && picked.actor <= 4 && !e.ctrlKey)
         sim.select(picked.actor, e.shiftKey);
       else sim.trigger = true;
     }
   });
   window.addEventListener("mouseup", (e) => {
     if (paused) return;
+    if (sim.sniping) {
+      if (e.button === 0) sim.trigger = false;
+      if (e.button === 1) middleDrag = null;
+      return;
+    }
     updatePointer(e);
     if (e.button === 0) {
       sim.trigger = false;
@@ -418,6 +464,7 @@ async function start() {
     if (e.button === 1) middleDrag = null;
   });
   canvas.addEventListener("pointercancel", () => {
+    exitSniping();
     cancelDrags();
     sim.release();
   });
@@ -429,7 +476,8 @@ async function start() {
     if (isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Escape" && !dialog.open) {
       e.preventDefault();
-      pause();
+      if (sim.sniping) exitSniping();
+      else pause();
       return;
     }
     if (paused) return;
@@ -463,12 +511,19 @@ async function start() {
     else if (e.code === "KeyR") {
       if (e.shiftKey) reset();
       else sim.reloadSelected();
-    } else if (e.code === "Space") sim.setBrace(true);
-    else if (e.code === "KeyF") scene.center();
+    } else if (e.code === "Space") {
+      if (sim.weapon === "rifle") {
+        cancelDrags();
+        scene.scope.resetSight();
+        sim.toggleSniping();
+        pointer.inside = false;
+        updateUI(sim, audio);
+      } else sim.setBrace(true);
+    } else if (e.code === "KeyF" && !sim.sniping) scene.center();
   });
   window.addEventListener("keyup", (e) => {
     keys.delete(e.code);
-    if (e.code === "Space") sim.setBrace(false);
+    if (e.code === "Space" && sim.weapon !== "rifle") sim.setBrace(false);
   });
 
   // Read-only state plus deliberate development controls, useful for bug reports and authored drills.
@@ -480,9 +535,9 @@ async function start() {
         audio: audio.inspect(),
         scope: scene.scope.inspect(),
         camera: {
-          x: scene.camera.position.x,
-          y: scene.camera.position.y,
-          z: scene.camera.position.z,
+          x: scene.listenerPosition.x,
+          y: scene.listenerPosition.y,
+          z: scene.listenerPosition.z,
         },
         render: {
           calls: scene.renderer.info.render.calls,
@@ -514,15 +569,16 @@ async function start() {
     const delta = Math.min((now - last) / 1000, 0.1);
     last = now;
     if (!paused) {
-      const panSpeed = delta * 13;
-      if (keys.has("KeyA")) scene.pan(-panSpeed, 0);
-      if (keys.has("KeyD")) scene.pan(panSpeed, 0);
-      if (keys.has("KeyW")) scene.pan(0, -panSpeed);
-      if (keys.has("KeyS")) scene.pan(0, panSpeed);
-      // Keep a rifle sight fixed while zooming/panning; scope movement changes aim on mouse events.
-      if (pointer.inside && (sim.weapon !== "rifle" || moveDrag))
-        aimAtPointer(!!moveDrag);
-      updateMove();
+      if (!sim.sniping) {
+        const panSpeed = delta * 13;
+        if (keys.has("KeyA")) scene.pan(-panSpeed, 0);
+        if (keys.has("KeyD")) scene.pan(panSpeed, 0);
+        if (keys.has("KeyW")) scene.pan(0, -panSpeed);
+        if (keys.has("KeyS")) scene.pan(0, panSpeed);
+        if (pointer.inside && (sim.weapon !== "rifle" || moveDrag))
+          aimAtPointer(!!moveDrag);
+        updateMove();
+      } else if (pointer.inside) aimAtPointer();
       accumulator += delta;
       let steps = 0;
       while (accumulator >= STEP && steps < 6) {
@@ -531,9 +587,9 @@ async function start() {
         steps++;
       }
       if (steps === 6) accumulator = Math.min(accumulator, STEP);
-      scene.updateAim(ground, pointer.inside && !selectionDrag);
+      scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag);
     } else scene.updateAim(ground, false);
-    audio.setListener(scene.camera.position);
+    audio.setListener(scene.listenerPosition);
     for (const event of sim.events.splice(0)) {
       scene.event(event);
       audio.event(event);

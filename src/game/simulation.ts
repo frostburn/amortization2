@@ -100,6 +100,7 @@ export class Simulation {
   selected = new Set([1]);
   aim: Vec3 = { x: -14, y: 1.2, z: -8 };
   trigger = false;
+  sniping = false;
   weapon: Weapon = "gun";
   range: RangeId;
   time = 0;
@@ -137,9 +138,10 @@ export class Simulation {
     this.events = [];
     this.selected = new Set([range === "long" ? 4 : 1]);
     this.trigger = false;
+    this.sniping = false;
     this.weapon = range === "long" ? "rifle" : "gun";
     this.aim =
-      range === "long" ? { x: 58, y: 1.25, z: 0 } : { x: -14, y: 1.25, z: -8 };
+      range === "long" ? { x: 58, y: 3.25, z: 0 } : { x: -14, y: 1.25, z: -8 };
     this.rifleAim = undefined;
     this.time = 0;
     this.shots = 0;
@@ -158,7 +160,7 @@ export class Simulation {
       RAPIER.ColliderDesc.cuboid(120, 0.5, 60).setFriction(0.8),
       floor,
     );
-    for (const box of this.layout.barriers) {
+    for (const box of [...this.layout.barriers, ...this.layout.platforms]) {
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, box.h / 2, box.z),
       );
@@ -173,7 +175,7 @@ export class Simulation {
       this.addActor(i + 1, "player", p.x, p.z),
     );
     this.layout.targets.forEach((p, i) =>
-      this.addActor(i + 10, p.kind, p.x, p.z),
+      this.addActor(i + 10, p.kind, p.x, p.z, p.elevation),
     );
     for (const p of this.layout.props) {
       const body = this.world.createRigidBody(
@@ -203,7 +205,13 @@ export class Simulation {
     this.world.step();
   }
 
-  private addActor(id: number, kind: ActorKind, x: number, z: number) {
+  private addActor(
+    id: number,
+    kind: ActorKind,
+    x: number,
+    z: number,
+    elevation = 0,
+  ) {
     const player = kind === "player";
     const model: RobotModel | null = player
       ? id === 4
@@ -212,7 +220,7 @@ export class Simulation {
       : null;
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(x, 0.98, z)
+        .setTranslation(x, elevation + 0.98, z)
         .lockRotations()
         .setLinearDamping(player ? 0.3 : 1.5)
         .setAngularDamping(5)
@@ -243,7 +251,7 @@ export class Simulation {
       model,
       body,
       collider,
-      spawn: { x, y: 0.98, z },
+      spawn: { x, y: elevation + 0.98, z },
       hp,
       maxHp: hp,
       stability: 1,
@@ -266,7 +274,7 @@ export class Simulation {
       hitTime: -10,
       dead: false,
       recoil: 0,
-      previous: { x, y: 0.98, z },
+      previous: { x, y: elevation + 0.98, z },
       previousRotation: { ...body.rotation() },
     });
   }
@@ -303,6 +311,7 @@ export class Simulation {
   }
   chooseWeapon(weapon: Weapon) {
     if (!this.canUse(weapon)) return false;
+    if (weapon !== "rifle") this.endSniping();
     if (this.weapon === "rifle") this.rifleAim = vcopy(this.aim);
     if (weapon === "rifle" && this.rifleAim) this.aim = vcopy(this.rifleAim);
     this.weapon = weapon;
@@ -356,6 +365,7 @@ export class Simulation {
 
   release() {
     this.trigger = false;
+    this.sniping = false;
     for (const a of this.squad) {
       a.firing = false;
       a.braced = false;
@@ -363,14 +373,39 @@ export class Simulation {
     }
   }
   setBrace(braced: boolean) {
+    if (!braced) this.endSniping();
     for (const a of this.active) {
       if (a.braced !== braced) a.braceTime = 0;
       a.braced = braced;
     }
   }
+  toggleSniping() {
+    if (this.sniping) {
+      this.endSniping();
+      return false;
+    }
+    const operator = this.weapon === "rifle" && this.rifleOperator;
+    if (!operator) return false;
+    this.sniping = true;
+    this.trigger = false;
+    operator.firing = false;
+    operator.braced = true;
+    operator.braceTime = 0;
+    return true;
+  }
+  endSniping() {
+    if (!this.sniping) return;
+    this.sniping = false;
+    this.trigger = false;
+    const operator = this.squad.find((a) => a.model === "sniper")!;
+    operator.braced = false;
+    operator.braceTime = 0;
+    operator.firing = false;
+  }
   private navigationBoxes(includeTargets = true) {
     return [
       ...this.layout.barriers,
+      ...this.layout.platforms,
       ...this.props.map((p) => ({
         x: p.body.translation().x,
         z: p.body.translation().z,
@@ -461,6 +496,7 @@ export class Simulation {
   }
 
   move(point: Vec2, queue = false) {
+    this.endSniping();
     const boxes = this.navigationBoxes();
     for (const target of this.moveDestinations(point)) {
       const actor = this.actors.find((a) => a.id === target.actor)!;
@@ -503,10 +539,12 @@ export class Simulation {
       dz = toward.z - p.z,
       length = Math.hypot(dx, dz) || 1;
     const reach = a.model === "sniper" ? 1.65 : 0.86;
+    const dy = a.model === "sniper" ? toward.y - p.y - 0.42 : 0;
+    const pitchedLength = Math.hypot(dx, dy, dz) || 1;
     return {
-      x: p.x + (dx / length) * reach + (dz / length) * 0.27,
-      y: p.y + 0.42,
-      z: p.z + (dz / length) * reach - (dx / length) * 0.27,
+      x: p.x + (dx / pitchedLength) * reach + (dz / length) * 0.27,
+      y: p.y + 0.42 + (dy / pitchedLength) * reach,
+      z: p.z + (dz / pitchedLength) * reach - (dx / length) * 0.27,
     };
   }
 
@@ -668,6 +706,7 @@ export class Simulation {
     a.hitTime = this.time;
     a.stability = Math.max(0, a.stability - (a.braced ? 0.05 : 0.16));
     if (a.hp <= 0) {
+      if (a.model === "sniper") this.endSniping();
       a.dead = true;
       a.killedBy = source;
       a.firing = false;
@@ -1098,6 +1137,7 @@ export class Simulation {
       maxDisplacement: this.maxDisplacement,
       drills: { ...this.drill },
       weapon: this.weapon,
+      sniping: this.sniping,
       selected: [...this.selected],
       grenades: this.grenades.map((g) => ({
         id: g.id,

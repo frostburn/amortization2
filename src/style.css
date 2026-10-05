@@ -460,6 +460,15 @@ button:disabled {
 .quick-controls span {
   white-space: nowrap;
 }
+.quick-controls i {
+  font-style: normal;
+}
+#range.sniping {
+  cursor: none;
+}
+#field.sniping .panel {
+  display: none;
+}
 kbd {
   display: inline-block;
   border: 1px solid #495955;
@@ -508,10 +517,15 @@ kbd {
   position: absolute;
   pointer-events: none;
   z-index: 1;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
   text-align: center;
   color: var(--amber);
   background: #121b1ee8;
-  padding: 7px 4px;
+  padding: 9px 14px;
   border: 1px solid #566b63;
   border-radius: 2px;
   font:

@@ -18,7 +18,7 @@ import type {
   MoveDestination,
   Simulation,
 } from "../game/simulation";
-import { SniperScope } from "./scope";
+import { SniperView } from "./scope";
 
 const MINT = 0x9be6cd,
   AMBER = 0xd3a24f,
@@ -151,7 +151,7 @@ export class RangeScene {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 260);
-  scope = new SniperScope();
+  scope = new SniperView();
   private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
   private dynamic = new THREE.Group();
@@ -487,6 +487,31 @@ export class RangeScene {
     box(this.environment, 108, 0.7, 20, 45, -0.38, 0, floor);
     box(this.environment, 8, 0.3, 18, -4, -0.16, 0, material(0x707874));
     for (const b of this.sim.layout.barriers) this.makeBarrier(b, concrete);
+    for (const platform of this.sim.layout.platforms) {
+      this.makeBarrier(platform, concrete);
+      const sign = label(
+        this.environment,
+        `+${platform.h} m`,
+        2.4,
+        0.55,
+        platform.x - platform.w / 2 - 0.03,
+        platform.h / 2,
+        platform.z,
+        false,
+        "#d8c796",
+      );
+      sign.rotation.y = -Math.PI / 2;
+      box(
+        this.environment,
+        0.04,
+        0.08,
+        platform.d,
+        platform.x - platform.w / 2 - 0.02,
+        platform.h - 0.04,
+        platform.z,
+        yellow,
+      );
+    }
     for (let x = 2; x <= 96; x += 2.5)
       for (const z of [-6, -1.5, 1.5, 6])
         box(this.environment, 1.1, 0.012, 0.045, x, 0.02, z, yellow);
@@ -544,7 +569,7 @@ export class RangeScene {
         2.8,
         0.5,
         target.x + 0.6,
-        2.6,
+        (target.elevation ?? 0) + 2.6,
         target.z,
         false,
         "#d8c796",
@@ -955,14 +980,15 @@ export class RangeScene {
     this.camera.updateMatrixWorld();
   }
   zoomBy(delta: number) {
-    const previous = this.zoom;
+    if (this.sim.sniping) {
+      this.scope.zoomBy(delta);
+      return;
+    }
     this.zoom = clamp(
       this.zoom * Math.exp(-delta * 0.001),
       0.8,
       this.sim.range === "long" ? 5 : 2.8,
     );
-    if (this.sim.weapon === "rifle" && previous < 1.5 && this.zoom >= 1.5)
-      this.center();
     this.resize();
   }
   pan(dx: number, dz: number) {
@@ -995,16 +1021,9 @@ export class RangeScene {
     clientX: number,
     clientY: number,
     grenade = false,
-  ): { aim: Vec3; ground: Vec3; actor?: number; scope?: boolean } | null {
+  ): { aim: Vec3; ground: Vec3; actor?: number } | null {
+    if (this.sim.sniping) return null;
     const rect = this.canvas.getBoundingClientRect();
-    if (!grenade && this.sim.weapon === "rifle") {
-      const picked = this.scope.pick(
-        clientX - rect.left,
-        clientY - rect.top,
-        this.sim,
-      );
-      if (picked) return picked;
-    }
     this.raycaster.setFromCamera(
       new THREE.Vector2(
         ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -1028,17 +1047,25 @@ export class RangeScene {
         y: actor.body.translation().y + 0.25,
         z: actor.body.translation().z,
       };
+    else if (!grenade && hit && this.sim.weapon === "rifle")
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     return { aim, ground, actor: actor?.id };
   }
   project(position: Vec3) {
     const p = new THREE.Vector3(position.x, position.y, position.z).project(
-        this.camera,
+        this.sim.sniping ? this.scope.camera : this.camera,
       ),
       r = this.canvas.getBoundingClientRect();
     return {
       x: r.left + ((p.x + 1) * r.width) / 2,
       y: r.top + ((1 - p.y) * r.height) / 2,
     };
+  }
+  get listenerPosition() {
+    const operator = this.sim.sniping && this.sim.rifleOperator;
+    if (!operator) return this.camera.position;
+    const p = operator.body.translation();
+    return { x: p.x, y: p.y + 0.65, z: p.z };
   }
   markMove() {
     this.destinationPreview = null;
@@ -1291,7 +1318,17 @@ export class RangeScene {
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
       });
-      v.torso.rotation.x = a.dead ? 0 : a.braced ? -0.12 : -a.recoil * 0.13;
+      v.torso.rotation.x = a.dead
+        ? 0
+        : a.model === "sniper"
+          ? -Math.atan2(
+              this.sim.aim.y - p.y - 0.42,
+              Math.hypot(this.sim.aim.x - p.x, this.sim.aim.z - p.z),
+            ) -
+            a.recoil * 0.13
+          : a.braced
+            ? -0.12
+            : -a.recoil * 0.13;
       if (v.bipod) v.bipod.visible = a.braced && !a.dead;
       v.torso.rotation.z = a.dead
         ? 0
@@ -1426,13 +1463,11 @@ export class RangeScene {
     });
     this.updateDestinations(delta);
     this.lightFlash.intensity *= Math.exp(-delta * 22);
-    this.renderer.render(this.scene, this.camera);
     const operator = this.sim.rifleOperator;
     const visual = operator && this.actors.get(operator.id);
-    this.scope.render(
+    const sniping = this.scope.render(
       this.renderer,
       this.scene,
-      this.camera,
       this.sim,
       visual
         ? [
@@ -1445,5 +1480,6 @@ export class RangeScene {
         : [],
       !paused,
     );
+    if (!sniping) this.renderer.render(this.scene, this.camera);
   }
 }

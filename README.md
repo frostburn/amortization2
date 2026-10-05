@@ -33,37 +33,40 @@ Four selected robots default to a 2 × 2 square; three form an equilateral trian
 
 ## Long Range
 
-Choose **Long Range** in the entry menu or the header. NEEDLE has **64 integrity and a 48 kg chassis**, compared with an assault robot's 160 integrity / 90 kg. Its rifle deals 140 damage, reaches 140 m, cycles every 1.4 s, and reloads a five-round magazine in 3 s. Hold **Space** for 0.6 s to settle the aim. Firing unbraced produces wide sway, heavy backward recoil, and a loss of stability.
+Choose **Long Range** in the entry menu or the header. NEEDLE has **64 integrity and a 48 kg chassis**, compared with an assault robot's 160 integrity / 90 kg. Its rifle deals 140 damage, reaches 140 m, cycles every 1.4 s, and reloads a five-round magazine in 3 s. Press **Space** to toggle braced first-person sniping. Support stays engaged after key release, and aim settles in 0.6 s. Firing unbraced from the overhead view produces wide sway, heavy backward recoil, and a loss of stability.
 
-At far zoom, use the common crosshair. Zoom toward NEEDLE to reveal a circular first-person view of the target. Use the **30 / 60 / 90 m** sight buttons to find distant targets while zoomed in, then aim inside the bubble and fire with LMB. The reticle shows the rifle's actual sway and turns mint when settled. **F** centres the robot. Rifle kills on all three targets complete the drill; cover still blocks shots.
+Use the **30 / 60 / 90 m** sight buttons to find a target before entering sniping. The rifle view fills the field at any overhead zoom. Point the mouse at a target to aim in both axes, middle-drag to turn the view, adjust scope magnification with the wheel, and fire with LMB. The cursor remains free to reach the range controls. The reticle shows the rifle's actual shot impact, including sway, and turns mint when settled. **Space**, **RMB**, or **Escape** returns to the previous overhead camera. Selecting another robot, changing weapons, pausing, or resetting also releases sniping.
+
+The 30 m target stands on the ground; the 60 and 90 m targets stand on solid **2 m and 5 m platforms**. Aim at the elevated silhouette: the rifle's muzzle, sight and shot all account for height, and shots aimed too low hit the platform. Rifle kills on all three targets complete the drill; cover still blocks shots.
 
 ## Controls
 
-| Input                       | Action                                                                        |
-| --------------------------- | ----------------------------------------------------------------------------- |
-| Hold left mouse             | Fire the selected gun or rifle                                                |
-| Left click in grenade mode  | Throw from the next ready selected robot (round-robin)                        |
-| Right click / drag          | Move selected robots / continuously steer their destination                   |
-| Shift + right click / drag  | Queue one move at the release point                                           |
-| 1–4 / click a robot         | Select a robot                                                                |
-| Shift + left drag           | Select the living robots inside the box; an empty box keeps the current group |
-| Shift + 1–4 / Shift + click | Add or remove a robot from selection                                          |
-| 5 / ALL                     | Select the living squad                                                       |
-| Q / E / G                   | Machine gun / sniper rifle / grenade                                          |
-| R                           | Reload selected robots                                                        |
-| Hold Space                  | Brace; release to resume a pending move                                       |
-| WASD / middle drag          | Pan camera                                                                    |
-| Mouse wheel                 | Zoom                                                                          |
-| F                           | Centre camera toward the selected robot                                       |
-| Escape / ?                  | Pause, controls, volume, and reduced motion                                   |
-| Shift + R / Reset range     | Restore the entire range                                                      |
-| Ctrl + left mouse           | Force fire when the cursor is over a squad member                             |
+| Input                       | Action                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| Hold left mouse             | Fire the selected gun or rifle                                                 |
+| Left click in grenade mode  | Throw from the next ready selected robot (round-robin)                         |
+| Right click / drag          | Move selected robots / continuously steer; in sniping, return overhead         |
+| Shift + right click / drag  | Queue one move at the release point                                            |
+| 1–4 / click a robot         | Select a robot                                                                 |
+| Shift + left drag           | Select the living robots inside the box; an empty box keeps the current group  |
+| Shift + 1–4 / Shift + click | Add or remove a robot from selection                                           |
+| 5 / ALL                     | Select the living squad                                                        |
+| Q / E / G                   | Machine gun / sniper rifle / grenade                                           |
+| R                           | Reload selected robots                                                         |
+| Space with the rifle        | Toggle braced first-person sniping                                             |
+| Hold Space with machine gun | Brace; release to resume a pending move                                        |
+| WASD / middle drag          | Pan overhead; middle-drag turns the first-person view                          |
+| Mouse wheel                 | Zoom overhead / adjust scope magnification                                     |
+| F                           | Centre camera toward the selected robot                                        |
+| Escape / ?                  | Escape leaves sniping first; otherwise pause, controls, volume, reduced motion |
+| Shift + R / Reset range     | Restore the entire range                                                       |
+| Ctrl + left mouse           | Force fire when the cursor is over a squad member                              |
 
 The game pauses on focus loss. Sound and motion preferences are saved locally. Explosions can damage the squad; concrete also protects it. Gun/rifle accuracy counts hits on living targets and excludes grenade hits. Destroying a drill target with the wrong weapon requires a reset before that drill can be completed. Shift-drag selection never fires or throws, including in grenade mode; ordinary left-button firing works while right-drag steering.
 
 ## Sound
 
-The supplied qubodup recordings drive the machine-gun attack, looping sustain, release, grenade blast, and rifle reload. Rifle shots blend the sharp post recording near the camera with the field recording at distance; panning follows the camera, and zoom moves the listening position. The simulation cadence matches the ten-shot machine-gun loop. Web Audio adds quiet impact details and a short low-frequency blast layer, with voice normalization, master volume, and compression. No external synthesizer or service is required to run the game.
+The supplied qubodup recordings drive the machine-gun attack, looping sustain, release, grenade blast, and rifle reload. Rifle shots blend the sharp post recording near the camera with the field recording at distance; panning follows the active camera, and overhead zoom moves the listening position. First-person sniping hears the close recording from the robot's eye position. The simulation cadence matches the ten-shot machine-gun loop. Web Audio adds quiet impact details and a short low-frequency blast layer, with voice normalization, master volume, and compression. No external synthesizer or service is required to run the game.
 
 See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original files and their included license manifest are preserved in `sounds/`.
 

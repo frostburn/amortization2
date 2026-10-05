@@ -74,7 +74,7 @@ The current compatibility distribution of Rapier inlines its WebAssembly into a 
 
 The first browser check uses headless Chromium with a software GPU. It catches rendering and interaction faults but is not a representative hardware frame-rate benchmark. Desktop GPU measurements and Firefox/Safari checks remain open. The narrow layout avoids overflow; touch play is not implemented.
 
-The eight additional sniper checks and the new horizontal lane are described in [NEEDLE and Long Range](sniper-range.md). Robot 4 is now the light sniper model; the other three retain machine guns.
+The ten additional sniper checks and the new horizontal lane are described in [NEEDLE and Long Range](sniper-range.md). Robot 4 is now the light sniper model; the other three retain machine guns.
 
 ## Next combat slice
 

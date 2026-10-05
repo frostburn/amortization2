@@ -40,7 +40,10 @@ describe("long-range sniper", () => {
   test("settled rifle shots complete the 30, 60 and 90 metre drill", () => {
     sim.setBrace(true);
     for (const target of sim.actors.filter((a) => a.kind === "precision")) {
-      sim.aim = { ...target.body.translation(), y: 1.25 };
+      sim.aim = {
+        ...target.body.translation(),
+        y: target.body.translation().y + 0.25,
+      };
       ticks(sim, RIFLE.interval + 0.1);
       sim.trigger = true;
       sim.step();
@@ -62,7 +65,10 @@ describe("long-range sniper", () => {
   test("an unbraced 90 metre shot misses and recoils substantially; a settled shot hits", () => {
     let sniper = sim.primary,
       target = sim.actors.find((a) => a.id === 12)!;
-    sim.aim = { ...target.body.translation(), y: 1.25 };
+    sim.aim = {
+      ...target.body.translation(),
+      y: target.body.translation().y + 0.25,
+    };
     const start = { ...sniper.body.translation() };
     sim.shoot(sniper);
     expect(target.hp).toBe(target.maxHp);
@@ -76,7 +82,10 @@ describe("long-range sniper", () => {
     sim.reset();
     sniper = sim.primary;
     target = sim.actors.find((a) => a.id === 12)!;
-    sim.aim = { ...target.body.translation(), y: 1.25 };
+    sim.aim = {
+      ...target.body.translation(),
+      y: target.body.translation().y + 0.25,
+    };
     sim.setBrace(true);
     ticks(sim, RIFLE.settle + 0.1);
     const bracedStart = { ...sniper.body.translation() };
@@ -90,7 +99,10 @@ describe("long-range sniper", () => {
 
   test("bracing must settle, and moving releases the support", () => {
     const target = sim.actors.find((a) => a.id === 12)!;
-    sim.aim = { ...target.body.translation(), y: 1.25 };
+    sim.aim = {
+      ...target.body.translation(),
+      y: target.body.translation().y + 0.25,
+    };
     sim.setBrace(true);
     ticks(sim, 0.2);
     sim.shoot(sim.primary);
@@ -125,6 +137,77 @@ describe("long-range sniper", () => {
     ticks(sim, RIFLE.reload + STEP);
     expect(sim.primary.ammo).toBe(5);
     expect(sim.shots).toBe(5);
+  });
+
+  test("sniping toggles support for NEEDLE and releases cleanly on gameplay transitions", () => {
+    expect(sim.toggleSniping()).toBe(true);
+    expect(sim.sniping).toBe(true);
+    ticks(sim, RIFLE.settle + 0.1);
+    expect(sim.primary.braceTime).toBe(RIFLE.settle);
+    sim.trigger = true;
+    expect(sim.toggleSniping()).toBe(false);
+    expect(sim.sniping).toBe(false);
+    expect(sim.primary.braced).toBe(false);
+    expect(sim.trigger).toBe(false);
+    sim.select(1);
+    expect(sim.toggleSniping()).toBe(false);
+    sim.select(5);
+    sim.chooseWeapon("rifle");
+    sim.toggleSniping();
+    expect(sim.squad.slice(0, 3).every((a) => !a.braced)).toBe(true);
+
+    for (const leave of [
+      () => sim.chooseWeapon("grenade"),
+      () => sim.select(1),
+      () => sim.move({ x: 3, z: 0 }),
+      () => sim.release(),
+      () => sim.reset("proving"),
+      () =>
+        sim.damage(
+          sim.primary,
+          1000,
+          { x: 0, y: 0, z: 0 },
+          sim.primary.body.translation(),
+        ),
+    ]) {
+      sim.reset("long");
+      sim.toggleSniping();
+      sim.trigger = true;
+      leave();
+      expect(sim.sniping).toBe(false);
+      expect(sim.squad[3].braced).toBe(false);
+      expect(sim.trigger).toBe(false);
+    }
+  });
+
+  test("raised targets stay supported, and only a shot aimed at their elevation hits", () => {
+    ticks(sim, 2);
+    const raised = sim.actors.find((a) => a.id === 11)!;
+    expect(raised.body.translation().y).toBeCloseTo(2.96, 1);
+    expect(
+      sim.actors.find((a) => a.id === 12)!.body.translation().y,
+    ).toBeCloseTo(5.96, 1);
+    sim.toggleSniping();
+    ticks(sim, RIFLE.settle + 0.1);
+    sim.aim = { x: raised.spawn.x, y: 1.25, z: raised.spawn.z };
+    sim.shoot(sim.primary);
+    expect(raised.hp).toBe(raised.maxHp);
+    const lowShot = sim.events.filter((e) => e.type === "shot").at(-1)!;
+    expect(lowShot.to.x).toBeLessThan(57);
+    expect(lowShot.to.y).toBeLessThan(2);
+    sim.aim = {
+      ...raised.body.translation(),
+      y: raised.body.translation().y + 0.25,
+    };
+    expect(sim.muzzle(sim.primary).y).toBeGreaterThan(
+      sim.primary.body.translation().y + 0.42,
+    );
+    ticks(sim, RIFLE.interval);
+    sim.shoot(sim.primary);
+    expect(raised.dead).toBe(true);
+    const highShot = sim.events.filter((e) => e.type === "shot").at(-1)!;
+    expect(highShot.to.y).toBeGreaterThan(2.8);
+    expect(highShot.to.y).toBeGreaterThan(highShot.from.y);
   });
 
   test("cover blocks a long rifle shot and wrong-weapon kills cannot complete the drill", () => {

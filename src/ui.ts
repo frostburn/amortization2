@@ -26,7 +26,7 @@ export function mountUI() {
       <nav aria-label="Range controls"><button id="reset" title="Reset the range (Shift+R)">RESET RANGE</button><button id="sound" aria-pressed="false" title="Toggle sound">SOUND ON</button><button id="help" aria-label="Help and settings">?</button></nav>
     </header>
     <main id="field">
-      <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, shift-drag to select a group, right-drag to steer, G for grenade, E for sniper rifle, Space to brace. Select robots with 1 to 4, or the squad with 5."></canvas><div id="selection-box" aria-hidden="true" hidden></div><div id="scope-label" aria-label="First-person rifle view" hidden></div>
+      <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, shift-drag to select a group, right-drag to steer, G for grenade, E for sniper rifle. Space toggles braced first-person sniping with the rifle; move the mouse to aim horizontally and vertically. Select robots with 1 to 4, or the squad with 5."></canvas><div id="selection-box" aria-hidden="true" hidden></div><div id="scope-label" aria-label="First-person rifle status" hidden></div>
       <aside class="drills panel" aria-label="Range drills">
         <div class="panel-heading">RANGE DRILLS <span id="drill-count">0 / 3</span></div>
         <div class="drill" id="drill-gun"><span class="check"></span><div>Machine gun<span class="detail" id="gun-progress">Clear six orange plates · 0 / 6</span></div></div>
@@ -44,9 +44,9 @@ export function mountUI() {
     <footer class="bottom-bar">
       <div class="squad" aria-label="Select robots">${SQUAD_NAMES.map((name, i) => `<button class="unit ${i === 0 ? "selected" : ""} ${i === 3 ? "sniper-unit" : ""}" data-unit="${i + 1}" aria-label="Select ${name}, robot ${i + 1}${i === 3 ? ", light sniper, 64 integrity" : ""}" aria-pressed="${i === 0}"><span class="unit-key">${i + 1}</span>${robotIcon}${i === 3 ? '<span class="unit-role">SNIPER</span>' : ""}<span class="unit-name">${name}</span><span class="integrity"><i></i></span></button>`).join("")}<button id="all" title="Select all robots (5)" aria-label="Select whole squad">ALL<span>5</span></button></div>
       <div class="weapons" aria-label="Choose weapon"><button class="weapon selected" id="gun" aria-pressed="true"><span class="weapon-icon">${gunIcon}</span><span class="weapon-name">MACHINE GUN<small>Q · 14 ROUNDS / SEC</small></span><span class="ammo"><b id="ammo">90</b><span> / 90</span></span><i id="reload-progress" class="reload-progress"></i></button><button class="weapon rifle" id="rifle" aria-pressed="false"><span class="weapon-icon">${rifleIcon}</span><span class="weapon-name">SNIPER RIFLE<small id="rifle-status">E · SPACE TO BRACE</small></span><span class="ammo"><b id="rifle-ammo">${RIFLE.magazine}</b><span> / ${RIFLE.magazine}</span></span><i id="rifle-reload-progress" class="reload-progress"></i></button><button class="weapon grenade" id="grenade" aria-pressed="false"><span class="weapon-icon">${grenadeIcon}</span><span class="weapon-name">GRENADE<small id="grenade-status">G · 2.4 SEC FUSE</small></span></button></div>
-      <div class="quick-controls"><span><kbd>LMB</kbd> FIRE</span><span><kbd>RMB</kbd> MOVE</span><span><kbd>SPACE</kbd> BRACE</span><span><kbd>R</kbd> RELOAD</span></div>
+      <div class="quick-controls"><span><kbd>LMB</kbd> FIRE</span><span><kbd>RMB</kbd> <i id="move-action">MOVE</i></span><span><kbd>SPACE</kbd> <i id="brace-action">BRACE</i></span><span><kbd>R</kbd> RELOAD</span></div>
     </footer>
-    <dialog id="menu"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location">AMORTIZATION II</p><h2 id="menu-title">Proving ground</h2><p id="menu-intro">Test sustained fire, displacement, and grenades. Or take NEEDLE, a fragile sniper, to the horizontal long range.</p><label class="range-choice">FIRING RANGE <select id="menu-range" aria-label="Choose range before entering">${rangeOptions}</select></label><div class="brief-controls"><p><kbd>LMB</kbd><span>Hold to fire. Grenade clicks rotate through ready robots (${GRENADE_COOLDOWN} s each).</span></p><p><kbd>RMB</kbd><span>Drag to steer selected robots. Shift-click queues a move.</span></p><p><kbd>⇧ + LMB</kbd><span>Drag a box to select a group. Shift-click toggles a robot.</span></p><p><kbd>1–4</kbd><span>Select a robot. <kbd>4</kbd> is NEEDLE. <kbd>5</kbd> selects the squad.</span></p><p><kbd>Q / E / G</kbd><span>Machine gun / sniper rifle / grenade. <kbd>R</kbd> reloads.</span></p><p><kbd>SPACE</kbd><span>Hold to brace; the rifle settles in ${RIFLE.settle} s. Unbraced shots kick hard.</span></p><p><kbd>WASD</kbd><span>Pan. Wheel zooms. <kbd>F</kbd> centres the robot. At close zoom, aim inside the rifle-view bubble.</span></p></div><div class="settings"><label>Volume <input id="volume" type="range" min="0" max="100" value="60" aria-label="Master volume" /></label><label class="motion"><input id="motion" type="checkbox" /> Reduce motion</label></div><p class="audio-credit">Sound recordings: qubodup / Freesound · CC0<br/><a href="https://github.com/frostburn/amortization2" target="_blank" rel="noreferrer">Source, credits &amp; issue reports ↗</a></p><button id="resume" class="primary">ENTER RANGE <span>↗</span></button><p class="desktop-note">Keyboard and mouse recommended. Headphones welcome.</p></div></dialog>`;
+    <dialog id="menu"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location">AMORTIZATION II</p><h2 id="menu-title">Proving ground</h2><p id="menu-intro">Test sustained fire, displacement, and grenades. Or take NEEDLE, a fragile sniper, to the horizontal long range.</p><label class="range-choice">FIRING RANGE <select id="menu-range" aria-label="Choose range before entering">${rangeOptions}</select></label><div class="brief-controls"><p><kbd>LMB</kbd><span>Hold to fire. Grenade clicks rotate through ready robots (${GRENADE_COOLDOWN} s each).</span></p><p><kbd>RMB</kbd><span>Drag to steer selected robots. Shift-click queues a move. In sniping, return to the overhead view.</span></p><p><kbd>⇧ + LMB</kbd><span>Drag a box to select a group. Shift-click toggles a robot.</span></p><p><kbd>1–4</kbd><span>Select a robot. <kbd>4</kbd> is NEEDLE. <kbd>5</kbd> selects the squad.</span></p><p><kbd>Q / E / G</kbd><span>Machine gun / sniper rifle / grenade. <kbd>R</kbd> reloads.</span></p><p><kbd>SPACE</kbd><span>Rifle: toggle braced first-person sniping; point to aim in both axes, middle-drag turns the view, wheel adjusts the scope. Aim settles in ${RIFLE.settle} s. Machine gun: hold to brace.</span></p><p><kbd>WASD</kbd><span>Pan the overhead view. Wheel zooms. <kbd>F</kbd> centres the robot. <kbd>Esc</kbd> leaves sniping; press again to pause.</span></p></div><div class="settings"><label>Volume <input id="volume" type="range" min="0" max="100" value="60" aria-label="Master volume" /></label><label class="motion"><input id="motion" type="checkbox" /> Reduce motion</label></div><p class="audio-credit">Sound recordings: qubodup / Freesound · CC0<br/><a href="https://github.com/frostburn/amortization2" target="_blank" rel="noreferrer">Source, credits &amp; issue reports ↗</a></p><button id="resume" class="primary">ENTER RANGE <span>↗</span></button><p class="desktop-note">Keyboard and mouse recommended. Headphones welcome.</p></div></dialog>`;
   return {
     canvas: document.querySelector<HTMLCanvasElement>("#range")!,
     dialog: document.querySelector<HTMLDialogElement>("#menu")!,
@@ -101,7 +101,7 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
   text(
     "range-note",
     long
-      ? "Sight a target, zoom to NEEDLE, and hold Space. Aim inside the bubble; LMB fires."
+      ? "Sight a target, then press Space for braced first-person sniping. Mouse aims in both axes; LMB fires."
       : "Unlimited range supplies. Reset to go again.",
   );
   for (const id of ["range-select", "menu-range"])
@@ -162,9 +162,9 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
           ? `CYCLING · ${rifle.shotWait.toFixed(1)} s`
           : rifle.braced
             ? rifle.braceTime >= RIFLE.settle
-              ? "SPACE · STEADY"
+              ? "SPACE · EXIT SIGHT"
               : `SETTLING · ${Math.round((rifle.braceTime / RIFLE.settle) * 100)}%`
-            : "E · SPACE TO BRACE",
+            : "E · SPACE TO SNIPE",
   );
   const thrower = sim.grenadeThrower;
   const grenadeWait = sim.grenadeCooldown.toFixed(1);
@@ -185,6 +185,11 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     .setAttribute("aria-pressed", String(audio.muted));
   const dead = !sim.active.length;
   text(
+    "brace-action",
+    sim.weapon === "rifle" ? (sim.sniping ? "EXIT SIGHT" : "SNIPE") : "BRACE",
+  );
+  text("move-action", sim.sniping ? "EXIT SIGHT" : "MOVE");
+  text(
     "mode-hint",
     dead
       ? "UNIT DISABLED · SELECT ANOTHER ROBOT OR RESET"
@@ -199,9 +204,9 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
               ? "RIFLE RELOADING · 3 s"
               : rifle.braced
                 ? rifle.braceTime >= RIFLE.settle
-                  ? "RIFLE STEADY · LMB TO FIRE"
-                  : "BRACING · LET THE RIFLE SETTLE"
-                : "UNBRACED · WIDE SWAY / HEAVY RECOIL · HOLD SPACE"
+                  ? "MOUSE AIM · LMB FIRE · MMB TURN · WHEEL ZOOM · SPACE RETURN"
+                  : "BRACING · LET THE RIFLE SETTLE · SPACE RETURN"
+                : "UNBRACED · HEAVY RECOIL · SPACE TO SNIPE"
           : reloading
             ? "RELOADING · KEEP MOVING"
             : sim.active.some((a) => a.braced)
