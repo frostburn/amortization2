@@ -394,7 +394,12 @@ describe("proving ground simulation", () => {
     sim.select(4);
     sim.throwGrenade({ x: 13, z: -9.8 });
     ticks(sim, 2.5);
-    expect(sim.drill).toEqual({ gun: true, impulse: true, grenade: true });
+    expect(sim.drill).toEqual({
+      gun: true,
+      impulse: true,
+      grenade: true,
+      rifle: false,
+    });
   });
 
   test("routes go around inflated range barriers without diagonal corner cutting", () => {

@@ -2,14 +2,17 @@
 
 ## Sound recordings
 
-The four recordings below were already supplied in this repository. Their entries in [`sounds/_readme_and_license.txt`](sounds/_readme_and_license.txt) identify **qubodup** as uploader/author and **Creative Commons 0** as the license. The original manifest also describes source recordings and editing. No original sample or license file has been modified.
+The seven recordings below were supplied in this repository. Their entries in [`sounds/_readme_and_license.txt`](sounds/_readme_and_license.txt) identify **qubodup** as uploader/author and **Creative Commons 0** as the license. The original manifest also describes source recordings and editing. No original sample or license file has been modified.
 
-| File                                                          | Source                          | Use                   |
-| ------------------------------------------------------------- | ------------------------------- | --------------------- |
-| `854644__qubodup__machine-gun-burst-loop-start.wav`           | https://freesound.org/s/854644/ | Machine-gun attack    |
-| `854643__qubodup__machine-gun-burst-loop-middle-10-shots.wav` | https://freesound.org/s/854643/ | Ten-shot sustain loop |
-| `854642__qubodup__machine-gun-burst-loop-end.wav`             | https://freesound.org/s/854642/ | Machine-gun release   |
-| `855893__qubodup__blast.flac`                                 | https://freesound.org/s/855893/ | Grenade blast         |
+| File                                                                              | Source                          | Use                   |
+| --------------------------------------------------------------------------------- | ------------------------------- | --------------------- |
+| `854644__qubodup__machine-gun-burst-loop-start.wav`                               | https://freesound.org/s/854644/ | Machine-gun attack    |
+| `854643__qubodup__machine-gun-burst-loop-middle-10-shots.wav`                     | https://freesound.org/s/854643/ | Ten-shot sustain loop |
+| `854642__qubodup__machine-gun-burst-loop-end.wav`                                 | https://freesound.org/s/854642/ | Machine-gun release   |
+| `855893__qubodup__blast.flac`                                                     | https://freesound.org/s/855893/ | Grenade blast         |
+| `855602__qubodup__sniper-shot-from-wood-and-metal-post-1-ga-precision-m40a6.flac` | https://freesound.org/s/855602/ | Close rifle shot      |
+| `855606__qubodup__sniper-shot-in-field-1-m2010-enhanced-sniper-rifle-esr.flac`    | https://freesound.org/s/855606/ | Distant rifle shot    |
+| `855601__qubodup__putting.flac`                                                   | https://freesound.org/s/855601/ | Rifle reload          |
 
 CC0: https://creativecommons.org/publicdomain/zero/1.0/
 

@@ -12,6 +12,7 @@ export type BoxSpec = {
 export const STEP = 1 / 60;
 export const GRAVITY = 12;
 export const MAGAZINE = 90;
+export const GUN_RANGE = 65;
 // The supplied ten-shot loop lasts 0.7145625 s. Match the simulated cadence.
 export const SHOT_INTERVAL = 0.7145625 / 10;
 export const RELOAD_SECONDS = 2.2;
@@ -19,6 +20,27 @@ export const GRENADE_FUSE = 2.4;
 export const GRENADE_COOLDOWN = 4;
 export const BLAST_RADIUS = 6.5;
 export const FORMATION_SPACING = 2.2;
+export const RIFLE = {
+  magazine: 5,
+  interval: 1.4,
+  reload: 3,
+  range: 140,
+  damage: 140,
+  settle: 0.6,
+  recoil: 180,
+};
+export const ROBOT_MODELS = {
+  assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun" },
+  sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle" },
+} as const;
+export type RobotModel = keyof typeof ROBOT_MODELS;
+export type Weapon = "gun" | "rifle" | "grenade";
+export type RangeBounds = {
+  left: number;
+  right: number;
+  back: number;
+  front: number;
+};
 export const BOUNDS = { left: -22, right: 22, back: -18, front: 14 };
 export const BARRIERS: BoxSpec[] = [
   { x: 0, z: -18.5, w: 45, d: 1, h: 3.7, style: "wall" },
@@ -57,7 +79,7 @@ export const TARGET_SPAWNS = [
   { x: 14.5, z: -9.5, kind: "blast" },
   { x: 13, z: -12, kind: "blast" },
 ] as const;
-export const SQUAD_NAMES = ["ANCHOR", "ROOK", "LATCH", "SPOOL"];
+export const SQUAD_NAMES = ["ANCHOR", "ROOK", "LATCH", "NEEDLE"];
 export const PLAYER_SPAWNS = [
   { x: -14, z: 10 },
   { x: -4, z: 10 },

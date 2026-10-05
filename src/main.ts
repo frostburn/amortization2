@@ -1,6 +1,14 @@
 import "./style.css";
 import { mountUI, updateUI } from "./ui";
-import { STEP, clamp, distance2, type Vec2, type Vec3 } from "./game/config";
+import {
+  STEP,
+  clamp,
+  distance2,
+  type Vec2,
+  type Vec3,
+  type Weapon,
+} from "./game/config";
+import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
 
 const { canvas, dialog } = mountUI();
@@ -21,6 +29,9 @@ async function start() {
   let pointer = { x: 0, y: 0, inside: false },
     ground: Vec3 = { x: -14, y: 0, z: -7 };
   let middleDrag: { x: number; y: number } | null = null;
+  let sniperPointer: { x: number; y: number } | null = null;
+  let capturePending = false,
+    sightCaptured = false;
   let selectionDrag: {
     x: number;
     y: number;
@@ -47,6 +58,8 @@ async function start() {
           muted: audio.muted,
           volume: audio.volume,
           reducedMotion: scene.reducedMotion,
+          invertX: scene.scope.invertX,
+          invertY: scene.scope.invertY,
         }),
       );
     } catch {
@@ -59,6 +72,10 @@ async function start() {
     );
     if (typeof settings.muted === "boolean") audio.setMuted(settings.muted);
     if (typeof settings.volume === "number") audio.setVolume(settings.volume);
+    if (typeof settings.invertX === "boolean")
+      scene.scope.invertX = settings.invertX;
+    if (typeof settings.invertY === "boolean")
+      scene.scope.invertY = settings.invertY;
     scene.reducedMotion =
       typeof settings.reducedMotion === "boolean"
         ? settings.reducedMotion
@@ -80,9 +97,21 @@ async function start() {
     scene.reducedMotion = motion.checked;
     saveSettings();
   });
+  for (const [id, axis] of [
+    ["invert-x", "invertX"],
+    ["invert-y", "invertY"],
+  ] as const) {
+    const input = document.getElementById(id) as HTMLInputElement;
+    input.checked = scene.scope[axis];
+    input.addEventListener("change", () => {
+      scene.scope[axis] = input.checked;
+      saveSettings();
+    });
+  }
 
   function pause(title = "Range paused") {
     paused = true;
+    exitSniping();
     sim.release();
     audio.stop();
     keys.clear();
@@ -111,9 +140,11 @@ async function start() {
     canvas.focus();
   }
   function reset() {
+    exitSniping();
     cancelDrags();
     keys.clear();
     sim.reset();
+    pointer.inside = false;
     scene.resetDynamic();
     scene.resetCamera();
     scene.updateAim(ground, false);
@@ -122,13 +153,70 @@ async function start() {
     toast("Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
-  function chooseWeapon(weapon: "gun" | "grenade") {
-    sim.weapon = weapon;
-    sim.trigger = false;
+  function chooseWeapon(weapon: Weapon) {
+    if (!sim.chooseWeapon(weapon)) {
+      toast(
+        weapon === "rifle"
+          ? "Select NEEDLE (4) to use the sniper rifle."
+          : "Select an assault robot to use the machine gun.",
+      );
+      return;
+    }
     audio.stop();
     updateUI(sim, audio);
     canvas.focus();
   }
+  function switchRange(range: RangeId) {
+    exitSniping();
+    cancelDrags();
+    keys.clear();
+    pointer.inside = false;
+    audio.stop();
+    sim.reset(range);
+    scene.resetEnvironment();
+    scene.resetDynamic();
+    scene.resetCamera();
+    accumulator = 0;
+    document.getElementById("menu-title")!.textContent =
+      range === "long" ? "Long range" : "Proving ground";
+    document.getElementById("menu-intro")!.textContent =
+      range === "long"
+        ? "NEEDLE trades armour for a powerful rifle. Sight a target and press Space to enter braced first-person sniping. Aim above the raised platforms before firing."
+        : "Test sustained fire, move heavy targets, and throw grenades over cover.";
+    updateUI(sim, audio);
+    if (!paused) canvas.focus();
+  }
+  for (const id of ["range-select", "menu-range"])
+    document
+      .getElementById(id)!
+      .addEventListener("change", (e) =>
+        switchRange((e.target as HTMLSelectElement).value as RangeId),
+      );
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "[data-sight]",
+  ))
+    button.addEventListener("click", () => {
+      const target = sim.actors.filter((a) => a.kind === "precision")[
+        Number(button.dataset.sight) / 30 - 1
+      ];
+      if (!target || sim.squad[3].dead) return;
+      const wasSniping = sim.sniping;
+      sim.select(4);
+      sim.chooseWeapon("rifle");
+      sim.aim = {
+        ...target.body.translation(),
+        y: target.body.translation().y + 0.25,
+      };
+      if (wasSniping) {
+        scene.scope.resetSight();
+        sim.toggleSniping();
+        captureSniping();
+      }
+      pointer.inside = false;
+      if (!wasSniping) scene.center(true);
+      updateUI(sim, audio);
+      canvas.focus();
+    });
   document.getElementById("resume")!.addEventListener("click", () => {
     void resume();
   });
@@ -152,6 +240,9 @@ async function start() {
   document
     .getElementById("gun")!
     .addEventListener("click", () => chooseWeapon("gun"));
+  document
+    .getElementById("rifle")!
+    .addEventListener("click", () => chooseWeapon("rifle"));
   document
     .getElementById("grenade")!
     .addEventListener("click", () => chooseWeapon("grenade"));
@@ -185,8 +276,16 @@ async function start() {
     },
     { passive: false },
   );
-  const aimAtPointer = () => {
-    const result = scene.pick(pointer.x, pointer.y, sim.weapon === "grenade");
+  const aimAtPointer = (groundOnly = false) => {
+    if (sim.sniping) {
+      scene.scope.aim(sim);
+      return null;
+    }
+    const result = scene.pick(
+      pointer.x,
+      pointer.y,
+      sim.weapon === "grenade" || groundOnly,
+    );
     if (result) {
       ground = result.ground;
       sim.aim = result.aim;
@@ -200,6 +299,50 @@ async function start() {
     middleDrag = null;
     selectionBox.hidden = true;
   }
+  function exitSniping() {
+    sim.endSniping();
+    scene.scope.resetSight();
+    pointer.inside = false;
+    sniperPointer = null;
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+  }
+  function captureFailed() {
+    capturePending = false;
+    if (sim.sniping)
+      toast("Move the mouse to aim. Hold at an edge to keep turning.");
+  }
+  function captureSniping() {
+    if (
+      !sim.sniping ||
+      paused ||
+      capturePending ||
+      document.pointerLockElement === canvas
+    )
+      return;
+    if (typeof canvas.requestPointerLock !== "function") {
+      captureFailed();
+      return;
+    }
+    capturePending = true;
+    try {
+      // Space/click provides user activation. Legacy browsers return void;
+      // modern browsers also reject a promise when capture is unavailable.
+      void canvas.requestPointerLock()?.catch(() => {
+        capturePending = false;
+      });
+    } catch {
+      captureFailed();
+    }
+  }
+  document.addEventListener("pointerlockerror", captureFailed);
+  document.addEventListener("pointerlockchange", () => {
+    const wasCaptured = sightCaptured;
+    sightCaptured = document.pointerLockElement === canvas;
+    capturePending = false;
+    sniperPointer = null;
+    if (sightCaptured && (!sim.sniping || paused)) document.exitPointerLock();
+    else if (!sightCaptured && wasCaptured) exitSniping();
+  });
   function updatePointer(e: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
     pointer = {
@@ -233,6 +376,25 @@ async function start() {
   // Mouse events retain per-button transitions when firing and steering together.
   window.addEventListener("mousemove", (e) => {
     if (paused) return;
+    if (sim.sniping) {
+      if (document.pointerLockElement === canvas) {
+        scene.scope.look(e.movementX, e.movementY, sim, canvas.clientHeight);
+      } else {
+        updatePointer(e);
+        if (pointer.inside && sniperPointer)
+          scene.scope.look(
+            e.clientX - sniperPointer.x,
+            e.clientY - sniperPointer.y,
+            sim,
+            canvas.clientHeight,
+          );
+        sniperPointer = pointer.inside
+          ? { x: e.clientX, y: e.clientY }
+          : null;
+        if (!pointer.inside) sim.trigger = false;
+      }
+      return;
+    }
     updatePointer(e);
     if (!(e.buttons & 1)) {
       sim.trigger = false;
@@ -263,15 +425,24 @@ async function start() {
       selectionBox.style.width = `${Math.abs(pointer.x - selectionDrag.x)}px`;
       selectionBox.style.height = `${Math.abs(pointer.y - selectionDrag.y)}px`;
     }
-    aimAtPointer();
+    aimAtPointer(!!moveDrag || !!selectionDrag);
     if (moveDrag?.queued) updateMove();
   });
   canvas.addEventListener("mousedown", (e) => {
     if (paused) return;
     e.preventDefault();
     canvas.focus();
+    if (sim.sniping) {
+      if (e.button === 2) exitSniping();
+      else if (e.button === 0) {
+        captureSniping();
+        scene.scope.aim(sim);
+        sim.trigger = true;
+      }
+      return;
+    }
     updatePointer(e);
-    const picked = aimAtPointer();
+    const picked = aimAtPointer(e.button === 2 || e.shiftKey);
     if (e.button === 2) {
       selectionDrag = null;
       selectionBox.hidden = true;
@@ -312,6 +483,11 @@ async function start() {
   });
   window.addEventListener("mouseup", (e) => {
     if (paused) return;
+    if (sim.sniping) {
+      if (e.button === 0) sim.trigger = false;
+      if (e.button === 1) middleDrag = null;
+      return;
+    }
     updatePointer(e);
     if (e.button === 0) {
       sim.trigger = false;
@@ -336,7 +512,7 @@ async function start() {
       updateUI(sim, audio);
     }
     if (e.button === 2 && moveDrag) {
-      aimAtPointer();
+      aimAtPointer(true);
       if (moveDrag.queued) {
         sim.move(ground, true);
         scene.markMove();
@@ -346,6 +522,7 @@ async function start() {
     if (e.button === 1) middleDrag = null;
   });
   canvas.addEventListener("pointercancel", () => {
+    exitSniping();
     cancelDrags();
     sim.release();
   });
@@ -357,7 +534,8 @@ async function start() {
     if (isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Escape" && !dialog.open) {
       e.preventDefault();
-      pause();
+      if (sim.sniping) exitSniping();
+      else pause();
       return;
     }
     if (paused) return;
@@ -370,6 +548,7 @@ async function start() {
         "KeyD",
         "KeyG",
         "KeyQ",
+        "KeyE",
         "KeyR",
         "KeyF",
         "Digit1",
@@ -386,15 +565,28 @@ async function start() {
       sim.select(Number(e.code.at(-1)), e.shiftKey);
     else if (e.code === "KeyG") chooseWeapon("grenade");
     else if (e.code === "KeyQ") chooseWeapon("gun");
+    else if (e.code === "KeyE") chooseWeapon("rifle");
     else if (e.code === "KeyR") {
       if (e.shiftKey) reset();
       else sim.reloadSelected();
-    } else if (e.code === "Space") sim.setBrace(true);
-    else if (e.code === "KeyF") scene.center();
+    } else if (e.code === "Space") {
+      if (sim.weapon === "rifle") {
+        cancelDrags();
+        if (sim.sniping) exitSniping();
+        else if (sim.toggleSniping()) {
+          scene.scope.resetSight();
+          sniperPointer = null;
+          pointer.inside = false;
+          scene.scope.aim(sim);
+          captureSniping();
+        }
+        updateUI(sim, audio);
+      } else sim.setBrace(true);
+    } else if (e.code === "KeyF" && !sim.sniping) scene.center();
   });
   window.addEventListener("keyup", (e) => {
     keys.delete(e.code);
-    if (e.code === "Space") sim.setBrace(false);
+    if (e.code === "Space" && sim.weapon !== "rifle") sim.setBrace(false);
   });
 
   // Read-only state plus deliberate development controls, useful for bug reports and authored drills.
@@ -404,6 +596,14 @@ async function start() {
         ...sim.inspect(),
         paused,
         audio: audio.inspect(),
+        scope: scene.scope.inspect(),
+        aiming: scene.inspectAim(),
+        pointerCaptured: document.pointerLockElement === canvas,
+        camera: {
+          x: scene.listenerPosition.x,
+          y: scene.listenerPosition.y,
+          z: scene.listenerPosition.z,
+        },
         render: {
           calls: scene.renderer.info.render.calls,
           triangles: scene.renderer.info.render.triangles,
@@ -415,7 +615,7 @@ async function start() {
         JSON.stringify(
           {
             version: "0.1.0",
-            range: "proving-ground",
+            range: sim.range,
             state: sim.inspect(),
             audio: audio.inspect(),
           },
@@ -434,13 +634,37 @@ async function start() {
     const delta = Math.min((now - last) / 1000, 0.1);
     last = now;
     if (!paused) {
-      const panSpeed = delta * 13;
-      if (keys.has("KeyA")) scene.pan(-panSpeed, 0);
-      if (keys.has("KeyD")) scene.pan(panSpeed, 0);
-      if (keys.has("KeyW")) scene.pan(0, -panSpeed);
-      if (keys.has("KeyS")) scene.pan(0, panSpeed);
-      if (pointer.inside) aimAtPointer();
-      updateMove();
+      if (!sim.sniping) {
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
+        const panSpeed = delta * 13;
+        if (keys.has("KeyA")) scene.pan(-panSpeed, 0);
+        if (keys.has("KeyD")) scene.pan(panSpeed, 0);
+        if (keys.has("KeyW")) scene.pan(0, -panSpeed);
+        if (keys.has("KeyS")) scene.pan(0, panSpeed);
+        if (pointer.inside && (sim.weapon !== "rifle" || moveDrag))
+          aimAtPointer(!!moveDrag);
+        updateMove();
+      } else {
+        if (
+          !capturePending &&
+          document.pointerLockElement !== canvas &&
+          pointer.inside
+        ) {
+          const rect = canvas.getBoundingClientRect();
+          // Keep turning at the edges if the browser cannot capture the mouse.
+          const edge = (position: number, size: number) => {
+            const n = (position / size) * 2 - 1;
+            return Math.sign(n) * Math.max(0, (Math.abs(n) - 0.8) / 0.2);
+          };
+          scene.scope.look(
+            edge(pointer.x - rect.left, rect.width) * rect.height * delta * 0.8,
+            edge(pointer.y - rect.top, rect.height) * rect.height * delta * 0.8,
+            sim,
+            rect.height,
+          );
+        }
+        scene.scope.aim(sim);
+      }
       accumulator += delta;
       let steps = 0;
       while (accumulator >= STEP && steps < 6) {
@@ -449,8 +673,9 @@ async function start() {
         steps++;
       }
       if (steps === 6) accumulator = Math.min(accumulator, STEP);
-      scene.updateAim(ground, pointer.inside && !selectionDrag);
+      scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag);
     } else scene.updateAim(ground, false);
+    audio.setListener(scene.listenerPosition);
     for (const event of sim.events.splice(0)) {
       scene.event(event);
       audio.event(event);
@@ -463,7 +688,12 @@ async function start() {
         );
     }
     audio.update(sim, paused);
-    scene.render(paused ? 1 : accumulator / STEP, paused ? 0 : delta, sim.time);
+    scene.render(
+      paused ? 1 : accumulator / STEP,
+      paused ? 0 : delta,
+      sim.time,
+      paused,
+    );
     uiTime += delta;
     if (uiTime > 0.08) {
       updateUI(sim, audio);
