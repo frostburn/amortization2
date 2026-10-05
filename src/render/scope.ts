@@ -11,7 +11,8 @@ export class SniperView {
   private operator?: Actor;
   private yaw = 0;
   private pitch = 0;
-  private raycaster = new THREE.Raycaster();
+  invertX = false;
+  invertY = false;
   private label = document.getElementById("scope-label")!;
   private field = document.getElementById("field")!;
   private material = new THREE.ShaderMaterial({
@@ -34,7 +35,8 @@ export class SniperView {
         float horizontal = (1.0 - smoothstep(0.0006, 0.0015, p.y)) * step(0.009, p.x) * (1.0 - step(0.065, p.x));
         float dot = 1.0 - smoothstep(0.001, 0.0025, length(p));
         float mark = max(dot, max(vertical, horizontal));
-        float shade = smoothstep(0.3, 0.72, length(vUv - 0.5)) * 0.48;
+        vec2 lens = (vUv - 0.5) * vec2(aspect, 1.0);
+        float shade = smoothstep(0.43, 0.49, length(lens)) * 0.96;
         gl_FragColor = vec4(mix(vec3(0.01, 0.03, 0.03), ink, mark), max(mark, shade));
         #include <colorspace_fragment>
       }`,
@@ -71,22 +73,17 @@ export class SniperView {
     this.camera.updateMatrixWorld();
   }
 
-  aim(x: number, y: number, sim: Simulation, width: number, height: number) {
+  aim(sim: Simulation) {
     const operator = sim.sniping && sim.rifleOperator;
     if (!operator) return;
-    this.camera.aspect = width / Math.max(1, height);
-    this.camera.updateProjectionMatrix();
     this.orient(sim);
-    this.raycaster.setFromCamera(
-      new THREE.Vector2((x / width) * 2 - 1, 1 - (y / height) * 2),
-      this.camera,
-    );
-    const ray = this.raycaster.ray;
-    const to = ray.origin.clone().addScaledVector(ray.direction, RIFLE.range);
-    const hit = sim.ray(ray.origin, to, operator.body);
-    sim.aim = ray.origin
+    const direction = this.camera.getWorldDirection(new THREE.Vector3());
+    const origin = this.camera.position;
+    const to = origin.clone().addScaledVector(direction, RIFLE.range);
+    const hit = sim.ray(origin, to, operator.body);
+    sim.aim = origin
       .clone()
-      .addScaledVector(ray.direction, hit?.timeOfImpact ?? RIFLE.range);
+      .addScaledVector(direction, hit?.timeOfImpact ?? RIFLE.range);
   }
 
   look(dx: number, dy: number, sim: Simulation, height: number) {
@@ -94,13 +91,13 @@ export class SniperView {
     this.orient(sim);
     const sensitivity =
       THREE.MathUtils.degToRad(this.camera.fov) / Math.max(1, height);
-    this.yaw -= dx * sensitivity;
+    this.yaw -= dx * sensitivity * (this.invertX ? -1 : 1);
     this.pitch = clamp(
-      this.pitch - dy * sensitivity,
+      this.pitch - dy * sensitivity * (this.invertY ? -1 : 1),
       -Math.PI * 0.47,
       Math.PI * 0.47,
     );
-    this.orient(sim);
+    this.aim(sim);
   }
 
   zoomBy(delta: number) {
@@ -121,6 +118,11 @@ export class SniperView {
     this.visible = !!operator;
     this.field.classList.toggle("sniping", this.visible);
     renderer.domElement.classList.toggle("sniping", this.visible);
+    const captured = document.pointerLockElement === renderer.domElement;
+    renderer.domElement.classList.toggle(
+      "mouse-captured",
+      this.visible && captured,
+    );
     this.label.hidden = !this.visible;
     if (!operator) {
       this.operator = undefined;
@@ -155,7 +157,7 @@ export class SniperView {
     const range = this.camera.position.distanceTo(
       new THREE.Vector3().copy(sim.aim),
     );
-    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"}`;
+    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"}${captured ? "" : " · CLICK TO CAPTURE"}`;
 
     const visibility = hiddenObjects.map((o) => o.visible);
     hiddenObjects.forEach((o) => (o.visible = false));
@@ -169,6 +171,13 @@ export class SniperView {
   }
 
   inspect() {
-    return { visible: this.visible, fov: this.camera.fov };
+    return {
+      visible: this.visible,
+      fov: this.camera.fov,
+      yaw: this.yaw,
+      pitch: this.pitch,
+      invertX: this.invertX,
+      invertY: this.invertY,
+    };
   }
 }

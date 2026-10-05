@@ -29,6 +29,9 @@ async function start() {
   let pointer = { x: 0, y: 0, inside: false },
     ground: Vec3 = { x: -14, y: 0, z: -7 };
   let middleDrag: { x: number; y: number } | null = null;
+  let sniperPointer: { x: number; y: number } | null = null;
+  let capturePending = false,
+    sightCaptured = false;
   let selectionDrag: {
     x: number;
     y: number;
@@ -55,6 +58,8 @@ async function start() {
           muted: audio.muted,
           volume: audio.volume,
           reducedMotion: scene.reducedMotion,
+          invertX: scene.scope.invertX,
+          invertY: scene.scope.invertY,
         }),
       );
     } catch {
@@ -67,6 +72,10 @@ async function start() {
     );
     if (typeof settings.muted === "boolean") audio.setMuted(settings.muted);
     if (typeof settings.volume === "number") audio.setVolume(settings.volume);
+    if (typeof settings.invertX === "boolean")
+      scene.scope.invertX = settings.invertX;
+    if (typeof settings.invertY === "boolean")
+      scene.scope.invertY = settings.invertY;
     scene.reducedMotion =
       typeof settings.reducedMotion === "boolean"
         ? settings.reducedMotion
@@ -88,6 +97,17 @@ async function start() {
     scene.reducedMotion = motion.checked;
     saveSettings();
   });
+  for (const [id, axis] of [
+    ["invert-x", "invertX"],
+    ["invert-y", "invertY"],
+  ] as const) {
+    const input = document.getElementById(id) as HTMLInputElement;
+    input.checked = scene.scope[axis];
+    input.addEventListener("change", () => {
+      scene.scope[axis] = input.checked;
+      saveSettings();
+    });
+  }
 
   function pause(title = "Range paused") {
     paused = true;
@@ -190,6 +210,7 @@ async function start() {
       if (wasSniping) {
         scene.scope.resetSight();
         sim.toggleSniping();
+        captureSniping();
       }
       pointer.inside = false;
       if (!wasSniping) scene.center(true);
@@ -257,14 +278,7 @@ async function start() {
   );
   const aimAtPointer = (groundOnly = false) => {
     if (sim.sniping) {
-      const rect = canvas.getBoundingClientRect();
-      scene.scope.aim(
-        pointer.x - rect.left,
-        pointer.y - rect.top,
-        sim,
-        rect.width,
-        rect.height,
-      );
+      scene.scope.aim(sim);
       return null;
     }
     const result = scene.pick(
@@ -289,7 +303,46 @@ async function start() {
     sim.endSniping();
     scene.scope.resetSight();
     pointer.inside = false;
+    sniperPointer = null;
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
   }
+  function captureFailed() {
+    capturePending = false;
+    if (sim.sniping)
+      toast("Move the mouse to aim. Hold at an edge to keep turning.");
+  }
+  function captureSniping() {
+    if (
+      !sim.sniping ||
+      paused ||
+      capturePending ||
+      document.pointerLockElement === canvas
+    )
+      return;
+    if (typeof canvas.requestPointerLock !== "function") {
+      captureFailed();
+      return;
+    }
+    capturePending = true;
+    try {
+      // Space/click provides user activation. Legacy browsers return void;
+      // modern browsers also reject a promise when capture is unavailable.
+      void canvas.requestPointerLock()?.catch(() => {
+        capturePending = false;
+      });
+    } catch {
+      captureFailed();
+    }
+  }
+  document.addEventListener("pointerlockerror", captureFailed);
+  document.addEventListener("pointerlockchange", () => {
+    const wasCaptured = sightCaptured;
+    sightCaptured = document.pointerLockElement === canvas;
+    capturePending = false;
+    sniperPointer = null;
+    if (sightCaptured && (!sim.sniping || paused)) document.exitPointerLock();
+    else if (!sightCaptured && wasCaptured) exitSniping();
+  });
   function updatePointer(e: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
     pointer = {
@@ -323,21 +376,26 @@ async function start() {
   // Mouse events retain per-button transitions when firing and steering together.
   window.addEventListener("mousemove", (e) => {
     if (paused) return;
-    updatePointer(e);
     if (sim.sniping) {
-      if (middleDrag && e.buttons & 4) {
-        scene.scope.look(
-          e.clientX - middleDrag.x,
-          e.clientY - middleDrag.y,
-          sim,
-          canvas.clientHeight,
-        );
-        middleDrag = { x: e.clientX, y: e.clientY };
-      } else middleDrag = null;
-      if (pointer.inside) aimAtPointer();
-      else sim.trigger = false;
+      if (document.pointerLockElement === canvas) {
+        scene.scope.look(e.movementX, e.movementY, sim, canvas.clientHeight);
+      } else {
+        updatePointer(e);
+        if (pointer.inside && sniperPointer)
+          scene.scope.look(
+            e.clientX - sniperPointer.x,
+            e.clientY - sniperPointer.y,
+            sim,
+            canvas.clientHeight,
+          );
+        sniperPointer = pointer.inside
+          ? { x: e.clientX, y: e.clientY }
+          : null;
+        if (!pointer.inside) sim.trigger = false;
+      }
       return;
     }
+    updatePointer(e);
     if (!(e.buttons & 1)) {
       sim.trigger = false;
       selectionDrag = null;
@@ -375,12 +433,12 @@ async function start() {
     e.preventDefault();
     canvas.focus();
     if (sim.sniping) {
-      updatePointer(e);
       if (e.button === 2) exitSniping();
       else if (e.button === 0) {
-        aimAtPointer();
+        captureSniping();
+        scene.scope.aim(sim);
         sim.trigger = true;
-      } else if (e.button === 1) middleDrag = { x: e.clientX, y: e.clientY };
+      }
       return;
     }
     updatePointer(e);
@@ -514,9 +572,14 @@ async function start() {
     } else if (e.code === "Space") {
       if (sim.weapon === "rifle") {
         cancelDrags();
-        scene.scope.resetSight();
-        sim.toggleSniping();
-        pointer.inside = false;
+        if (sim.sniping) exitSniping();
+        else if (sim.toggleSniping()) {
+          scene.scope.resetSight();
+          sniperPointer = null;
+          pointer.inside = false;
+          scene.scope.aim(sim);
+          captureSniping();
+        }
         updateUI(sim, audio);
       } else sim.setBrace(true);
     } else if (e.code === "KeyF" && !sim.sniping) scene.center();
@@ -534,6 +597,7 @@ async function start() {
         paused,
         audio: audio.inspect(),
         scope: scene.scope.inspect(),
+        pointerCaptured: document.pointerLockElement === canvas,
         camera: {
           x: scene.listenerPosition.x,
           y: scene.listenerPosition.y,
@@ -570,6 +634,7 @@ async function start() {
     last = now;
     if (!paused) {
       if (!sim.sniping) {
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
         const panSpeed = delta * 13;
         if (keys.has("KeyA")) scene.pan(-panSpeed, 0);
         if (keys.has("KeyD")) scene.pan(panSpeed, 0);
@@ -578,7 +643,27 @@ async function start() {
         if (pointer.inside && (sim.weapon !== "rifle" || moveDrag))
           aimAtPointer(!!moveDrag);
         updateMove();
-      } else if (pointer.inside) aimAtPointer();
+      } else {
+        if (
+          !capturePending &&
+          document.pointerLockElement !== canvas &&
+          pointer.inside
+        ) {
+          const rect = canvas.getBoundingClientRect();
+          // Keep turning at the edges if the browser cannot capture the mouse.
+          const edge = (position: number, size: number) => {
+            const n = (position / size) * 2 - 1;
+            return Math.sign(n) * Math.max(0, (Math.abs(n) - 0.8) / 0.2);
+          };
+          scene.scope.look(
+            edge(pointer.x - rect.left, rect.width) * rect.height * delta * 0.8,
+            edge(pointer.y - rect.top, rect.height) * rect.height * delta * 0.8,
+            sim,
+            rect.height,
+          );
+        }
+        scene.scope.aim(sim);
+      }
       accumulator += delta;
       let steps = 0;
       while (accumulator >= STEP && steps < 6) {

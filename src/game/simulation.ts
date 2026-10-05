@@ -218,9 +218,23 @@ export class Simulation {
         ? "sniper"
         : "assault"
       : null;
+    const yaw =
+      this.range === "long"
+        ? player
+          ? Math.PI / 2
+          : -Math.PI / 2
+        : player
+          ? Math.PI
+          : 0;
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(x, elevation + 0.98, z)
+        .setRotation({
+          x: 0,
+          y: Math.sin(yaw / 2),
+          z: 0,
+          w: Math.cos(yaw / 2),
+        })
         .lockRotations()
         .setLinearDamping(player ? 0.3 : 1.5)
         .setAngularDamping(5)
@@ -228,9 +242,7 @@ export class Simulation {
     );
     const shape = player
       ? RAPIER.ColliderDesc.capsule(0.56, 0.37)
-      : this.range === "long"
-        ? RAPIER.ColliderDesc.cuboid(0.3, 0.96, 0.48)
-        : RAPIER.ColliderDesc.cuboid(0.48, 0.96, 0.3);
+      : RAPIER.ColliderDesc.cuboid(0.48, 0.96, 0.3);
     const collider = this.world.createCollider(
       shape
         .setMass(model ? ROBOT_MODELS[model].mass : kind === "plate" ? 90 : 48)
@@ -255,14 +267,7 @@ export class Simulation {
       hp,
       maxHp: hp,
       stability: 1,
-      yaw:
-        this.range === "long"
-          ? player
-            ? Math.PI / 2
-            : -Math.PI / 2
-          : player
-            ? Math.PI
-            : 0,
+      yaw,
       ammo: model === "sniper" ? RIFLE.magazine : MAGAZINE,
       reload: 0,
       grenadeCooldown: 0,
@@ -711,6 +716,16 @@ export class Simulation {
       a.killedBy = source;
       a.firing = false;
       a.path = [];
+      // Hand the visible facing to physics before toppling. Living robots may
+      // have turned since spawning; interpolation must start from that pose too.
+      const rotation = {
+        x: 0,
+        y: Math.sin(a.yaw / 2),
+        z: 0,
+        w: Math.cos(a.yaw / 2),
+      };
+      a.body.setRotation(rotation, true);
+      a.previousRotation = { ...rotation };
       a.body.setEnabledRotations(true, true, true, true);
       a.body.applyTorqueImpulse(
         { x: impulse.z * 0.28, y: 0, z: -impulse.x * 0.28 },
@@ -1160,6 +1175,8 @@ export class Simulation {
         braceProgress: a.braceTime / RIFLE.settle,
         shotWait: Math.max(0, a.shotWait),
         position: vcopy(a.body.translation()),
+        rotation: { ...a.body.rotation() },
+        yaw: a.yaw,
         path: a.path.map((v) => ({ ...v })),
         destination: a.moveTarget ? { ...a.moveTarget } : null,
       })),

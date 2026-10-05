@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { RIFLE, STEP, distance2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { rifleMix } from "../src/audio/spatial";
+import { Quaternion, Vector3 } from "three";
 
 const ticks = (sim: Simulation, seconds: number) => {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
@@ -13,6 +14,40 @@ describe("long-range sniper", () => {
     sim = await Simulation.create("long");
   });
   afterEach(() => sim.world.free());
+
+  test("targets keep their facing when disabled and fall away from the impact", () => {
+    ticks(sim, 0.2);
+    for (const target of sim.actors.filter((a) => a.kind === "precision")) {
+      const facing = () => {
+        const q = target.body.rotation();
+        return new Vector3(0, 0, 1).applyQuaternion(new Quaternion(q.x, q.y, q.z, q.w));
+      };
+      expect(facing().x).toBeCloseTo(-1, 5);
+      const standing = { ...target.body.rotation() };
+      sim.damage(target, 140, { x: 180, y: 0, z: 0 }, target.body.translation(), "rifle");
+      expect(target.dead).toBe(true);
+      expect(facing().x).toBeCloseTo(-1, 5);
+      expect(target.previousRotation.y).toBeCloseTo(standing.y, 5);
+      expect(target.body.angvel().z).toBeLessThan(0);
+      ticks(sim, 0.12);
+      const q = target.body.rotation();
+      const up = new Vector3(0, 1, 0).applyQuaternion(new Quaternion(q.x, q.y, q.z, q.w));
+      expect(up.x).toBeGreaterThan(0.1);
+      expect(Math.abs(up.z)).toBeLessThan(0.05);
+    }
+  });
+
+  test("a robot that turns before being disabled hands its current pose to physics", () => {
+    const robot = sim.squad[0];
+    robot.yaw = -Math.PI / 4;
+    sim.damage(robot, robot.maxHp, { x: 0, y: 0, z: 0 }, robot.body.translation());
+    const q = robot.body.rotation();
+    const facing = new Vector3(0, 0, 1).applyQuaternion(new Quaternion(q.x, q.y, q.z, q.w));
+    expect(facing.x).toBeCloseTo(-Math.SQRT1_2, 5);
+    expect(facing.z).toBeCloseTo(Math.SQRT1_2, 5);
+    expect(robot.previousRotation.y).toBeCloseTo(q.y, 5);
+    expect(robot.previousRotation.w).toBeCloseTo(q.w, 5);
+  });
 
   test("the light chassis is fragile and weapon selection respects each model", () => {
     const sniper = sim.squad[3],

@@ -35,7 +35,7 @@ Four selected robots default to a 2 × 2 square; three form an equilateral trian
 
 Choose **Long Range** in the entry menu or the header. NEEDLE has **64 integrity and a 48 kg chassis**, compared with an assault robot's 160 integrity / 90 kg. Its rifle deals 140 damage, reaches 140 m, cycles every 1.4 s, and reloads a five-round magazine in 3 s. Press **Space** to toggle braced first-person sniping. Support stays engaged after key release, and aim settles in 0.6 s. Firing unbraced from the overhead view produces wide sway, heavy backward recoil, and a loss of stability.
 
-Use the **30 / 60 / 90 m** sight buttons to find a target before entering sniping. The rifle view fills the field at any overhead zoom. Point the mouse at a target to aim in both axes, middle-drag to turn the view, adjust scope magnification with the wheel, and fire with LMB. The cursor remains free to reach the range controls. The reticle shows the rifle's actual shot impact, including sway, and turns mint when settled. **Space**, **RMB**, or **Escape** returns to the previous overhead camera. Selecting another robot, changing weapons, pausing, or resetting also releases sniping.
+Use the **30 / 60 / 90 m** sight buttons to find a target before entering sniping. The rifle view fills the field at any overhead zoom. Move the mouse to turn and aim through the centred scope in both axes, adjust magnification with the wheel, and fire with LMB. The mouse is captured so aiming continues beyond screen edges. If capture is unavailable, mouse movement still turns the view and holding the pointer near an edge keeps turning. **Invert X axis** and **Invert Y axis** in the controls menu reverse either axis independently and persist across reloads. The reticle shows the rifle's actual shot impact, including sway, and turns mint when settled. **Space**, **RMB**, or **Escape** returns to the previous overhead camera. Selecting another robot, changing weapons, pausing, or resetting also releases sniping.
 
 The 30 m target stands on the ground; the 60 and 90 m targets stand on solid **2 m and 5 m platforms**. Aim at the elevated silhouette: the rifle's muzzle, sight and shot all account for height, and shots aimed too low hit the platform. Rifle kills on all three targets complete the drill; cover still blocks shots.
 
@@ -55,14 +55,14 @@ The 30 m target stands on the ground; the 60 and 90 m targets stand on solid **2
 | R                           | Reload selected robots                                                         |
 | Space with the rifle        | Toggle braced first-person sniping                                             |
 | Hold Space with machine gun | Brace; release to resume a pending move                                        |
-| WASD / middle drag          | Pan overhead; middle-drag turns the first-person view                          |
+| WASD / middle drag          | Pan the overhead view                                                          |
 | Mouse wheel                 | Zoom overhead / adjust scope magnification                                     |
 | F                           | Centre camera toward the selected robot                                        |
-| Escape / ?                  | Escape leaves sniping first; otherwise pause, controls, volume, reduced motion |
+| Escape / ?                  | Escape leaves sniping first; otherwise pause and open controls / settings       |
 | Shift + R / Reset range     | Restore the entire range                                                       |
 | Ctrl + left mouse           | Force fire when the cursor is over a squad member                              |
 
-The game pauses on focus loss. Sound and motion preferences are saved locally. Explosions can damage the squad; concrete also protects it. Gun/rifle accuracy counts hits on living targets and excludes grenade hits. Destroying a drill target with the wrong weapon requires a reset before that drill can be completed. Shift-drag selection never fires or throws, including in grenade mode; ordinary left-button firing works while right-drag steering.
+The game pauses on focus loss. Sound, motion and aiming preferences are saved locally. Explosions can damage the squad; concrete also protects it. Gun/rifle accuracy counts hits on living targets and excludes grenade hits. Destroying a drill target with the wrong weapon requires a reset before that drill can be completed. Shift-drag selection never fires or throws, including in grenade mode; ordinary left-button firing works while right-drag steering.
 
 ## Sound
 
