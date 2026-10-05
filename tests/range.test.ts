@@ -103,6 +103,116 @@ describe("proving ground simulation", () => {
     expect(findPath({ x: 0.1, z: 8.1 }, goal, BARRIERS).at(-1)).toEqual(goal);
   });
 
+  test("three selected robots arrive at an equilateral triangle centred on the move order", () => {
+    sim.selectGroup([1, 2, 3]);
+    sim.move({ x: 0, z: 8 });
+    const goals = sim.active.map((a) => a.moveTarget!);
+    for (let i = 0; i < 3; i++)
+      expect(distance2(goals[i], goals[(i + 1) % 3])).toBeCloseTo(
+        FORMATION_SPACING,
+      );
+    expect(goals.reduce((sum, p) => sum + p.x, 0) / 3).toBeCloseTo(0);
+    expect(goals.reduce((sum, p) => sum + p.z, 0) / 3).toBeCloseTo(8);
+    ticks(sim, 8);
+    for (const a of sim.active) {
+      expect(a.path).toHaveLength(0);
+      expect(distance2(a.body.translation(), a.moveTarget!)).toBeLessThan(0.15);
+    }
+  });
+
+  test("a clear destination beside a rectangular target remains reachable", () => {
+    sim.primary.body.setTranslation({ x: 0, y: 0.95, z: 9.5 }, true);
+    sim.actors
+      .find((a) => a.kind === "plate")!
+      .body.setTranslation({ x: 0, y: 0.96, z: 6 }, true);
+    sim.move({ x: 0, z: 6.9 });
+    expect(sim.primary.moveTarget).toEqual({ x: 0, z: 6.9 });
+    ticks(sim, 4);
+    expect(sim.primary.path).toHaveLength(0);
+    expect(
+      distance2(sim.primary.body.translation(), sim.primary.moveTarget!),
+    ).toBeLessThan(0.15);
+  });
+
+  test("a robot passes a stationary teammate locally without adding route legs", () => {
+    const walker = sim.squad[0],
+      blocker = sim.squad[1];
+    walker.body.setTranslation({ x: 0, y: 0.95, z: 8 }, true);
+    blocker.body.setTranslation({ x: -2, y: 0.95, z: 8 }, true);
+    blocker.braced = true;
+    sim.move({ x: -4, z: 8 });
+    expect(walker.path).toHaveLength(1);
+    let travelled = 0,
+      peak = 0,
+      previous = { ...walker.body.translation() };
+    for (let i = 0; i < 5 / STEP; i++) {
+      sim.step();
+      const p = walker.body.translation();
+      travelled += distance2(previous, p);
+      peak = Math.max(peak, walker.path.length);
+      previous = { ...p };
+    }
+    expect(peak).toBeLessThanOrEqual(1);
+    expect(travelled).toBeLessThan(6.5);
+    expect(walker.path).toHaveLength(0);
+    expect(
+      distance2(walker.body.translation(), walker.moveTarget!),
+    ).toBeLessThan(0.15);
+    expect(distance2(blocker.body.translation(), { x: -2, z: 8 })).toBeLessThan(
+      0.05,
+    );
+  });
+
+  test("opposing robots near cover yield and finish instead of oscillating at a route corner", () => {
+    const first = sim.squad[0],
+      fourth = sim.squad[3];
+    first.body.setTranslation({ x: 5.23, y: 0.95, z: -11.14 }, true);
+    fourth.body.setTranslation({ x: 5.79, y: 0.95, z: -10.43 }, true);
+    sim.select(1);
+    sim.move({ x: 5.375, z: -10.875 });
+    sim.select(4);
+    sim.move({ x: 6.125, z: -14.625 });
+    ticks(sim, 8);
+    for (const a of [first, fourth]) {
+      expect(a.path).toHaveLength(0);
+      expect(distance2(a.body.translation(), a.moveTarget!)).toBeLessThan(0.15);
+    }
+  });
+
+  test("repeated squad trips through crowded bays finish without growing detours for a straggler", () => {
+    sim.select(5);
+    for (const [x, z] of [
+      [0, 8],
+      [0, -3],
+      [0, -10],
+      [13, -9],
+      [10, -16],
+      [18, -16],
+      [-8, -10],
+      [-14, 6],
+      [0, 8],
+    ]) {
+      sim.move({ x, z });
+      const initial = sim.active.map((a) => a.path.length),
+        peak = [...initial];
+      const arrived = () =>
+        sim.active.every(
+          (a) =>
+            !a.path.length &&
+            distance2(a.body.translation(), a.moveTarget!) < 0.15,
+        );
+      for (let i = 0; i < 16 / STEP && !arrived(); i++) {
+        sim.step();
+        sim.active.forEach((a, j) => {
+          peak[j] = Math.max(peak[j], a.path.length);
+        });
+      }
+      expect(arrived(), `Squad stalled on move to ${x}, ${z}`).toBe(true);
+      for (let i = 0; i < peak.length; i++)
+        expect(peak[i]).toBeLessThanOrEqual(initial[i]);
+    }
+  });
+
   test("continuous fire follows the supplied loop cadence and reloads a depleted magazine", () => {
     sim.aim = { x: -21, y: 2, z: -17 };
     sim.trigger = true;
@@ -288,15 +398,28 @@ describe("proving ground simulation", () => {
   });
 
   test("routes go around inflated range barriers without diagonal corner cutting", () => {
-    const path = findPath({ x: 10, z: -3 }, { x: 12, z: -10 }, BARRIERS);
-    expect(path.length).toBeGreaterThan(8);
-    for (const p of path)
-      expect(
-        BARRIERS.some(
-          (b) =>
-            Math.abs(p.x - b.x) < b.w / 2 + 0.54 &&
-            Math.abs(p.z - b.z) < b.d / 2 + 0.54,
-        ),
-      ).toBe(false);
+    const start = { x: 10, z: -3 },
+      goal = { x: 12, z: -10 };
+    const path = findPath(start, goal, BARRIERS);
+    expect(path.length).toBeGreaterThan(1);
+    expect(path.at(-1)).toEqual(goal);
+    let from = start;
+    for (const to of path) {
+      const samples = Math.ceil(distance2(from, to) / 0.05);
+      for (let i = 0; i <= samples; i++) {
+        const p = {
+          x: from.x + ((to.x - from.x) * i) / samples,
+          z: from.z + ((to.z - from.z) * i) / samples,
+        };
+        expect(
+          BARRIERS.some(
+            (b) =>
+              Math.abs(p.x - b.x) < b.w / 2 + 0.54 &&
+              Math.abs(p.z - b.z) < b.d / 2 + 0.54,
+          ),
+        ).toBe(false);
+      }
+      from = to;
+    }
   });
 });

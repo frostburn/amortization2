@@ -29,7 +29,7 @@ The `dist/` directory is self-contained and uses relative asset URLs. Serve it o
 
 Four robots can move and fire together. Bracing improves control and reduces knockback. Targets and loose crates react physically; disabled robots topple and settle as single rigid bodies. Range supplies are unlimited. Reset restores targets, squad integrity, ammunition, and drill progress.
 
-Full-squad move orders default to a 2 × 2 square with 2.2 metres between corners. Four numbered ground markers show the assigned destinations and stay visible while the squad moves. The square shifts as a whole near cover and yard edges; robots take their own routes and regroup at those slots. Shift + right drag previews the queued formation in amber before release commits it. Smaller selections use a line.
+Four selected robots default to a 2 × 2 square; three form an equilateral triangle. Both use 2.2 metres between corners. Numbered ground markers show the assigned destinations and stay visible while the group moves. The formation shifts as a whole near cover, targets, and yard edges. Robots follow clear segments between route corners and pass or yield to nearby units without rebuilding their route around teammates. Shift + right drag previews the queued formation in amber before release commits it. Two robots use a line.
 
 ## Controls
 

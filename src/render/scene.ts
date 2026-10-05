@@ -852,18 +852,29 @@ export class RangeScene {
       }
     }
     const p = targets.map((t) => t.position);
+    const triangle =
+      p.length === 3 &&
+      p.every(
+        (point, i) =>
+          Math.abs(
+            Math.hypot(point.x - p[(i + 1) % 3].x, point.z - p[(i + 1) % 3].z) -
+              FORMATION_SPACING,
+          ) < 0.001,
+      );
     this.destinationOutline.visible =
-      p.length === 4 &&
-      Math.abs(p[0].x - p[1].x) < 0.001 &&
-      Math.abs(p[1].z - p[2].z) < 0.001 &&
-      Math.abs(p[2].x - p[3].x) < 0.001 &&
-      Math.abs(p[3].z - p[0].z) < 0.001 &&
-      Math.abs(Math.abs(p[0].x - p[2].x) - FORMATION_SPACING) < 0.001 &&
-      Math.abs(Math.abs(p[0].z - p[2].z) - FORMATION_SPACING) < 0.001;
+      triangle ||
+      (p.length === 4 &&
+        Math.abs(p[0].x - p[1].x) < 0.001 &&
+        Math.abs(p[1].z - p[2].z) < 0.001 &&
+        Math.abs(p[2].x - p[3].x) < 0.001 &&
+        Math.abs(p[3].z - p[0].z) < 0.001 &&
+        Math.abs(Math.abs(p[0].x - p[2].x) - FORMATION_SPACING) < 0.001 &&
+        Math.abs(Math.abs(p[0].z - p[2].z) - FORMATION_SPACING) < 0.001);
     if (this.destinationOutline.visible) {
       const positions =
         this.destinationOutline.geometry.getAttribute("position");
       p.forEach((point, i) => positions.setXYZ(i, point.x, 0.055, point.z));
+      this.destinationOutline.geometry.setDrawRange(0, p.length);
       positions.needsUpdate = true;
       this.destinationOutline.material.color.setHex(color);
       this.destinationOutline.material.opacity = fade * 0.25;

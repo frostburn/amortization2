@@ -20,7 +20,7 @@ import {
   type Vec2,
   type Vec3,
 } from "./config";
-import { findPath } from "./navigation";
+import { findPath, segmentClear } from "./navigation";
 
 export type ActorKind = "player" | "plate" | "heavy" | "moving" | "blast";
 export interface Actor {
@@ -296,7 +296,7 @@ export class Simulation {
   setBrace(braced: boolean) {
     for (const a of this.active) a.braced = braced;
   }
-  private navigationBoxes() {
+  private navigationBoxes(includeTargets = true) {
     return [
       ...BARRIERS,
       ...this.props.map((p) => ({
@@ -305,6 +305,16 @@ export class Simulation {
         w: p.w,
         d: p.d,
       })),
+      ...(includeTargets
+        ? this.actors
+            .filter((a) => a.kind !== "player" && !a.dead)
+            .map((a) => ({
+              x: a.body.translation().x,
+              z: a.body.translation().z,
+              w: 0.96,
+              d: 0.6,
+            }))
+        : []),
     ];
   }
 
@@ -312,6 +322,7 @@ export class Simulation {
     const active = this.active;
     if (!active.length) return [];
     const half = FORMATION_SPACING / 2;
+    const triangleRadius = FORMATION_SPACING / Math.sqrt(3);
     // Stable slots prevent robots trading places while a move is being steered.
     const offsets =
       active.length === 4
@@ -321,10 +332,16 @@ export class Simulation {
             { x: half, z: -half },
             { x: half, z: half },
           ]
-        : active.map((_, i) => ({
-            x: (i - (active.length - 1) / 2) * 1.65,
-            z: 0,
-          }));
+        : active.length === 3
+          ? [
+              { x: -half, z: triangleRadius / 2 },
+              { x: 0, z: -triangleRadius },
+              { x: half, z: triangleRadius / 2 },
+            ]
+          : active.map((_, i) => ({
+              x: (i - (active.length - 1) / 2) * 1.65,
+              z: 0,
+            }));
     const extentX = Math.max(...offsets.map((p) => Math.abs(p.x)));
     const extentZ = Math.max(...offsets.map((p) => Math.abs(p.z)));
     const minX = BOUNDS.left + 1 + extentX,
@@ -772,35 +789,9 @@ export class Simulation {
     // Recover the assigned corner if another hull or an impact displaces an arrival.
     if (!a.path.length && a.moveTarget && distance2(p, a.moveTarget) > 0.15)
       a.path = findPath(p, a.moveTarget, this.navigationBoxes());
-    if (a.path.length > 1) {
-      const occupied = this.squad
-        .filter((other) => other !== a && !other.dead)
-        .map((other) => ({
-          x: other.body.translation().x,
-          z: other.body.translation().z,
-          w: 0.9,
-          d: 0.9,
-        }));
-      const clear = (point: Vec2) =>
-        occupied.every(
-          (other) =>
-            Math.abs(point.x - other.x) >= 1 ||
-            Math.abs(point.z - other.z) >= 1,
-        );
-      if (!clear(a.path[0])) {
-        const next = a.path.findIndex(clear);
-        if (next > 0) {
-          const detour = findPath(p, a.path[next], [
-            ...this.navigationBoxes(),
-            ...occupied,
-          ]);
-          if (detour.length) a.path = [...detour, ...a.path.slice(next + 1)];
-        }
-      }
-    }
     while (
       a.path.length &&
-      distance2(p, a.path[0]) < (a.path.length === 1 ? 0.08 : 0.38)
+      distance2(p, a.path[0]) < (a.path.length === 1 ? 0.08 : 0.14)
     )
       a.path.shift();
     let dx = 0,
@@ -808,28 +799,12 @@ export class Simulation {
     if (a.path.length && !a.braced) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
-      const speed = Math.min(
-        a.firing ? 2.6 : 4.2,
-        a.path.length === 1 ? distance * 5 : Infinity,
-      );
+      const speed = Math.min(a.firing ? 2.6 : 4.2, distance * 5);
       const forwardX = (target.x - p.x) / distance,
         forwardZ = (target.z - p.z) / distance;
       dx = forwardX * speed;
       dz = forwardZ * speed;
-      for (const other of this.squad)
-        if (other !== a && !other.dead) {
-          const q = other.body.translation(),
-            d = distance2(p, q);
-          if (d < 1.4 && d > 0.01) {
-            dx += ((p.x - q.x) / d) * (1.4 - d) * 3;
-            dz += ((p.z - q.z) / d) * (1.4 - d) * 3;
-          }
-        }
-      const desiredSpeed = Math.hypot(dx, dz);
-      if (desiredSpeed > speed) {
-        dx *= speed / desiredSpeed;
-        dz *= speed / desiredSpeed;
-      }
+      ({ x: dx, z: dz } = this.walkVelocity(a, { x: dx, z: dz }));
     }
     // Finite acceleration preserves externally imparted velocity and permits lateral recovery.
     const acceleration = (a.braced ? 40 : 13) * (0.35 + a.stability * 0.65);
@@ -842,6 +817,96 @@ export class Simulation {
         { x: (ix / length) * amount, y: 0, z: (iz / length) * amount },
         true,
       );
+  }
+
+  private walkVelocity(a: Actor, preferred: Vec2): Vec2 {
+    const p = a.body.translation(),
+      velocity = a.body.linvel();
+    const speed = Math.hypot(preferred.x, preferred.z);
+    const remaining = distance2(p, a.path[0]);
+    const neighbours = this.actors
+      .filter(
+        (other) =>
+          other !== a &&
+          !other.dead &&
+          distance2(p, other.body.translation()) < 5,
+      )
+      .map((other) => ({
+        p: other.body.translation(),
+        v: other.body.linvel(),
+        player: other.kind === "player",
+      }));
+    if (!neighbours.length) return preferred;
+    const boxes = this.navigationBoxes(false);
+    let best: Vec2 = { x: 0, z: 0 },
+      bestScore = speed * speed * 2.5;
+    // A brief slow retreat can break a head-on jam when neither side can pass forwards.
+    for (const scale of [1, 0.5])
+      for (const angle of [
+        0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90, -90, 105, -105, 120,
+        -120, 135, -135, 150, -150, 165, -165, 180,
+      ]) {
+        const radians = (angle * Math.PI) / 180;
+        const candidate = {
+          x:
+            (preferred.x * Math.cos(radians) -
+              preferred.z * Math.sin(radians)) *
+            scale,
+          z:
+            (preferred.x * Math.sin(radians) +
+              preferred.z * Math.cos(radians)) *
+            scale,
+        };
+        // Predict only as far as this turn; the controller brakes and changes direction there.
+        const horizon = Math.min(0.65, remaining / (speed * scale));
+        const next = {
+          x: p.x + candidate.x * Math.min(0.5, horizon),
+          z: p.z + candidate.z * Math.min(0.5, horizon),
+        };
+        if (
+          next.x < BOUNDS.left + 0.37 ||
+          next.x > BOUNDS.right - 0.37 ||
+          next.z < BOUNDS.back + 0.37 ||
+          next.z > BOUNDS.front - 0.37 ||
+          !segmentClear(p, next, boxes, 0.36)
+        )
+          continue;
+        if (
+          neighbours.some((other) => {
+            const q = other.p,
+              v = other.v;
+            const rx = q.x - p.x,
+              rz = q.z - p.z,
+              vx = candidate.x - v.x,
+              vz = candidate.z - v.z;
+            const approach = rx * vx + rz * vz;
+            if (approach <= 0) return false;
+            // Targets have rectangular feet; a circular buffer can block a clear route corner.
+            if (!other.player)
+              return !segmentClear(
+                { x: -rx, z: -rz },
+                { x: -rx + vx * horizon, z: -rz + vz * horizon },
+                [{ x: 0, z: 0, w: 0.96, d: 0.6 }],
+                0.4,
+              );
+            const t = clamp(approach / (vx * vx + vz * vz || 1), 0, horizon);
+            return Math.hypot(rx - vx * t, rz - vz * t) < 0.9;
+          })
+        )
+          continue;
+        const score =
+          (candidate.x - preferred.x) ** 2 +
+          (candidate.z - preferred.z) ** 2 +
+          0.05 *
+            ((candidate.x - velocity.x) ** 2 +
+              (candidate.z - velocity.z) ** 2) +
+          (angle < 0 ? 0.01 : 0);
+        if (score < bestScore) {
+          bestScore = score;
+          best = candidate;
+        }
+      }
+    return best;
   }
 
   private checkDrills() {

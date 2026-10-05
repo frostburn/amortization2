@@ -8,11 +8,11 @@ const position = (id: number): Vec2 => ({
   z: BOUNDS.back + (Math.floor(id / WIDTH) + 0.5) * CELL,
 });
 
-function segmentClear(
+export function segmentClear(
   a: Vec2,
   b: Vec2,
   boxes: Pick<BoxSpec, "x" | "z" | "w" | "d">[],
-  radius: number,
+  radius = 0.55,
 ) {
   return boxes.every((box) => {
     let enter = 0,
@@ -69,7 +69,9 @@ export function findPath(
         Math.abs(goal.x - b.x) >= b.w / 2 + radius ||
         Math.abs(goal.z - b.z) >= b.d / 2 + radius,
     );
-  const nearest = (p: Vec2, visible = false) => {
+  if (exactGoal && segmentClear(start, goal, boxes, radius))
+    return [{ ...goal }];
+  const nearest = (p: Vec2, clearance: number | null = radius) => {
     let result = -1,
       best = Infinity;
     for (let id = 0; id < blocked.length; id++)
@@ -77,7 +79,8 @@ export function findPath(
         const d = distance2(position(id), p);
         if (
           d < best &&
-          (!visible || segmentClear(position(id), p, boxes, radius))
+          (clearance === null ||
+            segmentClear(position(id), p, boxes, clearance))
         ) {
           best = d;
           result = id;
@@ -85,8 +88,8 @@ export function findPath(
       }
     return result;
   };
-  const first = nearest(start),
-    last = nearest(goal, exactGoal);
+  const first = nearest(start, Math.min(radius, 0.36)),
+    last = nearest(goal, exactGoal ? radius : null);
   if (first < 0 || last < 0) return [];
   const open = new Set([first]);
   const closed = new Set<number>();
@@ -110,9 +113,24 @@ export function findPath(
         current = previous[current];
       }
       path.reverse();
+      path.unshift(position(first));
       if (exactGoal && (!path.length || distance2(path.at(-1)!, goal) > 0.001))
         path.push({ ...goal });
-      return path;
+      // Keep only visible turns, so following the route does not require visiting grid centres.
+      const turns: Vec2[] = [];
+      let anchor = start;
+      for (let i = 0; i < path.length; ) {
+        let next = i;
+        while (
+          next + 1 < path.length &&
+          segmentClear(anchor, path[next + 1], boxes, radius)
+        )
+          next++;
+        turns.push(path[next]);
+        anchor = path[next];
+        i = next + 1;
+      }
+      return turns;
     }
     open.delete(current);
     closed.add(current);
