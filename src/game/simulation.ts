@@ -5,6 +5,7 @@ import {
   GRAVITY,
   GRENADE_COOLDOWN,
   GRENADE_FUSE,
+  GUN_RANGE,
   MAGAZINE,
   RIFLE,
   ROBOT_MODELS,
@@ -544,12 +545,37 @@ export class Simulation {
       dz = toward.z - p.z,
       length = Math.hypot(dx, dz) || 1;
     const reach = a.model === "sniper" ? 1.65 : 0.86;
-    const dy = a.model === "sniper" ? toward.y - p.y - 0.42 : 0;
+    const dy = toward.y - p.y - 0.42;
     const pitchedLength = Math.hypot(dx, dy, dz) || 1;
     return {
       x: p.x + (dx / pitchedLength) * reach + (dz / length) * 0.27,
       y: p.y + 0.42 + (dy / pitchedLength) * reach,
       z: p.z + (dz / pitchedLength) * reach - (dx / length) * 0.27,
+    };
+  }
+
+  /** Nominal firearm line before spread, clipped by cover and weapon reach. */
+  aimTrace(a: Actor) {
+    const from = this.muzzle(a);
+    const dx = this.aim.x - from.x,
+      dy = this.aim.y - from.y,
+      dz = this.aim.z - from.z;
+    const length = Math.hypot(dx, dy, dz) || 1;
+    const reach = Math.min(length, a.model === "sniper" ? RIFLE.range : GUN_RANGE);
+    const end = {
+      x: from.x + (dx / length) * reach,
+      y: from.y + (dy / length) * reach,
+      z: from.z + (dz / length) * reach,
+    };
+    const hit = this.ray(from, end, a.body);
+    const distance = hit?.timeOfImpact ?? reach;
+    return {
+      from,
+      to: {
+        x: from.x + (dx / length) * distance,
+        y: from.y + (dy / length) * distance,
+        z: from.z + (dz / length) * distance,
+      },
     };
   }
 
@@ -583,7 +609,7 @@ export class Simulation {
       : 0.04 + a.recoil * 0.055 + (1 - a.stability) * 0.02;
   }
 
-  // Scope and shot share this direction: the visible sway is the rifle's actual aim.
+  // Settling, recoil and stability affect the shot around the fixed sight line.
   rifleDirection(a: Actor): Vec3 {
     const from = this.muzzle(a),
       dx = this.aim.x - from.x,
@@ -630,14 +656,14 @@ export class Simulation {
     dir.z /= norm;
     const hit = this.world.castRayAndGetNormal(
       new RAPIER.Ray(from, dir),
-      rifle ? RIFLE.range : 65,
+      rifle ? RIFLE.range : GUN_RANGE,
       true,
       undefined,
       undefined,
       undefined,
       a.body,
     );
-    const distance = hit?.timeOfImpact ?? (rifle ? RIFLE.range : 55);
+    const distance = hit?.timeOfImpact ?? (rifle ? RIFLE.range : GUN_RANGE);
     const to = {
       x: from.x + dir.x * distance,
       y: from.y + dir.y * distance,

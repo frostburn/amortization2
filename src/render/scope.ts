@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { RIFLE, clamp } from "../game/config";
 import type { Actor, Simulation } from "../game/simulation";
 
-/** A full-field rifle view with a reticle that follows the actual shot direction. */
+/** A full-field rifle view with an etched reticle fixed at the optical centre. */
 export class SniperView {
   readonly camera = new THREE.PerspectiveCamera(12, 1, 0.06, RIFLE.range + 10);
   private overlay = new THREE.Scene();
@@ -21,16 +21,15 @@ export class SniperView {
     depthWrite: false,
     toneMapped: false,
     uniforms: {
-      reticle: { value: new THREE.Vector2(0.5, 0.5) },
       ink: { value: new THREE.Color(0xd3a24f) },
       aspect: { value: 1 },
     },
     vertexShader: `varying vec2 vUv;
       void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
-    fragmentShader: `uniform vec2 reticle; uniform vec3 ink; uniform float aspect;
+    fragmentShader: `uniform vec3 ink; uniform float aspect;
       varying vec2 vUv;
       void main() {
-        vec2 p = abs(vUv - reticle) * vec2(aspect, 1.0);
+        vec2 p = abs(vUv - 0.5) * vec2(aspect, 1.0);
         float vertical = (1.0 - smoothstep(0.0006, 0.0015, p.x)) * step(0.009, p.y) * (1.0 - step(0.065, p.y));
         float horizontal = (1.0 - smoothstep(0.0006, 0.0015, p.y)) * step(0.009, p.x) * (1.0 - step(0.065, p.x));
         float dot = 1.0 - smoothstep(0.001, 0.0025, length(p));
@@ -134,21 +133,6 @@ export class SniperView {
     this.camera.aspect = width / Math.max(1, height);
     this.camera.updateProjectionMatrix();
     this.orient(sim);
-    const direction = sim.rifleDirection(operator);
-    const muzzle = sim.muzzle(operator);
-    const shot = new THREE.Vector3()
-      .copy(muzzle)
-      .addScaledVector(new THREE.Vector3().copy(direction), RIFLE.range);
-    const hit = sim.ray(muzzle, shot, operator.body);
-    if (hit)
-      shot
-        .copy(muzzle)
-        .addScaledVector(new THREE.Vector3().copy(direction), hit.timeOfImpact);
-    shot.project(this.camera);
-    this.material.uniforms.reticle.value.set(
-      (shot.x + 1) / 2,
-      (shot.y + 1) / 2,
-    );
     this.material.uniforms.aspect.value = this.camera.aspect;
     const ready = operator.braceTime >= RIFLE.settle && operator.reload === 0;
     this.material.uniforms.ink.value.setHex(ready ? 0x9be6cd : 0xd3a24f);

@@ -189,6 +189,10 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     sim.weapon === "rifle" ? (sim.sniping ? "EXIT SIGHT" : "SNIPE") : "BRACE",
   );
   text("move-action", sim.sniping ? "EXIT SIGHT" : "MOVE");
+  const gunElevation = sim.aim.y - gunner.body.translation().y - 0.42;
+  const gunHeight = Math.abs(gunElevation) > 0.35
+    ? ` · AIM ${gunElevation > 0 ? "↑ +" : "↓ "}${gunElevation.toFixed(1)} m`
+    : "";
   text(
     "mode-hint",
     dead
@@ -210,7 +214,7 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
           : reloading
             ? "RELOADING · KEEP MOVING"
             : sim.active.some((a) => a.braced)
-              ? "BRACED · RELEASE SPACE TO MOVE"
-              : "MACHINE GUN · HOLD LMB TO FIRE",
+              ? `BRACED${gunHeight} · RELEASE SPACE TO MOVE`
+              : `MACHINE GUN${gunHeight} · HOLD LMB TO FIRE`,
   );
 }

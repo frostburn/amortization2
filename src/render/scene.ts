@@ -195,6 +195,40 @@ export class RangeScene {
       depthWrite: false,
     }),
   );
+  private aimTicks = new THREE.LineSegments(
+    new THREE.BufferGeometry().setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute([
+        -0.46, 0, 0, -0.32, 0, 0, 0.32, 0, 0, 0.46, 0, 0,
+        0, -0.46, 0, 0, -0.32, 0, 0, 0.32, 0, 0, 0.46, 0,
+      ], 3),
+    ),
+    new THREE.LineBasicMaterial({ color: MINT, depthTest: false }),
+  );
+  private aimGround = new THREE.Mesh(
+    new THREE.RingGeometry(0.22, 0.25, 32),
+    new THREE.MeshBasicMaterial({
+      color: MINT, transparent: true, opacity: 0.35,
+      depthWrite: false, depthTest: false,
+    }),
+  );
+  private aimHeight = new THREE.Line(
+    new THREE.BufferGeometry().setAttribute(
+      "position", new THREE.BufferAttribute(new Float32Array(6), 3),
+    ),
+    new THREE.LineBasicMaterial({
+      color: MINT, transparent: true, opacity: 0.55,
+      depthWrite: false, depthTest: false,
+    }),
+  );
+  private aimGuides = new THREE.LineSegments(
+    new THREE.BufferGeometry().setAttribute(
+      "position", new THREE.BufferAttribute(new Float32Array(4 * 6), 3),
+    ),
+    new THREE.LineBasicMaterial({
+      color: MINT, transparent: true, opacity: 0.45, depthWrite: false,
+    }),
+  );
   private blastPreview = new THREE.Mesh(
     new THREE.RingGeometry(BLAST_RADIUS - 0.03, BLAST_RADIUS, 64),
     new THREE.MeshBasicMaterial({
@@ -294,7 +328,15 @@ export class RangeScene {
     this.particleMesh.count = 0;
     this.bulletMarks.count = 0;
     this.aimRing.rotation.x = this.blastPreview.rotation.x = -Math.PI / 2;
-    this.aiming.add(this.aimRing, this.blastPreview, this.arc);
+    this.aimGround.rotation.x = -Math.PI / 2;
+    this.aimRing.add(this.aimTicks);
+    this.aimGuides.frustumCulled = this.aimHeight.frustumCulled = false;
+    this.aimGuides.geometry.setDrawRange(0, 0);
+    this.aimRing.renderOrder = this.aimTicks.renderOrder = 10;
+    this.aiming.add(
+      this.aimRing, this.aimGround, this.aimHeight, this.aimGuides,
+      this.blastPreview, this.arc,
+    );
     const ringGeometry = new THREE.RingGeometry(0.42, 0.48, 32);
     for (let id = 1; id <= 4; id++) {
       const root = new THREE.Group();
@@ -1135,12 +1177,42 @@ export class RangeScene {
 
   updateAim(ground: Vec3, visible: boolean) {
     this.aiming.visible = visible;
+    if (!visible) return;
     const grenade = this.sim.weapon === "grenade";
-    this.aimRing.position.set(ground.x, 0.07, ground.z);
     this.aimRing.scale.setScalar(grenade ? 1.6 : 1);
+    this.aimRing.material.depthTest = grenade;
+    this.aimTicks.visible = this.aimGround.visible = this.aimHeight.visible =
+      this.aimGuides.visible = !grenade;
     const actor = this.sim.grenadeThrower;
     this.blastPreview.visible = this.arc.visible = grenade && !!actor;
-    if (!grenade || !actor) return;
+    if (!grenade) {
+      const aim = this.sim.aim;
+      this.aimRing.position.copy(aim);
+      this.aimRing.quaternion.copy(this.camera.quaternion);
+      this.aimGround.position.set(aim.x, 0.07, aim.z);
+      const height = this.aimHeight.geometry.getAttribute("position");
+      height.setXYZ(0, aim.x, 0.07, aim.z);
+      height.setXYZ(1, aim.x, aim.y, aim.z);
+      height.needsUpdate = true;
+      const guides = this.aimGuides.geometry.getAttribute("position");
+      let count = 0;
+      for (const operator of this.sim.active) {
+        if (
+          (this.sim.weapon === "gun" && operator.model !== "assault") ||
+          (this.sim.weapon === "rifle" && operator.model !== "sniper")
+        )
+          continue;
+        const { from, to } = this.sim.aimTrace(operator);
+        guides.setXYZ(count++, from.x, from.y, from.z);
+        guides.setXYZ(count++, to.x, to.y, to.z);
+      }
+      this.aimGuides.geometry.setDrawRange(0, count);
+      guides.needsUpdate = true;
+      return;
+    }
+    this.aimRing.position.set(ground.x, 0.07, ground.z);
+    this.aimRing.rotation.set(-Math.PI / 2, 0, 0);
+    if (!actor) return;
     const from = this.sim.grenadeOrigin(actor, ground);
     const { velocity, duration } = grenadeVelocity(from, ground);
     const points = [new THREE.Vector3(from.x, from.y, from.z)];
@@ -1170,6 +1242,24 @@ export class RangeScene {
     const end = points.at(-1)!;
     this.blastPreview.position.set(end.x, 0.07, end.z);
     this.aimRing.position.set(end.x, 0.08, end.z);
+  }
+
+  inspectAim() {
+    const guides = this.aimGuides.geometry.getAttribute("position");
+    return {
+      visible: this.aiming.visible,
+      target: this.aimRing.position.toArray(),
+      ground: this.aimGround.position.toArray(),
+      guides: this.aiming.visible && this.aimGuides.visible
+        ? Array.from(guides.array).slice(
+            0, this.aimGuides.geometry.drawRange.count * 3,
+          )
+        : [],
+      operators: this.sim.active.map((a) => ({
+        id: a.id,
+        pitch: this.actors.get(a.id)!.torso.rotation.x,
+      })),
+    };
   }
 
   event(e: GameEvent) {
@@ -1318,9 +1408,13 @@ export class RangeScene {
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
       });
+      const aimingFirearm = a.model === "sniper" || (
+        a.model === "assault" && this.sim.selected.has(a.id) &&
+        this.sim.weapon === "gun"
+      );
       v.torso.rotation.x = a.dead
         ? 0
-        : a.model === "sniper"
+        : aimingFirearm
           ? -Math.atan2(
               this.sim.aim.y - p.y - 0.42,
               Math.hypot(this.sim.aim.x - p.x, this.sim.aim.z - p.z),

@@ -597,6 +597,7 @@ async function start() {
         paused,
         audio: audio.inspect(),
         scope: scene.scope.inspect(),
+        aiming: scene.inspectAim(),
         pointerCaptured: document.pointerLockElement === canvas,
         camera: {
           x: scene.listenerPosition.x,

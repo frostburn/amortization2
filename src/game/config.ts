@@ -12,6 +12,7 @@ export type BoxSpec = {
 export const STEP = 1 / 60;
 export const GRAVITY = 12;
 export const MAGAZINE = 90;
+export const GUN_RANGE = 65;
 // The supplied ten-shot loop lasts 0.7145625 s. Match the simulated cadence.
 export const SHOT_INTERVAL = 0.7145625 / 10;
 export const RELOAD_SECONDS = 2.2;

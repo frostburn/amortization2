@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { RIFLE, STEP, distance2 } from "../src/game/config";
+import { GUN_RANGE, RIFLE, STEP, distance2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { rifleMix } from "../src/audio/spatial";
 import { Quaternion, Vector3 } from "three";
@@ -14,6 +14,62 @@ describe("long-range sniper", () => {
     sim = await Simulation.create("long");
   });
   afterEach(() => sim.world.free());
+
+  test("machine gun elevation preview agrees with the muzzle and an elevated hit", () => {
+    sim.select(1);
+    sim.setBrace(true);
+    ticks(sim, 0.3);
+    const gunner = sim.primary,
+      target = sim.actors.find((a) => a.id === 11)!;
+    sim.aim = {
+      ...target.body.translation(),
+      y: target.body.translation().y + 0.25,
+    };
+    const trace = sim.aimTrace(gunner);
+    expect(trace.from.y).toBeGreaterThan(gunner.body.translation().y + 0.42);
+    expect(trace.to.y).toBeGreaterThan(3);
+    expect(trace.to.x).toBeCloseTo(57.7, 1);
+    expect(sim.ray(trace.from, sim.aim, gunner.body)!.collider.handle).toBe(
+      target.collider.handle,
+    );
+    const hp = target.hp;
+    sim.shoot(gunner);
+    expect(target.hp).toBe(hp - 14);
+    const shot = sim.events.find((e) => e.type === "shot");
+    expect(shot?.type).toBe("shot");
+    if (shot?.type === "shot") {
+      expect(shot.from).toEqual(trace.from);
+      expect(shot.to.y).toBeGreaterThan(3);
+    }
+  });
+
+  test("the aim guide stops at cover and the machine gun's actual maximum reach", () => {
+    sim.select(1);
+    ticks(sim, 0.3);
+    const gunner = sim.primary;
+    sim.aim = { x: 58, y: 1.2, z: 0 };
+    const blocked = sim.aimTrace(gunner);
+    expect(blocked.to.x).toBeCloseTo(56, 1);
+    expect(blocked.to.y).toBeLessThan(2);
+    sim.aim = {
+      x: 200, y: gunner.body.translation().y + 0.42, z: -4,
+    };
+    const limited = sim.aimTrace(gunner);
+    expect(Math.hypot(
+      limited.to.x - limited.from.x,
+      limited.to.y - limited.from.y,
+      limited.to.z - limited.from.z,
+    )).toBeCloseTo(GUN_RANGE, 4);
+    sim.shoot(gunner);
+    const shot = sim.events.find((e) => e.type === "shot");
+    if (shot?.type === "shot") {
+      expect(Math.hypot(
+        shot.to.x - shot.from.x,
+        shot.to.y - shot.from.y,
+        shot.to.z - shot.from.z,
+      )).toBeCloseTo(GUN_RANGE, 4);
+    } else throw new Error("Expected a machine gun shot");
+  });
 
   test("targets keep their facing when disabled and fall away from the impact", () => {
     ticks(sim, 0.2);
