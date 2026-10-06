@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { GUN_RANGE, RIFLE, STEP, distance2 } from "../src/game/config";
+import { FIREARMS, GUN_RANGE, RIFLE, STEP, distance2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { rifleMix } from "../src/audio/spatial";
 import { Quaternion, Vector3 } from "three";
@@ -34,7 +34,7 @@ describe("long-range sniper", () => {
     );
     const hp = target.hp;
     sim.shoot(gunner);
-    expect(target.hp).toBe(hp - 14);
+    expect(target.hp).toBe(hp - FIREARMS.gun.damage);
     const shot = sim.events.find((e) => e.type === "shot");
     expect(shot?.type).toBe("shot");
     if (shot?.type === "shot") {

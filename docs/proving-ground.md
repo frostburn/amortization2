@@ -6,7 +6,7 @@ Establish the feel of a four-robot squad before adding hostile AI or campaign st
 
 ## Layout
 
-The playable yard is approximately 44 × 32 metres, viewed through a panning, zooming orthographic camera. World Y is up; negative Z leads away from the firing line.
+The playable yard is 66 × 48 metres, viewed through a panning, zooming isometric camera. World Y is up; negative Z leads away from the firing line. The camera projects the three axes at 120°, with smaller default character silhouettes and screen-aligned panning. Extra apron and back space allow movement around the drills. One plate has a wider firing bearing so a pushed wreck cannot seal the next lane.
 
 | Lane              | Contents                                               | Question it answers                                              |
 | ----------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
@@ -23,8 +23,8 @@ Four squad members start across the apron. LATCH starts at the grenade bay. Robo
 | Simulation                    | Fixed 60 Hz; at most six catch-up steps per rendered frame  |
 | Machine-gun cadence           | 10 shots / 0.7145625 s, matching the supplied loop          |
 | Magazine / reload             | 90 rounds / 2.2 s                                           |
-| Target damage per bullet      | 14                                                          |
-| Bullet impulse                | 48 N·s horizontally before bracing reduction                |
+| Target damage per bullet      | 6                                                           |
+| Bullet impulse                | 180 N·s horizontally before bracing reduction               |
 | Walk / firing movement speed  | 4.2 / 2.6 m/s                                               |
 | Full-squad formation          | 2 × 2 square; 2.2 m between corners                         |
 | Three-member formation        | Equilateral triangle; 2.2 m between corners                 |
@@ -38,7 +38,7 @@ Balance constants and authored geometry live in `src/game/config.ts`. Weapon int
 
 ## Physical response
 
-Living actors have upright rigid bodies. Finite motor acceleration lets external impulses move a robot before it recovers and continues its route. Bracing reduces incoming impulse and increases recovery authority. Death unlocks rigid-body rotation; damping and restrained vertical blast force keep the outcome compact. There are no skeletal ragdolls.
+Living actors have upright rigid bodies. Horizontal impact velocity is retained separately from walking, decays gradually, and adds to the assigned movement velocity. The motor cannot erase an incoming volley as a walking error. Bracing receives 60% of ordinary bullet impulse; heavier chassis resist more. Ordinary bullets disturb position and accuracy while automatic weapons can keep firing. Rifle and blast hits briefly interrupt attacks. Death unlocks rigid-body rotation; damping and restrained vertical blast force keep the outcome compact. See [kinetic combat tuning](combat-feel.md).
 
 Friendly fire is enabled for grenades and sniper shots on both teams. Rifle rays and guides stop at teammates; grenades can damage, suppress and displace the thrower and allies, with ordinary distance and cover protection. Machine gun and pistol rays ignore teammates. Loose props retain their physical reactions.
 
@@ -52,9 +52,9 @@ Selecting four living robots gives move orders a square footprint; three use an 
 
 ## Audio behavior
 
-The entry gesture creates the audio context and decodes the four supplied files. Each firing robot has a scheduled start, looping sustain, and release tail. Firing voices are normalized as the squad joins in. Muzzle loops stop on release, empty magazine, reload, deselection, pause, or death. Reload and impact details use filtered noise and short tones; the blast recording gets a brief 75→34 Hz layer. Master compression contains simultaneous bursts.
+The entry gesture creates the audio context and decodes the supplied samples. Each firing robot has a scheduled start, looping sustain, and release tail. Firing voices are normalized as the squad joins in. Muzzle loops stop on release, empty magazine, reload, deselection, pause, or death. Reload and impact details use filtered noise and short tones; the blast recording gets a brief 75→34 Hz layer. Master compression contains simultaneous bursts.
 
-The audio bus currently pans from world X. It has no physical propagation delay, acoustic occlusion, or environmental convolution yet. Final loudness and timbre require headphone and speaker listening tests; successful browser decoding alone does not establish mix quality.
+The audio bus pans along the active camera's right axis, keeping centred action balanced in the diagonal view and while turning a scope. It has no physical propagation delay, acoustic occlusion, or environmental convolution yet. Final loudness and timbre require headphone and speaker listening tests; successful browser decoding alone does not establish mix quality.
 
 ## Code boundaries
 

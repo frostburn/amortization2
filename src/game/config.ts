@@ -43,7 +43,7 @@ export const MINIGUN = {
   interval: 1 / 30,
   reload: 3.8,
   range: 65,
-  damage: 9,
+  damage: 3,
   muzzle: 1.18,
   windUp: 0.5,
   coast: 0.7,
@@ -51,7 +51,7 @@ export const MINIGUN = {
 export const FIREARMS = {
   gun: {
     magazine: MAGAZINE, interval: SHOT_INTERVAL, reload: RELOAD_SECONDS,
-    range: GUN_RANGE, damage: 14, muzzle: 0.86,
+    range: GUN_RANGE, damage: 6, muzzle: 0.86,
   },
   rifle: RIFLE,
   pistol: PISTOL,
@@ -59,6 +59,14 @@ export const FIREARMS = {
 };
 export type Firearm = keyof typeof FIREARMS;
 export type Weapon = Firearm | "grenade";
+// Automatic fire buys ground before it kills. Motor control must preserve this
+// external velocity rather than treating it as a walking error every frame.
+export const KINETIC = {
+  impulse: { gun: 180, minigun: 84, pistol: 36, rifle: 180 },
+  bracedBullet: 0.6,
+  drag: 3.2,
+  maxSpeed: 7,
+};
 export const FRIENDLY_FIRE = {
   gun: false, pistol: false, minigun: false, rifle: true, grenade: true,
 } as const;
@@ -77,12 +85,12 @@ export type RangeBounds = {
   back: number;
   front: number;
 };
-export const BOUNDS = { left: -22, right: 22, back: -18, front: 14 };
+export const BOUNDS = { left: -33, right: 33, back: -27, front: 21 };
 export const BARRIERS: BoxSpec[] = [
-  { x: 0, z: -18.5, w: 45, d: 1, h: 3.7, style: "wall" },
-  { x: -22.5, z: -2, w: 1, d: 33, h: 2.5, style: "wall" },
-  { x: 22.5, z: -2, w: 1, d: 33, h: 2.5, style: "wall" },
-  { x: 0, z: 14.5, w: 45, d: 1, h: 0.4, style: "wall" },
+  { x: 0, z: -27.5, w: 67, d: 1, h: 3.7, style: "wall" },
+  { x: -33.5, z: -3, w: 1, d: 49, h: 2.5, style: "wall" },
+  { x: 33.5, z: -3, w: 1, d: 49, h: 0.6, style: "wall" },
+  { x: 0, z: 21.5, w: 67, d: 1, h: 0.4, style: "wall" },
   { x: 7, z: -5, w: 0.65, d: 18, h: 1.15, style: "barrier" },
   { x: 13, z: -6, w: 5.2, d: 0.75, h: 1.35, style: "barrier" },
   { x: 17.9, z: -12.7, w: 6.5, d: 0.75, h: 1.7, style: "barrier" },
@@ -105,7 +113,8 @@ export const TARGET_SPAWNS = [
   { x: -17, z: 2, kind: "plate" },
   { x: -12, z: -1.5, kind: "plate" },
   { x: -17.5, z: -5.6, kind: "plate" },
-  { x: -11, z: -8.5, kind: "plate" },
+  // Distinct firing bearings keep pushed wrecks from sealing the next lane.
+  { x: -8.5, z: -8.5, kind: "plate" },
   { x: -16.5, z: -12.5, kind: "plate" },
   { x: -12, z: -14.2, kind: "plate" },
   { x: -4.3, z: -4.3, kind: "heavy" },

@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
-  BARRIERS,
   BLAST_RADIUS,
   FORMATION_SPACING,
   FIREARMS,
@@ -21,6 +20,7 @@ import type {
 } from "../game/simulation";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
+import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
 
 const MINT = 0x9be6cd,
   AMBER = 0xd3a24f,
@@ -156,7 +156,7 @@ type Trail = { mesh: THREE.Mesh; life: number };
 export class RangeScene {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
-  camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 260);
+  camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 400);
   scope = new SniperView();
   private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
@@ -188,8 +188,7 @@ export class RangeScene {
   private markIndex = 0;
   private dummy = new THREE.Object3D();
   private cameraTarget = new THREE.Vector3(0, 0, -2.5);
-  private cameraOffset = new THREE.Vector3(0, 28, 38);
-  private baseHalfHeight = 12;
+  private cameraOffset = new THREE.Vector3().copy(TACTICAL_CAMERA_OFFSET);
   private zoom = 1;
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -394,7 +393,7 @@ export class RangeScene {
 
   private buildEnvironment(tex: THREE.Texture) {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(9, 7);
+    tex.repeat.set(13, 10);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
     const floorMat = new THREE.MeshStandardMaterial({
@@ -410,32 +409,32 @@ export class RangeScene {
       roughness: 0.94,
     });
     if (this.sim.range === "long") {
-      tex.repeat.set(22, 4);
+      tex.repeat.set(30, 7);
       this.buildLongRange(floorMat, concrete);
       this.batchEnvironment();
       return;
     }
     if (this.sim.range === "arena") {
-      tex.repeat.set(13, 9);
+      tex.repeat.set(22, 16);
       this.buildArena(floorMat, concrete);
       return;
     }
-    box(this.environment, 48, 0.7, 36, 0, -0.38, -2, floorMat);
-    box(this.environment, 47, 0.3, 5.6, 0, -0.16, 11.3, material(0x707874));
-    for (const b of BARRIERS) this.makeBarrier(b, concrete);
-    for (let x = -22; x <= 22; x += 5.5) {
-      box(this.environment, 0.32, 3.9, 0.4, x, 1.95, -18.0, concrete);
-      box(this.environment, 0.55, 0.15, 1.25, x, 3.95, -18.35, metal);
+    box(this.environment, 72, 0.7, 52, 0, -0.38, -3, floorMat);
+    box(this.environment, 67, 0.3, 5.6, 0, -0.16, 18.3, material(0x707874));
+    for (const b of this.sim.layout.barriers) this.makeBarrier(b, concrete);
+    for (let x = -33; x <= 33; x += 5.5) {
+      box(this.environment, 0.32, 3.9, 0.4, x, 1.95, -27.0, concrete);
+      box(this.environment, 0.55, 0.15, 1.25, x, 3.95, -27.35, metal);
     }
     // Back wall service pipes and vent cabinets.
     for (const h of [2.9, 3.25]) {
-      const pipe = cylinder(this.environment, 0.12, 19, 9, h, -17.85);
+      const pipe = cylinder(this.environment, 0.12, 19, 9, h, -26.85);
       pipe.rotation.z = Math.PI / 2;
     }
     for (const x of [1, 7, 13, 19])
-      box(this.environment, 0.16, 0.72, 0.3, x, 3.06, -17.75, silver);
+      box(this.environment, 0.16, 0.72, 0.3, x, 3.06, -26.75, silver);
     for (const x of [-19, 18]) {
-      box(this.environment, 2.1, 1.2, 0.35, x, 1.7, -17.83, metal);
+      box(this.environment, 2.1, 1.2, 0.35, x, 1.7, -26.83, metal);
       for (let i = 0; i < 7; i++)
         box(
           this.environment,
@@ -444,7 +443,7 @@ export class RangeScene {
           0.04,
           x,
           1.28 + i * 0.13,
-          -17.63,
+          -26.63,
           dark,
         );
     }
@@ -455,7 +454,7 @@ export class RangeScene {
       2.0,
       -5,
       2.6,
-      -17.92,
+      -26.92,
       false,
       "#283230",
     );
@@ -466,7 +465,7 @@ export class RangeScene {
       0.65,
       -5,
       1.5,
-      -17.91,
+      -26.91,
       false,
       "#404841",
     );
@@ -517,29 +516,29 @@ export class RangeScene {
     }
     // Subtle slab joints across the training surface.
     const joint = material(0x5e6662);
-    for (let x = -22; x < 22; x += 5.5)
-      box(this.environment, 0.014, 0.007, 32, x, 0.007, -2, joint);
-    for (let z = -18; z < 14; z += 5.5)
-      box(this.environment, 44, 0.007, 0.014, 0, 0.007, z, joint);
+    for (let x = -33; x < 33; x += 5.5)
+      box(this.environment, 0.014, 0.007, 48, x, 0.007, -3, joint);
+    for (let z = -27; z < 21; z += 5.5)
+      box(this.environment, 66, 0.007, 0.014, 0, 0.007, z, joint);
     // Range lights, guard rails, and equipment outside the walkable yard.
-    for (const x of [-23.6, 23.6])
+    for (const x of [-34.6, 34.6])
       for (const z of [-14, 3, 12]) {
         cylinder(this.environment, 0.11, 5.4, x, 2.7, z);
         box(this.environment, 0.7, 0.38, 0.4, x, 5.3, z, dark);
         box(this.environment, 0.58, 0.24, 0.03, x, 5.28, z + 0.22, pale);
         box(this.environment, 0.65, 0.22, 0.65, x, 0.1, z, concrete);
       }
-    for (const x of [-23, 23]) {
-      const rail = cylinder(this.environment, 0.035, 28, x, 2.9, -2, yellow);
+    for (const x of [-34, 34]) {
+      const rail = cylinder(this.environment, 0.035, 46, x, 2.9, -3, yellow);
       rail.rotation.x = Math.PI / 2;
-      for (let z = -16; z < 13; z += 3)
+      for (let z = -25; z < 21; z += 3)
         cylinder(this.environment, 0.03, 0.7, x, 2.58, z, yellow);
     }
     this.batchEnvironment();
   }
 
   private buildLongRange(floor: THREE.Material, concrete: THREE.Material) {
-    box(this.environment, 108, 0.7, 20, 45, -0.38, 0, floor);
+    box(this.environment, 148, 0.7, 36, 54, -0.38, 0, floor);
     box(this.environment, 8, 0.3, 18, -4, -0.16, 0, material(0x707874));
     for (const b of this.sim.layout.barriers) this.makeBarrier(b, concrete);
     for (const platform of this.sim.layout.platforms) {
@@ -635,12 +634,12 @@ export class RangeScene {
         box(this.environment, 0.25, 0.08, 0.35, target.x, 2.25, z, yellow);
       }
     }
-    for (let x = -6; x < 98; x += 6) {
-      box(this.environment, 0.025, 0.007, 18, x, 0.009, 0, dark);
-      box(this.environment, 0.22, 3, 0.4, x, 1.5, -9.0, concrete);
+    for (let x = -16; x < 126; x += 6) {
+      box(this.environment, 0.025, 0.007, 32, x, 0.009, 0, dark);
+      box(this.environment, 0.22, 3, 0.4, x, 1.5, -16.0, concrete);
     }
     for (const z of [-3, 3])
-      box(this.environment, 106, 0.007, 0.016, 45, 0.009, z, dark);
+      box(this.environment, 144, 0.007, 0.016, 54, 0.009, z, dark);
     label(
       this.environment,
       "PRECISION / BRACE BEFORE FIRING",
@@ -648,20 +647,20 @@ export class RangeScene {
       0.8,
       88,
       2.2,
-      -8.95,
+      -15.95,
       false,
       "#283230",
     );
   }
 
   private buildArena(floorMat: THREE.Material, concrete: THREE.Material) {
-    box(this.environment, 70, 0.7, 49, 0, -0.38, 0, floorMat);
+    box(this.environment, 118, 0.7, 85, 0, -0.38, 0, floorMat);
     for (const b of this.sim.layout.barriers) this.makeBarrier(b, concrete);
-    for (let x = -30; x <= 30; x += 6)
-      box(this.environment, 0.02, 0.006, 44, x, 0.012, 0, dark);
-    for (let z = -18; z <= 18; z += 6)
-      box(this.environment, 64, 0.006, 0.02, 0, 0.012, z, dark);
-    label(this.environment, "ARENA / LIVE FIRE", 13, 0.9, 0, 0.032, 15.8, true, "#d2bd8e");
+    for (let x = -54; x <= 54; x += 6)
+      box(this.environment, 0.02, 0.006, 80, x, 0.012, 0, dark);
+    for (let z = -36; z <= 36; z += 6)
+      box(this.environment, 112, 0.006, 0.02, 0, 0.012, z, dark);
+    label(this.environment, "ARENA / LIVE FIRE", 13, 0.9, 0, 0.032, 32, true, "#d2bd8e");
     for (const gate of ARENA_ENTRIES) {
       label(this.environment, gate.name, 5, 0.7,
         gate.x + gate.dx * 2.4, 0.032, gate.z + gate.dz * 2.4, true, "#c99b5b");
@@ -686,15 +685,15 @@ export class RangeScene {
 
   private configureRangeLighting() {
     const long = this.sim.range === "long";
-    this.scene.fog = new THREE.Fog(0x242d30, long ? 115 : 90, long ? 180 : 145);
+    this.scene.fog = new THREE.Fog(0x242d30, 240, 340);
     this.sun.position.set(long ? 10 : -18, long ? 70 : 38, long ? 30 : 15);
     this.sun.target.position.set(long ? 45 : 0, 0, 0);
     const camera = this.sun.shadow.camera;
-    camera.left = -(long ? 76 : this.sim.range === "arena" ? 46 : 36);
-    camera.right = long ? 76 : this.sim.range === "arena" ? 46 : 36;
-    camera.top = long ? 40 : 32;
-    camera.bottom = -(long ? 40 : 32);
-    camera.far = long ? 180 : 95;
+    camera.left = -(long ? 90 : this.sim.range === "arena" ? 76 : 46);
+    camera.right = long ? 90 : this.sim.range === "arena" ? 76 : 46;
+    camera.top = long ? 70 : this.sim.range === "arena" ? 60 : 40;
+    camera.bottom = -camera.top;
+    camera.far = 230;
     camera.updateProjectionMatrix();
   }
 
@@ -1095,12 +1094,7 @@ export class RangeScene {
     const rect = this.canvas.getBoundingClientRect();
     this.renderer.setSize(rect.width, rect.height, false);
     const aspect = rect.width / Math.max(1, rect.height);
-    const half =
-      Math.max(
-        this.baseHalfHeight,
-        (this.sim.range === "long" ? 58 : this.sim.range === "arena" ? 36 : 23) / aspect,
-        this.sim.range === "arena" ? 18 : 0,
-      ) / this.zoom;
+    const half = tacticalHalfHeight(this.sim.range, aspect, this.zoom);
     this.camera.left = -half * aspect;
     this.camera.right = half * aspect;
     this.camera.top = half;
@@ -1123,15 +1117,16 @@ export class RangeScene {
     }
     this.zoom = clamp(
       this.zoom * Math.exp(-delta * 0.001),
-      0.8,
+      0.65,
       this.sim.range === "long" ? 5 : 2.8,
     );
     this.resize();
   }
   pan(dx: number, dz: number) {
     const b = this.sim.layout.bounds;
-    this.cameraTarget.x = clamp(this.cameraTarget.x + dx, b.left, b.right);
-    this.cameraTarget.z = clamp(this.cameraTarget.z + dz, b.back, b.front);
+    const ground = tacticalPan(dx, dz);
+    this.cameraTarget.x = clamp(this.cameraTarget.x + ground.x, b.left, b.right);
+    this.cameraTarget.z = clamp(this.cameraTarget.z + ground.z, b.back, b.front);
     this.updateCamera();
   }
   center(onlyIfClose = false) {
@@ -1146,9 +1141,9 @@ export class RangeScene {
   }
   resetCamera() {
     this.cameraTarget.set(
-      this.sim.range === "long" ? 45 : 0,
+      this.sim.range === "long" ? 54 : 0,
       0,
-      this.sim.range === "proving" ? -2.5 : 0,
+      this.sim.range === "proving" ? -3 : 0,
     );
     this.zoom = 1;
     this.resize();
@@ -1173,7 +1168,7 @@ export class RangeScene {
       return null;
     const origin = this.raycaster.ray.origin,
       dir = this.raycaster.ray.direction;
-    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, 160));
+    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far));
     const actor =
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
@@ -1200,6 +1195,14 @@ export class RangeScene {
     if (!operator) return this.camera.position;
     const p = operator.body.translation();
     return { x: p.x, y: p.y + 0.65, z: p.z };
+  }
+  get listenerRight() {
+    const camera = this.sim.sniping ? this.scope.camera : this.camera;
+    return { x: camera.matrixWorld.elements[0], z: camera.matrixWorld.elements[2] };
+  }
+  inspectCamera() {
+    return { target: { x: this.cameraTarget.x, y: this.cameraTarget.y, z: this.cameraTarget.z },
+      zoom: this.zoom, halfHeight: this.camera.top, right: this.listenerRight };
   }
   markMove() {
     this.destinationPreview = null;

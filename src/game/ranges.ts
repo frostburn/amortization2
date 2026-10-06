@@ -10,10 +10,10 @@ import {
 
 export type RangeId = "proving" | "long" | "arena";
 export const ARENA_ENTRIES = [
-  { name: "NORTH", x: 0, z: -20, dx: 0, dz: 1 },
-  { name: "EAST", x: 30, z: 0, dx: -1, dz: 0 },
-  { name: "SOUTH", x: 0, z: 20, dx: 0, dz: -1 },
-  { name: "WEST", x: -30, z: 0, dx: 1, dz: 0 },
+  { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
+  { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
+  { name: "SOUTH", x: 0, z: 38, dx: 0, dz: -1 },
+  { name: "WEST", x: -54, z: 0, dx: 1, dz: 0 },
 ] as const;
 export type TargetKind = (typeof TARGET_SPAWNS)[number]["kind"] | "precision";
 type RangeDefinition = {
@@ -29,15 +29,15 @@ type RangeDefinition = {
 export const RANGES: Record<RangeId, RangeDefinition> = {
   arena: {
     name: "ENDLESS ARENA",
-    bounds: { left: -32, right: 32, back: -22, front: 22 },
+    bounds: { left: -56, right: 56, back: -40, front: 40 },
     barriers: [
       // Four broad entrances. The near wall stays low enough for the overhead camera.
-      ...[-19, 19].flatMap((x): BoxSpec[] => [
-        { x, z: -22.5, w: 26, d: 1, h: 3, style: "wall" },
-        { x, z: 22.5, w: 26, d: 1, h: 0.6, style: "wall" },
+      ...[-31, 31].flatMap((x): BoxSpec[] => [
+        { x, z: -40.5, w: 50, d: 1, h: 3, style: "wall" },
+        { x, z: 40.5, w: 50, d: 1, h: 0.6, style: "wall" },
       ]),
-      ...[-32.5, 32.5].flatMap((x): BoxSpec[] => [-14, 14].map((z) => ({
-        x, z, w: 1, d: 16, h: 2, style: "wall",
+      ...[-56.5, 56.5].flatMap((x): BoxSpec[] => [-23, 23].map((z) => ({
+        x, z, w: 1, d: 34, h: x > 0 ? 0.6 : 2.5, style: "wall",
       }))),
       { x: 0, z: -6, w: 4, d: 3, h: 2.6, style: "crate" },
       { x: -11, z: 0, w: 0.8, d: 9, h: 1.25, style: "barrier" },
@@ -47,6 +47,11 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
       { x: 19, z: -11, w: 3, d: 3, h: 2.5, style: "crate" },
       { x: -19, z: 11, w: 6, d: 0.8, h: 1.3, style: "barrier" },
       { x: 19, z: 11, w: 6, d: 0.8, h: 1.3, style: "barrier" },
+      ...[-40, 40].flatMap((x): BoxSpec[] => [
+        { x, z: -18, w: 5, d: 3, h: 2.5, style: "crate" },
+        { x, z: 18, w: 5, d: 0.8, h: 1.3, style: "barrier" },
+      ]),
+      ...[-28, 28].map((z): BoxSpec => ({ x: 0, z, w: 7, d: 0.8, h: 1.25, style: "barrier" })),
     ],
     platforms: [],
     players: [
@@ -70,12 +75,12 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
   },
   long: {
     name: "LONG RANGE",
-    bounds: { left: -8, right: 98, back: -9, front: 9 },
+    bounds: { left: -18, right: 126, back: -16, front: 16 },
     barriers: [
-      { x: 45, z: -9.5, w: 107, d: 1, h: 2.8, style: "wall" },
-      { x: 45, z: 9.5, w: 107, d: 1, h: 0.6, style: "wall" },
-      { x: -8.5, z: 0, w: 1, d: 19, h: 1.4, style: "wall" },
-      { x: 98.5, z: 0, w: 1, d: 19, h: 4, style: "wall" },
+      { x: 54, z: -16.5, w: 145, d: 1, h: 2.8, style: "wall" },
+      { x: 54, z: 16.5, w: 145, d: 1, h: 0.6, style: "wall" },
+      { x: -18.5, z: 0, w: 1, d: 33, h: 1.4, style: "wall" },
+      { x: 126.5, z: 0, w: 1, d: 33, h: 0.6, style: "wall" },
       { x: 43, z: 5.7, w: 3, d: 1, h: 1.3, style: "barrier" },
       { x: 72, z: -5, w: 2, d: 1.8, h: 1.6, style: "crate" },
     ],

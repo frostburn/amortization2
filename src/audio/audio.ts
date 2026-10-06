@@ -16,9 +16,9 @@ import impact1Url from "../../sounds/minigun/impact-1.wav?url";
 import impact2Url from "../../sounds/minigun/impact-2.wav?url";
 import impact3Url from "../../sounds/minigun/impact-3.wav?url";
 import flybyUrl from "../../sounds/855248__qubodup__real-bullet-flyby-sound.flac?url";
-import { MINIGUN, clamp, type Vec3 } from "../game/config";
+import { MINIGUN, clamp, type Vec2, type Vec3 } from "../game/config";
 import type { GameEvent, Simulation } from "../game/simulation";
-import { rifleMix } from "./spatial";
+import { rifleMix, spatialPan } from "./spatial";
 
 type Voice = {
   start: AudioBufferSourceNode;
@@ -44,14 +44,16 @@ export class RangeAudio {
   failed = false;
   ready = false;
   private listener: Vec3 = { x: 0, y: 28, z: 35.5 };
+  private listenerRight: Vec2 = { x: 1, z: 0 };
   private lastRifle?: ReturnType<typeof rifleMix>;
   private pistolShots = 0;
   private impactSerial = 0;
   private nextImpact = 0;
   private nextFlyby = 0;
 
-  setListener(position: Vec3) {
+  setListener(position: Vec3, right: Vec2 = { x: 1, z: 0 }) {
     this.listener = { ...position };
+    this.listenerRight = { ...right };
   }
 
   async unlock() {
@@ -134,7 +136,7 @@ export class RangeAudio {
     const amp = ctx.createGain();
     amp.gain.value = gain;
     const pan = ctx.createStereoPanner();
-    pan.pan.value = clamp((position.x - this.listener.x) / 32, -0.8, 0.8);
+    pan.pan.value = spatialPan(position, this.listener, this.listenerRight);
     amp.connect(pan);
     pan.connect(this.effects!);
     return { amp, pan };
@@ -190,7 +192,7 @@ export class RangeAudio {
       const voice = this.voices.get(a.id);
       if (voice) {
         voice.pan.pan.setTargetAtTime(
-          clamp((position.x - this.listener.x) / 32, -0.8, 0.8),
+          spatialPan(position, this.listener, this.listenerRight),
           this.context.currentTime,
           0.05,
         );
@@ -264,7 +266,7 @@ export class RangeAudio {
   private moveLayer(layer: Layer, position: Vec3, gain: number) {
     const now = this.context!.currentTime;
     layer.gain.gain.setTargetAtTime(gain, now, 0.02);
-    layer.pan.pan.setTargetAtTime(clamp((position.x - this.listener.x) / 32, -0.8, 0.8), now, 0.04);
+    layer.pan.pan.setTargetAtTime(spatialPan(position, this.listener, this.listenerRight), now, 0.04);
   }
   private stopLayer(layer: Layer, fade = 0.008) {
     const now = this.context!.currentTime;
@@ -387,7 +389,7 @@ export class RangeAudio {
     if (!this.ready) return;
     if (e.type === "shot") {
       if (e.weapon === "rifle") {
-        const mix = rifleMix(e.from, this.listener);
+        const mix = rifleMix(e.from, this.listener, this.listenerRight);
         this.lastRifle = mix;
         // Equal-power mix; align the recordings' attacks without cutting their tails.
         if (mix.near > 0.001)

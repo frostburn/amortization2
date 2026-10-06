@@ -14,6 +14,7 @@ export type EnemyBrain = {
   nextThink: number;
   nextRoute: number;
   nextAttack: number;
+  entryUntil: number;
   nextGrenade: number;
   burstUntil: number;
   visible: boolean;
@@ -129,6 +130,7 @@ export class ArenaCombat {
         target: null, aim: { x: 0, y: 1.25, z: 9 }, state: "entering",
         nextThink: this.sim.time + slot * 0.04, nextRoute: 0,
         nextAttack: this.sim.time + 1, nextGrenade: this.sim.time + 6,
+        entryUntil: this.sim.time + 2.5,
         burstUntil: 0, visible: false, fire: false,
       };
       this.sim.navigate(a, a.ai.rally);
@@ -141,7 +143,7 @@ export class ArenaCombat {
     const sim = this.sim, brain = a.ai!, now = sim.time;
     brain.fire = false;
     if (brain.state === "entering") {
-      if (distance2(a.body.translation(), brain.rally) > 0.7) return;
+      if (distance2(a.body.translation(), brain.rally) > 0.7 && now < brain.entryUntil) return;
       brain.state = "advancing";
       brain.nextAttack = Math.max(brain.nextAttack, now + 0.8);
     }
@@ -179,7 +181,7 @@ export class ArenaCombat {
         }
       }
       const state = sim.ammunition(a);
-      const suppressed = a.stability < 0.55 || now - a.hitTime < 0.25;
+      const suppressed = sim.isDisrupted(a);
       if (this.wave >= 4 && !suppressed && a.model === "assault" &&
           now >= brain.nextGrenade && distance > 10 && distance < 24 &&
           !sim.grenades.some((g) => g.team === "enemy") &&
@@ -195,7 +197,7 @@ export class ArenaCombat {
         brain.state = suppressed ? "suppressed" : "reloading";
         brain.burstUntil = 0;
         brain.nextAttack = Math.max(brain.nextAttack, now + 0.5);
-      } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? 24 : 25)) {
+      } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? 24 : 38)) {
         a.braced = true;
         a.path = [];
         a.moveTarget = undefined;
@@ -214,7 +216,7 @@ export class ArenaCombat {
     }
     const state = sim.ammunition(a);
     if (brain.state === "aiming" && now >= brain.nextAttack &&
-        a.braceTime >= (a.weapon === "rifle" ? RIFLE.settle : 0.15)) {
+        (a.weapon !== "rifle" || a.braceTime >= RIFLE.settle)) {
       brain.burstUntil = now + (a.weapon === "gun" ? 0.22 + Math.min(this.wave, 10) * 0.01 : 0.06);
       brain.nextAttack = now + (a.weapon === "rifle" ? 2.4 : Math.max(0.8, 1.6 - this.wave * 0.04));
     }
@@ -226,7 +228,7 @@ export class ArenaCombat {
   private firingPosition(a: Actor, target: Actor): Vec2 {
     const p = a.body.translation(), q = target.body.translation();
     const bearing = Math.atan2(p.x - q.x, p.z - q.z);
-    const radius = a.weapon === "rifle" ? 35 : a.weapon === "pistol" ? 12 : 17;
+    const radius = a.weapon === "rifle" ? 45 : a.weapon === "pistol" ? 12 : 30;
     const b = this.sim.layout.bounds;
     const solids = [...this.sim.layout.barriers, ...this.sim.layout.platforms,
       ...this.sim.props.map((prop) => ({ x: prop.body.translation().x, z: prop.body.translation().z, w: prop.w, d: prop.d }))];

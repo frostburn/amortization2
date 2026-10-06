@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { FIREARMS, GRENADE_FUSE, PISTOL, RIFLE, STEP, distance2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
+import { ARENA_ENTRIES } from "../src/game/ranges";
 
 function ticks(sim: Simulation, seconds: number) {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
@@ -220,8 +221,9 @@ describe("endless arena", () => {
   });
 
   test("an occupied announced entrance spawns a squad beside the player, never inside it", () => {
-    const placements = [{ x: -1.1, z: -20 }, { x: 1.1, z: -20 },
-      { x: -1.1, z: -18.1 }, { x: 1.1, z: -18.1 }];
+    const gate = ARENA_ENTRIES[0];
+    const placements = [{ x: -1.1, z: gate.z }, { x: 1.1, z: gate.z },
+      { x: -1.1, z: gate.z + 1.9 }, { x: 1.1, z: gate.z + 1.9 }];
     sim.squad.forEach((a, i) => a.body.setTranslation({ ...placements[i], y: 0.96 }, true));
     ticks(sim, 4.01);
     for (const a of sim.arena!.enemies)
@@ -256,11 +258,13 @@ describe("endless arena", () => {
 
   test("a robot displaced beyond an open entrance can walk back into the arena", () => {
     sim.select(1);
-    sim.primary.body.setTranslation({ x: 34.5, y: 0.96, z: 0 }, true);
-    sim.squad[1].body.setTranslation({ x: 31, y: 0.96, z: 1.7 }, true);
-    sim.move({ x: 28, z: 0 });
+    const edge = sim.layout.bounds.right;
+    const goal = { x: edge - 4, z: 0 };
+    sim.primary.body.setTranslation({ x: edge + 2.5, y: 0.96, z: 0 }, true);
+    sim.squad[1].body.setTranslation({ x: edge - 1, y: 0.96, z: 1.7 }, true);
+    sim.move(goal);
     ticks(sim, 3);
     expect(sim.primary.path).toHaveLength(0);
-    expect(distance2(sim.primary.body.translation(), { x: 28, z: 0 })).toBeLessThan(0.15);
+    expect(distance2(sim.primary.body.translation(), goal)).toBeLessThan(0.15);
   });
 });
