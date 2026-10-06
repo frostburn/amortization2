@@ -8,7 +8,7 @@ import {
   type RangeBounds,
 } from "./config";
 
-import { CITY_DISTRICT, buildingSolid, type CityDistrict } from "./city";
+import { CITY_DISTRICT, buildingSolid, waterSolids, type CityDistrict } from "./city";
 
 export type RangeId = "proving" | "long" | "arena" | "city";
 export const ARENA_ENTRIES = [
@@ -34,7 +34,7 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
     name: "CITY DISTRICT",
     city: CITY_DISTRICT,
     bounds: CITY_DISTRICT.bounds,
-    barriers: [...CITY_DISTRICT.buildings.map(buildingSolid), ...CITY_DISTRICT.furniture],
+    barriers: [...CITY_DISTRICT.buildings.map(buildingSolid), ...CITY_DISTRICT.furniture, ...CITY_DISTRICT.water.flatMap(waterSolids)],
     platforms: [],
     players: [{ x: -1.1, z: 3.1 }, { x: -1.1, z: 0.9 }, { x: 1.1, z: 0.9 }, { x: 1.1, z: 3.1 }],
     targets: [],

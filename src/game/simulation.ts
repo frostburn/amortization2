@@ -197,6 +197,7 @@ export class Simulation {
       floor,
     );
     for (const box of [...this.layout.barriers, ...this.layout.platforms]) {
+      if (box.navigationOnly) continue;
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, box.h / 2, box.z),
       );

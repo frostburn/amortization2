@@ -46,13 +46,16 @@ describe("building facades", () => {
       return ray.intersectObject(building.root, true);
     };
     try {
-      for (const [x, y] of prefab === "shop" ? [[5.8, 2.3], [0.25, 1.4]] : [[7.4, 2.12], [0.25, 1.4]]) {
+      const openings = prefab === "shop" ? [[5.8, 2.3], [0.25, 1.4]]
+        : prefab === "depot" ? [[7.4, 2.12], [4.1, 1.4]]
+        : [[prefab === "pump" ? 3.65 : 7.4, 2.12], [0.25, 1.4]];
+      for (const [x, y] of openings) {
         const panes = sample(x, y);
         expect(panes).toHaveLength(1);
         expect((panes[0].object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>).material.color.getHex()).toBe(0x354c52);
         expect(panes[0].point.z).toBeCloseTo(front + 0.04, 4);
       }
-      const wall = sample(9, 2.12);
+      const wall = sample(prefab === "pump" ? 5.15 : 9, 2.12);
       expect(wall).toHaveLength(1); expect(wall[0].point.z).toBeCloseTo(front, 4);
     } finally {
       building.root.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });

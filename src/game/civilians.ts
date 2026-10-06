@@ -1,14 +1,18 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { BLAST_RADIUS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
-import { buildingSolid, type CartRoute, type CityDistrict } from "./city";
+import { buildingSolid, inWater, type CivilianModel, type CartRoute, type CityDistrict } from "./city";
 import type { Simulation } from "./simulation";
 import { segmentClear } from "./navigation";
 
 export const CART = { width: 0.82, length: 0.94, height: 0.62, mass: 35, hp: 36, speed: 1.6,
-  maxImpactSpeed: 14, maxSpin: 8 };
+  retreatSpeed: 1.6, turnSpeed: 2.6, clearance: 0.65, maxImpactSpeed: 14, maxSpin: 8, motorPitch: 1 };
+export const CRATE = { width: 1.12, length: 1.34, height: 1.26, mass: 115, hp: 80, speed: 1.2,
+  retreatSpeed: 0.85, turnSpeed: 1.8, clearance: 0.95, maxImpactSpeed: 10, maxSpin: 5, motorPitch: 0.67 };
+export const CIVILIAN_CHASSIS = { CART, CRATE };
 export type CartState = "travel" | "delivery" | "yield" | "alert" | "tumbling" | "stranded" | "disabled";
 export type CivilianCart = {
   id: number;
+  model: CivilianModel;
   route: CartRoute;
   next: number;
   direction: number;
@@ -27,6 +31,7 @@ export type CivilianCart = {
   settled: number;
   distance: number;
   deliveries: number;
+  compartment: number;
 };
 
 function lineDistance(p: Vec2, a: Vec2, b: Vec2) {
@@ -42,6 +47,7 @@ export class CityLife {
   constructor(private sim: Simulation, public district: CityDistrict) {
     let id = 1000;
     for (const route of district.routes) {
+      const model = route.model ?? "CART", chassis = CIVILIAN_CHASSIS[model];
       const lengths = route.points.map((p, i) => distance2(p, route.points[(i + 1) % route.points.length]));
       const total = lengths.reduce((sum, d) => sum + d, 0);
       for (let i = 0; i < route.count; i++) {
@@ -51,16 +57,16 @@ export class CityLife {
         const t = distance / lengths[segment], x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
         const yaw = Math.atan2(b.x - a.x, b.z - a.z);
         const body = sim.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(x, CART.height / 2 + 0.01, z).lockRotations()
+          .setTranslation(x, chassis.height / 2 + 0.01, z).lockRotations()
           .setLinearDamping(0.4).setAngularDamping(5).setCcdEnabled(true));
         body.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, true);
-        const collider = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(CART.width / 2, CART.height / 2, CART.length / 2)
-          .setMass(CART.mass).setFriction(0.1).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(0.02), body);
-        this.carts.push({ id: id++, route, next, direction: 1, body, collider,
+        const collider = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(chassis.width / 2, chassis.height / 2, chassis.length / 2)
+          .setMass(chassis.mass).setFriction(0.1).setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min).setRestitution(0.02), body);
+        this.carts.push({ id: id++, model, route, next, direction: 1, body, collider,
           previous: { ...body.translation() }, previousRotation: { ...body.rotation() }, yaw,
-          hp: CART.hp, state: "travel", wait: 0, blocked: 0, alertUntil: 0, brakeUntil: 0,
+          hp: chassis.hp, state: "travel", wait: 0, blocked: 0, alertUntil: 0, brakeUntil: 0,
           impactUntil: 0, settled: 0,
-          distance: 0, deliveries: 0 });
+          distance: 0, deliveries: 0, compartment: i % 3 });
       }
     }
   }
@@ -99,17 +105,22 @@ export class CityLife {
     }
   }
 
-  damage(c: CivilianCart, damage: number, impulse: Vec3, point: Vec3) {
-    const wasAlive = c.hp > 0;
-    c.hp = Math.max(0, c.hp - damage);
-    // Release the drive and rotation locks before applying torque, including
-    // on a lethal hit. Wrecks remain physical targets for subsequent shots.
+  private releaseDrive(c: CivilianCart) {
     c.impactUntil = this.sim.time + 0.6; c.settled = 0; c.wait = 0;
     c.body.lockRotations(false, true);
     c.collider.setFriction(0.65); c.collider.setRestitution(0.16);
     c.body.setLinearDamping(0.35); c.body.setAngularDamping(1.8);
+  }
+
+  damage(c: CivilianCart, damage: number, impulse: Vec3, point: Vec3) {
+    const chassis = CIVILIAN_CHASSIS[c.model];
+    const wasAlive = c.hp > 0;
+    c.hp = Math.max(0, c.hp - damage);
+    // Release the drive and rotation locks before applying torque, including
+    // on a lethal hit. Wrecks remain physical targets for subsequent shots.
+    this.releaseDrive(c);
     c.body.applyImpulseAtPoint(impulse, point, true);
-    for (const [v, limit, angular] of [[c.body.linvel(), CART.maxImpactSpeed, false], [c.body.angvel(), CART.maxSpin, true]] as const) {
+    for (const [v, limit, angular] of [[c.body.linvel(), chassis.maxImpactSpeed, false], [c.body.angvel(), chassis.maxSpin, true]] as const) {
       const speed = Math.hypot(v.x, v.y, v.z);
       if (speed > limit) {
         const bounded = { x: v.x * limit / speed, y: v.y * limit / speed, z: v.z * limit / speed };
@@ -140,22 +151,27 @@ export class CityLife {
 
   update() {
     for (const c of this.carts) {
+      const chassis = CIVILIAN_CHASSIS[c.model];
       const p = c.body.translation(), velocity = c.body.linvel();
       c.previous = { ...p }; c.previousRotation = { ...c.body.rotation() };
       c.distance += Math.hypot(velocity.x, velocity.z) * STEP;
+      // A hull in the water cannot motor over the bank. Let it settle without
+      // inventing damage or a gunfire alert; a later impulse can push it dry.
+      if (c.hp && !c.impactUntil && p.y - chassis.height / 2 < 0.12 && this.district.water.some(w => inWater(p, w)))
+        this.releaseDrive(c);
       if (!c.hp) continue;
       if (c.impactUntil) {
         // No motor braking or forced upright pose during flight or a landing.
         c.state = "tumbling";
         const q = c.body.rotation(), spin = c.body.angvel();
         const quiet = Math.hypot(velocity.x, velocity.y, velocity.z) < 0.45 && Math.hypot(spin.x, spin.y, spin.z) < 0.7;
-        const supported = quiet && !!this.sim.ray(p, { x: p.x, y: p.y - 0.8, z: p.z }, c.body);
+        const supported = quiet && !!this.sim.ray(p, { x: p.x, y: p.y - chassis.height / 2 - 0.5, z: p.z }, c.body);
         c.settled = this.sim.time >= c.impactUntil && supported ? c.settled + STEP : 0;
         if (c.settled < 0.35) continue;
         const upright = 1 - 2 * (q.x * q.x + q.z * q.z) > 0.85;
         if (!upright) { c.state = "stranded"; continue; }
         const reachable = c.route.points.map((point, index) => ({ point, index }))
-          .filter(({ point }) => segmentClear(p, point, this.sim.layout.barriers, 0.65))
+          .filter(({ point }) => segmentClear(p, point, this.sim.layout.barriers, chassis.clearance))
           .sort((a, b) => distance2(p, a.point) - distance2(p, b.point));
         if (!reachable.length) { c.state = "stranded"; continue; }
         c.next = reachable[0].index;
@@ -174,6 +190,7 @@ export class CityLife {
         if (target.stop && !alerted && (!target.building || !this.isClosed(target.building))) {
           c.wait = target.stop;
           c.deliveries++;
+          c.compartment = (c.compartment + 1) % 3;
         }
         this.advance(c);
         const next = c.route.points[c.next]; dx = next.x - p.x; dz = next.z - p.z; distance = Math.hypot(dx, dz);
@@ -188,7 +205,8 @@ export class CityLife {
       const obstacles = [
         ...this.sim.actors.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.45, cart: false })),
         ...this.sim.props.map(a => ({ id: -a.id, p: a.body.translation(), radius: Math.max(a.w, a.d) / 2 + 0.8, cart: false })),
-        ...this.carts.filter(other => other !== c).map(other => ({ id: other.id, p: other.body.translation(), radius: 1.25, cart: true })),
+        ...this.carts.filter(other => other !== c).map(other => ({ id: other.id, p: other.body.translation(),
+          radius: chassis.clearance + CIVILIAN_CHASSIS[other.model].clearance, cart: true })),
       ];
       const obstacle = obstacles.find(other => {
         const ox = other.p.x - p.x, oz = other.p.z - p.z;
@@ -202,22 +220,24 @@ export class CityLife {
       if (c.blocked > 2.5 && !signal) { this.reverse(c); c.blocked = 0; }
       const stopped = !!obstacle || signal || c.wait > 0 || c.brakeUntil > this.sim.time;
       c.state = alerted ? "alert" : c.wait > 0 ? "delivery" : stopped ? "yield" : "travel";
-      const speed = stopped ? 0 : Math.min(CART.speed, distance * 2.5);
-      const desired = Math.atan2(forward.x, forward.z);
+      const speed = stopped ? 0 : Math.min(alerted ? chassis.retreatSpeed : chassis.speed, distance * 2.5);
+      const stop = c.route.points[(c.next - c.direction + c.route.points.length) % c.route.points.length];
+      const building = c.wait && c.model === "CRATE" ? this.district.buildings.find(b => b.id === stop.building) : undefined;
+      const desired = building ? Math.atan2(building.x - p.x, building.z - p.z) : c.wait ? c.yaw : Math.atan2(forward.x, forward.z);
       const turn = Math.atan2(Math.sin(desired - c.yaw), Math.cos(desired - c.yaw));
-      c.yaw += clamp(turn, -STEP * 2.6, STEP * 2.6);
+      c.yaw += clamp(turn, -STEP * chassis.turnSpeed, STEP * chassis.turnSpeed);
       c.body.setRotation({ x: 0, y: Math.sin(c.yaw / 2), z: 0, w: Math.cos(c.yaw / 2) }, true);
       // Limited motor force preserves collision impulses rather than teleporting a cart.
       const facing = Math.max(0, Math.cos(turn));
-      c.body.applyImpulse({ x: clamp(forward.x * speed * facing - velocity.x, -STEP * 4, STEP * 4) * CART.mass,
-        y: 0, z: clamp(forward.z * speed * facing - velocity.z, -STEP * 4, STEP * 4) * CART.mass }, true);
+      c.body.applyImpulse({ x: clamp(forward.x * speed * facing - velocity.x, -STEP * 4, STEP * 4) * chassis.mass,
+        y: 0, z: clamp(forward.z * speed * facing - velocity.z, -STEP * 4, STEP * 4) * chassis.mass }, true);
     }
   }
 
   inspect() {
     return { crossing: this.crossing,
       closedShops: this.district.buildings.filter(b => this.isClosed(b.id)).map(b => b.id),
-      carts: this.carts.map(c => ({ id: c.id, model: "CART", route: c.route.id, state: c.state,
+      carts: this.carts.map(c => ({ id: c.id, model: c.model, route: c.route.id, state: c.state, compartment: c.compartment,
         hp: c.hp, yaw: c.yaw, deliveries: c.deliveries, distance: c.distance,
         position: { ...c.body.translation() }, rotation: { ...c.body.rotation() }, velocity: { ...c.body.linvel() }, alertUntil: c.alertUntil,
         destination: { ...c.route.points[c.next] } })) };

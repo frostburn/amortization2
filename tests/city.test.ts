@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { Simulation } from "../src/game/simulation";
-import { BUILDING_KIT, CITY_DISTRICT, buildingSolid } from "../src/game/city";
-import { CART, CityLife } from "../src/game/civilians";
+import { BUILDING_KIT, CITY_DISTRICT, buildingSolid, inWater } from "../src/game/city";
+import { CART, CRATE, CIVILIAN_CHASSIS, CityLife } from "../src/game/civilians";
 import { STEP, distance2 } from "../src/game/config";
-import { segmentClear } from "../src/game/navigation";
+import { findPath, segmentClear } from "../src/game/navigation";
 
 const ticks = (sim: Simulation, seconds: number) => {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
@@ -18,10 +18,12 @@ describe("city district", () => {
     expect(turned.w).toBe(BUILDING_KIT.shop.d);
     expect(turned.d).toBe(BUILDING_KIT.shop.w);
     for (const route of CITY_DISTRICT.routes) for (const [i, point] of route.points.entries()) {
-      expect(segmentClear(point, route.points[(i + 1) % route.points.length], sim.layout.barriers, 0.65)).toBe(true);
+      expect(segmentClear(point, route.points[(i + 1) % route.points.length], sim.layout.barriers,
+        CIVILIAN_CHASSIS[route.model ?? "CART"].clearance), route.id).toBe(true);
       if (point.building) expect(CITY_DISTRICT.buildings.some(b => b.id === point.building)).toBe(true);
     }
-    expect(sim.city!.carts).toHaveLength(16);
+    expect(sim.city!.carts.filter(c => c.model === "CART")).toHaveLength(20);
+    expect(sim.city!.carts.filter(c => c.model === "CRATE")).toHaveLength(5);
     expect(sim.arena).toBeUndefined();
     expect([...sim.selected]).toEqual([1, 2, 3, 4]);
   });
@@ -37,14 +39,87 @@ describe("city district", () => {
     ticks(sim, 60);
     for (const c of sim.city!.carts) {
       const p = c.body.translation();
-      expect(c.hp).toBe(CART.hp);
+      const chassis = CIVILIAN_CHASSIS[c.model];
+      expect(c.hp, `${c.model} ${c.id}`).toBe(chassis.hp);
       expect(c.distance).toBeGreaterThan(25);
-      expect(p.y).toBeGreaterThan(0.25);
-      expect(p.y).toBeLessThan(0.36);
+      expect(p.y).toBeGreaterThan(chassis.height / 2 - 0.06);
+      expect(p.y).toBeLessThan(chassis.height / 2 + 0.06);
       expect(sim.layout.barriers.some(b => Math.abs(p.x - b.x) < b.w / 2 && Math.abs(p.z - b.z) < b.d / 2)).toBe(false);
     }
     expect(sim.city!.carts.reduce((sum, c) => sum + c.deliveries, 0)).toBeGreaterThan(10);
     expect(sim.events.some(e => e.type === "drill" || e.type === "wave")).toBe(false);
+  });
+
+  test("CRATE visits separate compartments and withdraws slowly after gunfire", () => {
+    const c = sim.city!.carts.find(c => c.model === "CRATE" && c.route.id === "canal-parcels")!;
+    expect(c.body.mass()).toBeCloseTo(CRATE.mass);
+    const initial = c.compartment;
+    for (const index of [0, 1]) {
+      const point = c.route.points[index];
+      c.body.setTranslation({ x: point.x, y: CRATE.height / 2 + 0.01, z: point.z }, true);
+      c.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      c.next = index; c.wait = 0; sim.world.step(); ticks(sim, 0.1);
+      expect(c.state).toBe("delivery");
+      expect(c.compartment).toBe((initial + index + 1) % 3);
+    }
+    sim.city!.disturb(c.body.translation());
+    expect(c.wait).toBe(0); expect(c.state).toBe("alert");
+    ticks(sim, 2);
+    expect(c.hp).toBe(CRATE.hp);
+    expect(Math.hypot(c.body.linvel().x, c.body.linvel().z)).toBeLessThan(CRATE.retreatSpeed + 0.05);
+    expect(c.state).toBe("alert");
+    ticks(sim, 8);
+    expect(c.state).not.toBe("alert");
+  });
+
+  test("CRATE takes less displacement than CART under the same bullet pressure", () => {
+    const cart = sim.city!.carts[0], crate = sim.city!.carts.find(c => c.model === "CRATE")!;
+    for (const [c, x] of [[cart, -3], [crate, 3]] as const) {
+      const chassis = CIVILIAN_CHASSIS[c.model];
+      c.body.setTranslation({ x, y: chassis.height / 2 + 0.01, z: 15 }, true);
+      c.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      sim.city!.damage(c, 6, { x: 0, y: 100, z: 180 }, c.body.translation());
+    }
+    expect(crate.hp).toBe(CRATE.hp - 6);
+    expect(crate.body.linvel().z).toBeLessThan(cart.body.linvel().z / 2);
+    ticks(sim, 0.25);
+    expect(crate.state).toBe("tumbling"); expect(crate.body.translation().z).toBeGreaterThan(15.2);
+    expect(crate.body.translation().z).toBeLessThan(cart.body.translation().z);
+    expect(sim.hits).toBe(0); expect(sim.grenadeHits).toBe(0);
+  });
+
+  test("the canal blocks ground orders but its crossings connect both banks", () => {
+    const water = CITY_DISTRICT.water[0], start = { x: 62, z: 24 }, goal = { x: 90, z: 24 };
+    expect(segmentClear(start, goal, sim.layout.barriers)).toBe(false);
+    const path = findPath(start, goal, sim.layout.barriers, 0.7, sim.layout.bounds);
+    expect(path.length).toBeGreaterThan(1);
+    for (const [i, p] of path.entries()) {
+      expect(segmentClear(i ? path[i - 1] : start, p, sim.layout.barriers, 0.7)).toBe(true);
+      expect(inWater(p, water)).toBe(false);
+    }
+    expect(path.at(-1)).toEqual(goal);
+    sim.squad[0].body.setTranslation({ ...start, y: 0.98 }, true);
+    sim.world.step(); sim.select(1); sim.move(goal);
+    for (let i = 0; i < 20 / STEP; i++) {
+      sim.step(); expect(inWater(sim.squad[0].body.translation(), water)).toBe(false);
+    }
+    expect(distance2(sim.squad[0].body.translation(), goal)).toBeLessThan(1);
+  });
+
+  test("impacts can cross the canal, wet neutral hulls strand and bridges remain dry", () => {
+    const [wet, dry] = sim.city!.carts;
+    wet.body.setTranslation({ x: 76, y: 2, z: 24 }, true);
+    dry.body.setTranslation({ x: 76, y: CART.height / 2 + 0.01, z: -9 }, true);
+    dry.route = CITY_DISTRICT.routes.find(r => r.id === "canal-parcels")!;
+    dry.next = 5; dry.yaw = Math.PI / 2;
+    sim.world.step(); ticks(sim, 0.1);
+    expect(wet.hp).toBe(CART.hp); expect(dry.hp).toBe(CART.hp);
+    ticks(sim, 2);
+    expect(wet.hp).toBe(CART.hp); expect(wet.state).toBe("stranded");
+    expect(dry.hp).toBe(CART.hp); expect(dry.body.translation().x).toBeGreaterThan(77);
+    expect(sim.hits).toBe(0); expect(sim.grenadeHits).toBe(0);
+    expect(sim.events.filter(e => e.type === "down")).toHaveLength(0);
+    expect(sim.city!.inspect().closedShops).toHaveLength(0);
   });
 
   test("nearby shots cause local retreat and shop closure, then quiet restores service", () => {
@@ -191,7 +266,7 @@ describe("city district", () => {
     expect(sim.city!.inspect().carts.map(c => c.position)).toEqual(starts);
     sim.reset("arena"); expect(sim.city).toBeUndefined();
     expect(sim.actors).toHaveLength(4);
-    sim.reset("city", "minigunner"); expect(sim.city!.carts).toHaveLength(16);
+    sim.reset("city", "minigunner"); expect(sim.city!.carts).toHaveLength(25);
     expect(sim.squad[1].model).toBe("minigunner");
   });
 });
