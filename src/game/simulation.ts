@@ -23,6 +23,7 @@ import {
   type Weapon,
   type Firearm,
 } from "./config";
+import { CityLife } from "./civilians";
 import { findPath, segmentClear } from "./navigation";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat, type EnemyBrain } from "./arena";
@@ -124,6 +125,7 @@ export class Simulation {
   range: RangeId;
   fourthModel: RobotModel;
   arena?: ArenaCombat;
+  city?: CityLife;
   time = 0;
   shots = 0;
   hits = 0;
@@ -161,7 +163,7 @@ export class Simulation {
     this.props = [];
     this.grenades = [];
     this.events = [];
-    this.selected = new Set(range === "arena" ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
+    this.selected = new Set((range === "arena" || range === "city") ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
     this.trigger = false;
     this.sniping = false;
     this.weapon = range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
@@ -235,6 +237,7 @@ export class Simulation {
         previousRotation: { ...body.rotation() },
       });
     }
+    this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
     this.arena = range === "arena" ? new ArenaCombat(this) : undefined;
@@ -792,6 +795,9 @@ export class Simulation {
         if (covering) this.coverHits++;
         else this.hits++;
       }
+    } else if (hit && this.city?.carts.some(c => c.collider.handle === hit.collider.handle)) {
+      const cart = this.city.carts.find(c => c.collider.handle === hit.collider.handle)!;
+      this.city.damage(cart, spec.damage, { x: dir.x * 28, y: dir.y * 10, z: dir.z * 28 }, to);
     } else if (hit?.collider.parent()?.isDynamic()) {
       hit.collider
         .parent()!
@@ -801,6 +807,7 @@ export class Simulation {
           true,
         );
     }
+    this.city?.disturb(from, to);
     state.ammo--;
     state.shotWait = spec.interval + Math.max(-STEP, state.shotWait);
     a.recoil = Math.min(1, a.recoil + (rifle && !a.braced ? 1 : 0.15));
@@ -1049,6 +1056,7 @@ export class Simulation {
         true,
       );
     }
+    this.city?.blast(origin);
     this.events.push({ type: "explosion", position: origin, affected, team: grenade.team });
   }
 
@@ -1154,6 +1162,7 @@ export class Simulation {
         );
       }
     }
+    this.city?.update();
     for (const p of this.props) {
       p.previous = vcopy(p.body.translation());
       p.previousRotation = { ...p.body.rotation() };
@@ -1357,6 +1366,7 @@ export class Simulation {
       range: this.range,
       fourthModel: this.fourthModel,
       arena: this.arena?.inspect() ?? null,
+      city: this.city?.inspect() ?? null,
       aim: vcopy(this.aim),
       time: this.time,
       shots: this.shots,

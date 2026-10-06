@@ -171,7 +171,7 @@ async function start() {
     scene.updateAim(ground, false);
     audio.stop();
     accumulator = 0;
-    toast(sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
+    toast(sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
@@ -205,9 +205,11 @@ async function start() {
     scene.resetCamera();
     accumulator = 0;
     document.getElementById("menu-title")!.textContent =
-      range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
+      range === "city" ? "City district" : range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent =
-      range === "arena"
+      range === "city"
+        ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
+        : range === "arena"
         ? "Survive incoming robot squads. Watch the marked entrances, move around cover, and interrupt enemy bursts. Survivors are repaired and rearmed between waves; disabled robots stay down. Shift+R restarts."
         : range === "long"
         ? "NEEDLE trades armour for a powerful rifle. Sight a target and press Space to enter braced first-person sniping. Aim above the raised platforms before firing."
@@ -734,7 +736,7 @@ async function start() {
       if (event.type === "drill" || event.type === "wave") toast(event.message);
       if (event.type === "throw" && sim.actors.find((a) => a.id === event.actor)?.kind === "enemy")
         toast("Incoming grenade. Move or take cover.", true);
-      if (event.type === "explosion")
+      if (event.type === "explosion" && !sim.city)
         toast(
           event.team === "enemy" ? "Incoming grenade detonated."
           : event.affected

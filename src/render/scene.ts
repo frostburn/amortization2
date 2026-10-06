@@ -19,6 +19,8 @@ import type {
   MoveDestination,
   Simulation,
 } from "../game/simulation";
+import { CityView } from "./city";
+import { CartFleet } from "./carts";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
@@ -161,6 +163,8 @@ export class RangeScene {
   scope = new SniperView();
   private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
+  private cityView?: CityView;
+  private cartFleet?: CartFleet;
   private environmentLabels = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
@@ -411,6 +415,13 @@ export class RangeScene {
       map: tex,
       roughness: 0.97,
     });
+    if (this.sim.city) {
+      tex.repeat.set(30, 26);
+      floorMat.dispose();
+      this.cityView = new CityView(this.sim.city.district, tex);
+      this.environment.add(this.cityView.root);
+      return;
+    }
     const wallTex = tex.clone();
     wallTex.repeat.set(2, 1);
     const concrete = new THREE.MeshStandardMaterial({
@@ -699,9 +710,9 @@ export class RangeScene {
     this.sun.position.set(long ? 10 : -18, long ? 70 : 38, long ? 30 : 15);
     this.sun.target.position.set(long ? 45 : 0, 0, 0);
     const camera = this.sun.shadow.camera;
-    camera.left = -(long ? 90 : this.sim.range === "arena" ? 76 : 46);
-    camera.right = long ? 90 : this.sim.range === "arena" ? 76 : 46;
-    camera.top = long ? 70 : this.sim.range === "arena" ? 60 : 40;
+    camera.left = -(this.sim.range === "city" ? 110 : long ? 90 : this.sim.range === "arena" ? 76 : 46);
+    camera.right = this.sim.range === "city" ? 110 : long ? 90 : this.sim.range === "arena" ? 76 : 46;
+    camera.top = this.sim.range === "city" ? 95 : long ? 70 : this.sim.range === "arena" ? 60 : 40;
     camera.bottom = -camera.top;
     camera.far = 230;
     camera.updateProjectionMatrix();
@@ -735,6 +746,7 @@ export class RangeScene {
         m.dispose();
       }
     this.environment.clear();
+    this.cityView = undefined;
     this.environmentLabels.clear();
     this.entryMarkers.clear();
     this.buildEnvironment(this.texture);
@@ -1059,6 +1071,8 @@ export class RangeScene {
   }
 
   resetDynamic() {
+    this.cartFleet?.dispose();
+    this.cartFleet = undefined;
     for (const visual of this.actors.values()) this.disposeActor(visual);
     // Props retain their shared primitive geometry and materials.
     this.dynamic.traverse((object) => {
@@ -1073,6 +1087,10 @@ export class RangeScene {
       marker.material.dispose();
     }
     this.grenadeHazards.clear();
+    if (this.sim.city) {
+      this.cartFleet = new CartFleet(this.sim.city.carts);
+      this.dynamic.add(this.cartFleet.root);
+    }
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
       const group = this.makeCrate(p.w, p.h, p.d);
@@ -1194,7 +1212,9 @@ export class RangeScene {
         if (aim.y < upperBody)
           aim = { x: p.x, y: upperBody, z: p.z };
       }
-    } else if (!grenade && hit && this.sim.weapon === "rifle")
+    } else if (!grenade && hit && this.sim.city?.carts.some(c => c.collider.handle === hit.collider.handle))
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    else if (!grenade && hit && this.sim.weapon === "rifle")
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     return { aim, ground, actor: actor?.id };
   }
@@ -1499,6 +1519,8 @@ export class RangeScene {
   render(alpha: number, delta: number, elapsed: number, paused = false) {
     this.renderer.info.reset();
     this.updateCamera();
+    this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
+    this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
       this.camera.position.y += (Math.random() - 0.5) * this.shake;

@@ -8,7 +8,9 @@ import {
   type RangeBounds,
 } from "./config";
 
-export type RangeId = "proving" | "long" | "arena";
+import { CITY_DISTRICT, buildingSolid, type CityDistrict } from "./city";
+
+export type RangeId = "proving" | "long" | "arena" | "city";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -18,6 +20,7 @@ export const ARENA_ENTRIES = [
 export type TargetKind = (typeof TARGET_SPAWNS)[number]["kind"] | "precision";
 type RangeDefinition = {
   name: string;
+  city?: CityDistrict;
   bounds: RangeBounds;
   barriers: BoxSpec[];
   platforms: BoxSpec[];
@@ -27,6 +30,16 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  city: {
+    name: "CITY DISTRICT",
+    city: CITY_DISTRICT,
+    bounds: CITY_DISTRICT.bounds,
+    barriers: [...CITY_DISTRICT.buildings.map(buildingSolid), ...CITY_DISTRICT.furniture],
+    platforms: [],
+    players: [{ x: -1.1, z: 3.1 }, { x: -1.1, z: 0.9 }, { x: 1.1, z: 0.9 }, { x: 1.1, z: 3.1 }],
+    targets: [],
+    props: [{ x: 40, z: 28, w: 0.8, h: 0.65, d: 0.8, mass: 12 }],
+  },
   arena: {
     name: "ENDLESS ARENA",
     bounds: { left: -56, right: 56, back: -40, front: 40 },

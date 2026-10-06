@@ -1,0 +1,164 @@
+import * as THREE from "three";
+import { BUILDING_KIT, buildingSolid, type BuildingSpec, type CityDistrict } from "../game/city";
+import type { Simulation } from "../game/simulation";
+import { batchRigid, block, surface, tube } from "./primitives";
+
+type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
+  bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
+
+// A small reusable kit: repeated window bays, storefront, service roof and shutter.
+export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.MeshStandardMaterial>): BuildingView {
+  const paint = (color: number, metalness = 0, roughness = 0.85) => {
+    const key = `${color}/${metalness}/${roughness}`;
+    const mat = shared?.get(key) ?? surface(color, metalness, roughness);
+    shared?.set(key, mat); return mat;
+  };
+  const kit = BUILDING_KIT[spec.prefab], root = new THREE.Group();
+  const wall = paint(({ brick: 0x9a7667, sand: 0xb8ad92, slate: 0x7d8a88 })[spec.finish]);
+  const frame = paint(0x49585b, 0.4), glass = paint(0x354c52, 0.5, 0.35);
+  const trim = paint(0xd0c9b2), accent = paint(spec.accent), roof = paint(0x656d6b);
+  const materials = [wall, frame, glass, trim, accent, roof];
+  const { w, h, d } = kit, front = d / 2 + 0.02;
+  block(root, w, h, d, 0, h / 2, 0, wall);
+  block(root, w + 0.25, 0.32, d + 0.25, 0, h + 0.16, 0, trim);
+  block(root, w - 0.7, 0.18, d - 0.7, 0, h + 0.37, 0, roof);
+  for (const x of [-w / 2 + 0.4, w / 2 - 0.4]) {
+    block(root, 0.32, h, 0.12, x, h / 2, front, trim);
+    block(root, 0.32, h, 0.12, x, h / 2, -front, trim);
+  }
+  for (let f = 0; f < kit.floors; f++) {
+    const y = 2 + f * 3.35;
+    for (const x of [-7.5, -3.75, 0, 3.75, 7.5]) for (const z of [-front, front]) {
+      block(root, 2.35, 2.1, 0.12, x, y, z, frame);
+      block(root, 2.08, 1.85, 0.15, x, y, z, glass);
+      block(root, 2.55, 0.12, 0.32, x, y - 1.08, z, trim);
+    }
+    for (const x of [-w / 2 - 0.02, w / 2 + 0.02]) for (const z of [-d / 4, d / 4]) {
+      block(root, 0.12, 2.1, 2.35, x, y, z, frame);
+      block(root, 0.15, 1.85, 2.08, x, y, z, glass);
+    }
+  }
+  block(root, 2.5, 3.0, 0.2, 0, 1.5, front + 0.12, frame);
+  block(root, 2.15, 2.75, 0.24, 0, 1.4, front + 0.12, glass);
+  block(root, 0.09, 2.75, 0.3, 0, 1.4, front + 0.12, trim);
+  if (spec.prefab === "shop") {
+    block(root, 16.8, 0.18, 2, 0, 3.45, front + 0.6, accent);
+    block(root, 16.8, 0.5, 0.13, 0, 3.15, front + 1.55, accent);
+    for (const x of [-5.5, 5.5]) {
+      block(root, 6.5, 2.7, 0.2, x, 1.6, front + 0.12, glass);
+      block(root, 6.7, 0.15, 0.32, x, 0.2, front + 0.2, trim);
+      for (const shelf of [0.7, 1.2, 1.7])
+        block(root, 5.5, 0.09, 0.28, x, shelf, front + 0.25, accent);
+    }
+  }
+  for (const x of [-5, 5]) {
+    block(root, 2.2, 0.9, 1.7, x, h + 0.9, -1.2, frame);
+    block(root, 1.9, 0.12, 1.4, x, h + 1.42, -1.2, roof);
+    for (let i = -3; i <= 3; i++) block(root, 1.8, 0.08, 0.07, x, h + 1.49, -1.2 + i * 0.16, trim);
+  }
+  batchRigid(root);
+  let shutter: THREE.Mesh | undefined;
+  if (spec.prefab === "shop" && !spec.backdrop) {
+    // Separate articulated part; never bake it into the static facade.
+    shutter = block(root, 16.3, 1, 0.12, 0, 3, front + 0.33, roof);
+    shutter.visible = false;
+  }
+  root.position.set(spec.x, 0, spec.z); root.rotation.y = spec.turn * Math.PI / 2;
+  const solid = buildingSolid(spec);
+  return { spec, root, materials, shutter, opacity: 1, closed: 0,
+    bounds: new THREE.Box3(new THREE.Vector3(solid.x - solid.w / 2, 0, solid.z - solid.d / 2),
+      new THREE.Vector3(solid.x + solid.w / 2, solid.h + 1.5, solid.z + solid.d / 2)) };
+}
+
+export class CityView {
+  root = new THREE.Group();
+  private buildings: BuildingView[];
+  private signals: { mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>; axis: number }[] = [];
+  private ray = new THREE.Ray();
+  private intersection = new THREE.Vector3();
+  constructor(district: CityDistrict, texture: THREE.Texture) {
+    const ground = new THREE.Group(), asphalt = surface(0x424c50), paving = surface(0x9c9f94);
+    paving.map = texture;
+    const white = surface(0xd3cdbc), yellow = surface(0xb7a166), dark = surface(0x344347, 0.4);
+    const leaf = surface(0x566f53), earth = surface(0x737767);
+    block(ground, 190, 0.16, 170, 0, -0.1, -6, earth);
+    // Road/sidewalk segments and intersections are authored district data.
+    for (const street of district.streets) {
+      const alongX = street.axis === "x", offset = (street.width + street.sidewalk) / 2;
+      const x = alongX ? street.center : street.at, z = alongX ? street.at : street.center;
+      block(ground, alongX ? street.length : street.width, 0.025, alongX ? street.width : street.length, x, 0, z, asphalt);
+      for (const side of [-1, 1]) block(ground, alongX ? street.length : street.sidewalk, 0.03,
+        alongX ? street.sidewalk : street.length, x + (alongX ? 0 : side * offset), 0.018,
+        z + (alongX ? side * offset : 0), paving);
+      for (let t = -street.length / 2; t < street.length / 2; t += 7)
+        block(ground, alongX ? 2.8 : 0.12, 0.008, alongX ? 0.12 : 2.8,
+          x + (alongX ? t : 0), 0.022, z + (alongX ? 0 : t), yellow);
+    }
+    const intersections = district.streets.filter(s => s.axis === "x").flatMap(horizontal =>
+      district.streets.filter(s => s.axis === "z").map(vertical => ({ x: vertical.at, z: horizontal.at })));
+    for (const junction of intersections) {
+      block(ground, 11.5, 0.009, 28, junction.x, 0.041, junction.z, asphalt);
+      block(ground, 28, 0.009, 11.5, junction.x, 0.042, junction.z, asphalt);
+    }
+    for (const junction of district.junctions) {
+      for (const s of [-1, 1]) for (let i = -5; i <= 5; i++) {
+        block(ground, 0.52, 0.006, 2.5, junction.x + i * 0.9, 0.05, junction.z + s * 9, white);
+        block(ground, 2.5, 0.006, 0.52, junction.x + s * 9, 0.05, junction.z + i * 0.9, white);
+      }
+    }
+    for (const f of district.furniture) {
+      if (f.fixture === "signal") {
+        tube(ground, 0.035, 1.65, f.x, 0.825, f.z, dark);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x8cb6a0 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.32, 0.1), mat);
+        mesh.position.set(f.x, 1.7, f.z);
+        if (f.axis) mesh.rotation.y = Math.PI / 2;
+        this.root.add(mesh); this.signals.push({ mesh, axis: f.axis });
+      } else if (f.fixture === "lamp") {
+        tube(ground, 0.075, f.h, f.x, f.h / 2, f.z, dark);
+        block(ground, 1.2, 0.12, 0.25, f.x + Math.sign(f.x) * 0.5, f.h - 0.05, f.z, dark);
+        block(ground, 0.9, 0.04, 0.19, f.x + Math.sign(f.x) * 0.5, f.h - 0.13, f.z, white);
+      } else if (f.fixture === "planter") {
+        block(ground, f.w, f.h, f.d, f.x, f.h / 2, f.z, paving);
+        block(ground, f.w - 0.2, 0.2, f.d - 0.2, f.x, f.h - 0.07, f.z, leaf);
+      } else {
+        block(ground, f.w, 0.12, f.d, f.x, 0.48, f.z, dark);
+        block(ground, 0.15, 0.4, f.d, f.x - Math.sign(f.x) * 0.3, 0.69, f.z, dark);
+        for (const dz of [-0.85, 0.85]) block(ground, 0.5, 0.45, 0.12, f.x, 0.225, f.z + dz, dark);
+      }
+    }
+    batchRigid(ground); this.root.add(ground);
+    const background = new THREE.Group(), shared = new Map<string, THREE.MeshStandardMaterial>();
+    this.buildings = [];
+    for (const spec of district.buildings) {
+      const building = makeBuilding(spec, spec.backdrop ? shared : undefined);
+      if (spec.backdrop) background.add(building.root);
+      else { this.buildings.push(building); this.root.add(building.root); }
+    }
+    batchRigid(background); this.root.add(background);
+  }
+
+  update(sim: Simulation, camera: THREE.Camera, delta: number) {
+    if (!sim.city) return;
+    for (const signal of this.signals) signal.mesh.material.color.setHex(signal.axis === sim.city.crossing ? 0x87d5b5 : 0xb78159);
+    for (const b of this.buildings) {
+      const obscures = !sim.sniping && !b.spec.backdrop && sim.active.some(a => {
+        const p = a.body.translation(), target = new THREE.Vector3(p.x, p.y, p.z);
+        this.ray.set(camera.position, target.clone().sub(camera.position).normalize());
+        const hit = this.ray.intersectBox(b.bounds, this.intersection);
+        return !!hit && hit.distanceTo(camera.position) < target.distanceTo(camera.position);
+      });
+      b.opacity = sim.sniping ? 1 : THREE.MathUtils.damp(b.opacity, obscures ? 0.22 : 1, 9, delta);
+      for (const mat of b.materials) {
+        mat.transparent = b.opacity < 0.995;
+        mat.opacity = b.opacity; mat.depthWrite = !mat.transparent;
+      }
+      if (b.shutter) {
+        b.closed = THREE.MathUtils.damp(b.closed, sim.city.isClosed(b.spec.id) ? 1 : 0, 5, delta);
+        b.shutter.visible = b.closed > 0.01;
+        b.shutter.scale.y = Math.max(0.01, b.closed * 2.9);
+        b.shutter.position.y = 3.1 - b.closed * 1.45;
+      }
+    }
+  }
+}
