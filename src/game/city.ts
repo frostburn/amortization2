@@ -44,14 +44,21 @@ const buildings: BuildingSpec[] = [
   { id: "dispatch", prefab: "shop", x: 27, z: 21, turn: 2, finish: "slate", accent: 0x728763 },
   { id: "workshop", prefab: "workshop", x: 27, z: 34, turn: 0, finish: "sand", accent: 0x918d77 },
 ];
-// Adjacent blocks are scenery with solid hulls. Roads continue through the map edge.
-for (const [i, x] of [-82, -56, -28, 0, 28, 56, 82].entries()) {
+// Adjacent scenery occupies parcels between the continuing street corridors.
+// A second northern row preserves skyline density without filling road lanes.
+const northLots = [[-80, -69], [-27, -69], [27, -69], [80, -69],
+  [-80, -85], [-27, -85], [27, -85]];
+for (const [i, [x, z]] of northLots.entries()) {
   buildings.push({ id: `north-skyline-${i}`, prefab: i % 2 ? "office" : "apartment",
-    x, z: -69, turn: 0, finish: i % 2 ? "slate" : "brick", accent: 0x6d7f83, backdrop: true });
+    x, z, turn: 0, finish: i % 2 ? "slate" : "brick", accent: 0x6d7f83, backdrop: true });
 }
-for (const [i, z] of [-34, -8, 18, 44].entries()) {
-  buildings.push({ id: `west-skyline-${i}`, prefab: i % 2 ? "apartment" : "shop",
-    x: -76, z, turn: 1, finish: "sand", accent: 0x827c64, backdrop: true });
+// Paired west-side buildings face their nearest cross street; awnings point
+// away from the narrow gap between neighbours.
+const westLots = [[-29.5, "shop", 2], [-17, "apartment", 0],
+  [17, "apartment", 2], [29.5, "shop", 0]] as const;
+for (const [i, [z, prefab, turn]] of westLots.entries()) {
+  buildings.push({ id: `west-skyline-${i}`, prefab,
+    x: -80, z, turn, finish: "sand", accent: 0x827c64, backdrop: true });
 }
 
 const routes: CartRoute[] = [];

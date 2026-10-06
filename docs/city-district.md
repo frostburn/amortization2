@@ -26,6 +26,8 @@ The first district keeps building interiors closed. Facades are real solids, not
 
 Author additional districts with the same prefab and footprint vocabulary. Put objectives, entrances and civilian activity on district data rather than inside a renderer. Vary routes, fleet density, service stops, finishes, building transforms and delivery timing. Use a few active adjacent streets to suggest the larger city; do not simulate kilometres of invisible traffic.
 
+Place skyline buildings in parcels between continuing streets. Keep their hulls off the carriageways and sidewalks, and allow space for awnings and roof trim between neighbours. The district's northern scenery uses two rows; its western pairs face their nearest cross streets.
+
 Later work can add road vehicles, charging docks, parcel aircraft and other civilian chassis. Keep their policies local and bounded: near combat, cancel tasks and suspend affected services; elsewhere, maintain normal activity. Reopening shops, maintenance visits and rerouted deliveries should show recovery after the player's activity. Avoid mission-status prose hovering over every machine.
 
 `window.amortization2.inspect().city` reports positions, route destinations, deliveries, distance travelled, state, crossing phase and closed shops for QA. The sandbox is deterministic at the fixed simulation timestep. Inspectors do not issue movement or damage commands.
