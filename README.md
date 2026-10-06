@@ -57,6 +57,10 @@ Enemy squads enter, acquire targets and move around blocked sight lines. **Waves
 
 Each wave adds robots up to three four-member squads, then continues indefinitely. Entrances rotate and avoid nearby survivors when the warning is planned; occupied entrance slots shift before spawning. Enemy attacks become more frequent in later waves. The HUD shows wave, remaining hostiles, total disabled hostiles and surviving squad members. Enemy shots do not count toward the player's accuracy. There are no missions, unlocks or ammunition economy.
 
+## City district
+
+Choose **City District** for a 120 × 104 metre urban sandbox. Sixteen six-wheel CART delivery robots circulate between shops and homes, pause to open their lids, yield to the squad and observe crossing signals. Nearby gunfire interrupts deliveries and closes local shop shutters; activity resumes after quiet. Hits launch and tumble the light CART chassis, including wrecks. Their motor mix is independently adjustable in the pause menu and defaults to 40% of its original level. Buildings, streets and furniture use reusable geometry and collision footprints. The district has no mission or enemy waves yet. See [city construction and behavior](docs/city-district.md) and [the civilian cast through 2040](docs/civilian-robots.md).
+
 ## Controls
 
 | Input                       | Action                                                                         |
@@ -103,6 +107,6 @@ TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and 
 
 In the browser console, `window.amortization2.inspect()` returns current state, `project({ x, y, z })` maps a world point to the screen, and `exportReport()` returns a JSON bug report. These are inspection helpers, not a save game or replay format.
 
-This is a combat test range, not yet a campaign: missions, progression, multiplayer, controller support, and mobile controls remain future work. The arena is intended for refining live combat before authoring missions. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
+This is a combat test range, not yet a campaign: missions, progression, multiplayer, controller support, and mobile controls remain future work. The arena refines live combat; the city district establishes reusable mission scenery and civilian activity. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
 
 Code is [MIT licensed](LICENSE). Asset licensing is documented separately in the credits.
