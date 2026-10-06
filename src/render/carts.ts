@@ -64,7 +64,7 @@ export class CartFleet {
   dispose() {
     const materials = new Set<THREE.Material>();
     for (const mesh of [...this.parts, this.lid, this.light]) {
-      mesh.geometry.dispose(); (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(m => materials.add(m));
+      mesh.dispose(); mesh.geometry.dispose(); (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(m => materials.add(m));
     }
     materials.forEach(m => m.dispose()); this.root.removeFromParent();
   }
