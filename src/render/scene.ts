@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   BLAST_RADIUS,
+  AUTOMATIC_AIM,
   FORMATION_SPACING,
   FIREARMS,
   GRAVITY,
@@ -1172,11 +1173,18 @@ export class RangeScene {
     const actor =
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
-    let aim: Vec3 = { x: ground.x, y: 1.25, z: ground.z };
-    if (!grenade && hit && actor)
-      // Preserve the height under the cursor so upper-body aim can clear low cover.
+    const automatic = this.sim.weapon === "gun" || this.sim.weapon === "minigun";
+    let aim: Vec3 = { x: ground.x, y: automatic ? AUTOMATIC_AIM.height : 1.25, z: ground.z };
+    if (!grenade && hit && actor) {
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
-    else if (!grenade && hit && this.sim.weapon === "rifle")
+      // Hovering a leg must not dip an automatic burst back into low cover.
+      // Elevated targets retain their own height, including shots above this floor.
+      if (automatic && !actor.dead) {
+        const p = actor.body.translation(), upperBody = p.y + AUTOMATIC_AIM.bodyOffset;
+        if (aim.y < upperBody)
+          aim = { x: p.x, y: upperBody, z: p.z };
+      }
+    } else if (!grenade && hit && this.sim.weapon === "rifle")
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     return { aim, ground, actor: actor?.id };
   }

@@ -64,6 +64,85 @@ describe("kinetic combat and recovery", () => {
     expect(displacements[0]).toBeGreaterThan(displacements[2] * 1.25);
   });
 
+  test("a cold minigun drives an advancing robot back harder than a machine gun", () => {
+    const outcomes: { retreat: number; damage: number; hits: number }[] = [];
+    for (const model of ["assault", "minigunner"] as const) {
+      sim.reset("arena", model);
+      sim.arena!.countdown = 100;
+      sim.select(4);
+      sim.primary.body.setTranslation({ x: -30, y: 0.96, z: 12 }, true);
+      const enemy = sim.addEnemy("assault", { x: -30, z: -8 });
+      // Extra durability isolates pressure over the same trigger hold, including
+      // the minigun's cold wind-up, without a corpse ending either measurement.
+      enemy.hp = enemy.maxHp = 1000;
+      const goal = { x: -30, z: 8 };
+      enemy.path = [goal];
+      enemy.moveTarget = goal;
+      sim.world.step();
+      sim.setBrace(true);
+      sim.trigger = true;
+      ticks(sim, 2.5, () => track(sim, enemy));
+      outcomes.push({ retreat: -8 - enemy.body.translation().z, damage: 1000 - enemy.hp, hits: sim.hits });
+      expect(enemy.moveTarget).toEqual(goal);
+      expect(enemy.path.length).toBeGreaterThan(0);
+      expect(enemy.dead).toBe(false);
+      expect(sim.isDisrupted(enemy)).toBe(false);
+    }
+    const [gun, minigun] = outcomes;
+    expect(minigun.retreat).toBeGreaterThan(gun.retreat + 3);
+    expect(minigun.damage).toBeGreaterThan(gun.damage * 1.35);
+    expect(minigun.hits).toBeGreaterThan(gun.hits * 1.5);
+  });
+
+  test("machine-gun support preserves stronger minigun momentum and walls still stop it", () => {
+    const robot = sim.primary;
+    robot.body.setTranslation({ x: -53, y: 0.96, z: 12 }, true);
+    sim.world.step();
+    for (let i = 0; i < 6; i++)
+      sim.damage(robot, 0, { x: -KINETIC.impulse.minigun, y: 0, z: 0 }, robot.body.translation(), "minigun");
+    const before = robot.body.linvel().x;
+    expect(-robot.knockback.x).toBeGreaterThan(KINETIC.maxSpeed);
+    sim.damage(robot, 0, { x: -KINETIC.impulse.gun, y: 0, z: 0 }, robot.body.translation(), "gun");
+    expect(robot.body.linvel().x).toBeCloseTo(before);
+    ticks(sim, 1, () => {
+      sim.damage(robot, 0, { x: -KINETIC.impulse.minigun, y: 0, z: 0 }, robot.body.translation(), "minigun");
+      expect(Math.hypot(robot.knockback.x, robot.knockback.z)).toBeLessThanOrEqual(KINETIC.minigunMaxSpeed + 1e-6);
+    });
+    expect(robot.body.translation().x).toBeGreaterThan(sim.layout.bounds.left);
+    expect(robot.body.translation().x).toBeLessThan(-55);
+    sim.move({ x: -48, z: 12 });
+    ticks(sim, 5);
+    expect(distance2(robot.body.translation(), robot.moveTarget!)).toBeLessThan(0.15);
+    expect(Math.hypot(robot.knockback.x, robot.knockback.z)).toBeLessThan(0.001);
+  });
+
+  test("sweeping a minigun across three advancing robots herds the whole squad", () => {
+    sim.reset("arena", "minigunner");
+    sim.arena!.countdown = 100;
+    sim.select(4);
+    sim.primary.body.setTranslation({ x: -30, y: 0.96, z: 16 }, true);
+    const enemies = [-33, -30, -27].map(x => {
+      const enemy = sim.addEnemy("assault", { x, z: -8 });
+      enemy.moveTarget = { x, z: 8 };
+      enemy.path = [enemy.moveTarget];
+      return enemy;
+    });
+    sim.world.step();
+    sim.setBrace(true);
+    sim.trigger = true;
+    ticks(sim, 0.5, () => track(sim, enemies[0]));
+    for (let sweep = 0; sweep < 12; sweep++)
+      ticks(sim, 0.2, () => track(sim, enemies[sweep % enemies.length]));
+    expect(sim.hits).toBeGreaterThan(60);
+    for (const enemy of enemies) {
+      expect(enemy.dead).toBe(false);
+      expect(enemy.hp).toBeLessThan(enemy.maxHp - 70);
+      expect(enemy.body.translation().z).toBeLessThan(-8.5);
+      expect(enemy.moveTarget).toEqual({ x: enemy.spawn.x, z: 8 });
+      expect(sim.isDisrupted(enemy)).toBe(false);
+    }
+  });
+
   test("walking orders survive a volley and recover after momentum decays", () => {
     const robot = sim.primary;
     const goal: Vec2 = { x: -30, z: 18 };
