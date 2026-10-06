@@ -1,4 +1,4 @@
-import { AUTOMATIC_AIM, PISTOL, RIFLE, ROBOT_MODELS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
+import { AUTOMATIC_AIM, ENEMY_BRACE_WAVE, PISTOL, RIFLE, ROBOT_MODELS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
 import { ARENA_ENTRIES } from "./ranges";
 import { segmentClear } from "./navigation";
 import type { Actor, Simulation } from "./simulation";
@@ -56,7 +56,7 @@ export class ArenaCombat {
         a.ai!.fire = a.firing = false;
         a.path = [];
         a.moveTarget = undefined;
-        a.braced = true;
+        a.braced = this.wave >= ENEMY_BRACE_WAVE;
       }
       sim.events.push({ type: "wave", message: `Squad lost on wave ${this.wave}. Shift+R restarts the arena.` });
       return;
@@ -72,6 +72,7 @@ export class ArenaCombat {
         a.pistol.ammo = a.model === "sniper" ? PISTOL.magazine : 0;
         a.reload = a.pistol.reload = a.grenadeCooldown = a.recoil = 0;
         a.stability = 1;
+        a.stagger = a.staggerDuration = a.staggerGrace = 0;
         a.firing = false;
       }
       this.planEntries(living);
@@ -142,6 +143,12 @@ export class ArenaCombat {
   private updateEnemy(a: Actor, living: Actor[]) {
     const sim = this.sim, brain = a.ai!, now = sim.time;
     brain.fire = false;
+    if (sim.isDisrupted(a)) {
+      if (brain.state !== "entering") brain.state = "suppressed";
+      brain.burstUntil = 0;
+      return;
+    }
+    if (brain.state === "suppressed") brain.nextThink = now;
     if (brain.state === "entering") {
       if (distance2(a.body.translation(), brain.rally) > 0.7 && now < brain.entryUntil) return;
       brain.state = "advancing";
@@ -183,8 +190,7 @@ export class ArenaCombat {
         }
       }
       const state = sim.ammunition(a);
-      const suppressed = sim.isDisrupted(a);
-      if (this.wave >= 4 && !suppressed && a.model === "assault" &&
+      if (this.wave >= 4 && a.model === "assault" &&
           now >= brain.nextGrenade && distance > 10 && distance < 24 &&
           !sim.grenades.some((g) => g.team === "enemy") &&
           living.filter((other) => distance2(q, other.body.translation()) < 4).length >= 2 &&
@@ -195,12 +201,12 @@ export class ArenaCombat {
           brain.burstUntil = 0;
         }
       }
-      if (suppressed || state.reload > 0) {
-        brain.state = suppressed ? "suppressed" : "reloading";
+      if (state.reload > 0) {
+        brain.state = "reloading";
         brain.burstUntil = 0;
         brain.nextAttack = Math.max(brain.nextAttack, now + 0.5);
       } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? 24 : 38)) {
-        a.braced = true;
+        a.braced = this.wave >= ENEMY_BRACE_WAVE;
         a.path = [];
         a.moveTarget = undefined;
         brain.state = "aiming";

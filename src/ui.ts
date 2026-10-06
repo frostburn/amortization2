@@ -209,15 +209,17 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     button.querySelector<HTMLElement>(".integrity i")!.style.width =
       `${(actor.hp / actor.maxHp) * 100}%`;
     button.classList.toggle("braced", actor.braced);
+    const staggered = sim.isDisrupted(actor);
+    button.classList.toggle("staggered", staggered);
     const role = button.querySelector<HTMLElement>(".unit-role")!;
-    role.hidden = !actor.cover && actor.model === "assault";
-    role.textContent = actor.cover ? "COVER" : actor.model === "minigunner" ? actor.spooling && actor.spin < 1 ? "WIND-UP" : actor.firing ? "FIRING" : "MINIGUN" : "SNIPER";
+    role.hidden = !staggered && !actor.cover && actor.model === "assault";
+    role.textContent = staggered ? "STAGGER" : actor.cover ? "COVER" : actor.model === "minigunner" ? actor.spooling && actor.spin < 1 ? "WIND-UP" : actor.firing ? "FIRING" : "MINIGUN" : "SNIPER";
     button.classList.toggle("sniper-unit", actor.model === "sniper");
     button.classList.toggle("minigunner-unit", actor.model === "minigunner");
     const name = squadName(id, actor.model);
     button.querySelector<HTMLElement>(".unit-name")!.textContent = name;
-    button.setAttribute("aria-label", `Select ${name}, robot ${id}, ${ROBOT_MODELS[actor.model!].name}, ${Math.ceil(actor.hp)} integrity`);
-    button.title = `${name} · ${ROBOT_MODELS[actor.model!].name} · ${Math.ceil(actor.hp)} / ${actor.maxHp} INTEGRITY${actor.cover ? " · AUTOMATIC COVER FIRE · MOVEMENT ORDERS ACTIVE" : ""}`;
+    button.setAttribute("aria-label", `Select ${name}, robot ${id}, ${ROBOT_MODELS[actor.model!].name}, ${Math.ceil(actor.hp)} integrity${staggered ? ", staggered" : ""}`);
+    button.title = `${name} · ${ROBOT_MODELS[actor.model!].name} · ${Math.ceil(actor.hp)} / ${actor.maxHp} INTEGRITY${staggered ? " · STAGGERED · BRACING RECOVERS FASTER" : ""}${actor.cover ? " · AUTOMATIC COVER FIRE · MOVEMENT ORDERS ACTIVE" : ""}`;
   }
   document
     .getElementById("all")!
@@ -235,6 +237,8 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     "rifle-status",
     !sim.rifleOperator
       ? "E · SELECT NEEDLE (4)"
+      : sim.isDisrupted(rifle)
+        ? "STAGGER · RECOVERING"
       : reloading && sim.weapon === "rifle"
         ? `RELOAD · ${rifle.reload.toFixed(1)} s`
         : rifle.shotWait > 0
@@ -276,6 +280,10 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     "mode-hint",
     dead
       ? "UNIT DISABLED · SELECT ANOTHER ROBOT OR RESET"
+      : sim.active.some((a) => sim.isDisrupted(a))
+        ? sim.weapon === "rifle"
+          ? sim.sniping ? "STAGGER · BRACED RECOVERY" : "STAGGER · SPACE TO BRACE AND SNIPE"
+          : "STAGGER · HOLD SPACE TO RECOVER FASTER"
       : sim.weapon === "grenade"
         ? thrower
           ? `GRENADE · ${squadName(thrower.id, thrower.model)} NEXT · ${GRENADE_FUSE} s FUSE · ${GRENADE_COOLDOWN} s COOLDOWN`

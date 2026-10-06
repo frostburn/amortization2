@@ -10,6 +10,7 @@ import {
   PISTOL,
   MINIGUN,
   KINETIC,
+  STAGGER,
   RIFLE,
   ROBOT_MODELS,
   STEP,
@@ -56,7 +57,9 @@ export interface Actor {
   path: Vec2[];
   moveTarget?: Vec2;
   hitTime: number;
-  disruptedUntil: number;
+  stagger: number;
+  staggerDuration: number;
+  staggerGrace: number;
   knockback: Vec2;
   dead: boolean;
   recoil: number;
@@ -315,7 +318,9 @@ export class Simulation {
       braceTime: 0,
       path: [],
       hitTime: -10,
-      disruptedUntil: -10,
+      stagger: 0,
+      staggerDuration: 0,
+      staggerGrace: 0,
       knockback: { x: 0, z: 0 },
       dead: false,
       recoil: 0,
@@ -411,13 +416,13 @@ export class Simulation {
       this.chooseWeapon(ROBOT_MODELS[this.primary.model!].weapon);
   }
   get grenadeThrower(): Actor | undefined {
-    const ready = this.active.filter((a) => this.supports(a, "grenade") && a.grenadeCooldown === 0);
+    const ready = this.active.filter((a) => this.supports(a, "grenade") && a.grenadeCooldown === 0 && !this.isDisrupted(a));
     return ready.find((a) => a.id > this.lastGrenadier) ?? ready[0];
   }
   get grenadeCooldown() {
     const active = this.active.filter((a) => this.supports(a, "grenade"));
     return active.length
-      ? Math.min(...active.map((a) => a.grenadeCooldown))
+      ? Math.min(...active.map((a) => Math.max(a.grenadeCooldown, a.stagger / (a.braced ? STAGGER.bracedRecovery : 1))))
       : 0;
   }
   get destroyed() {
@@ -727,7 +732,7 @@ export class Simulation {
 
   shoot(a: Actor, weapon: Firearm = a.weapon) {
     const state = this.ammunition(a, weapon);
-    if (a.dead || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0 || (weapon === "minigun" && a.spin < 1)) return;
+    if (a.dead || this.isDisrupted(a) || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0 || (weapon === "minigun" && a.spin < 1)) return;
     const covering = a.kind === "player" && this.sniping && !!a.cover;
     const automaticOrder = (this.weapon === "gun" || this.weapon === "minigun") &&
       (weapon === "gun" || weapon === "minigun");
@@ -866,11 +871,28 @@ export class Simulation {
     a.hp = Math.max(0, a.hp - amount);
     a.hitTime = this.time;
     a.stability = Math.max(0, a.stability - (bullet ? a.braced ? 0.012 : 0.025 : a.braced ? 0.05 : 0.16));
-    // Ordinary bullets jolt aim and position, but cannot continually postpone a burst.
-    if (!bullet) a.disruptedUntil = this.time + (source === "grenade" ? 0.5 : 0.25);
+    // A volley gives discrete staggers rather than restarting the stun on every
+    // round. Rifle/blast shocks can override the brief ordinary-hit grace.
+    if (!bullet || (a.stagger === 0 && a.staggerGrace === 0)) {
+      a.stagger = Math.max(a.stagger, STAGGER.duration[source ?? "rifle"]);
+      a.staggerDuration = a.stagger;
+      a.braceTime = 0;
+      a.firing = a.spooling = false;
+      if (a.ai) {
+        a.ai.fire = false;
+        a.ai.burstUntil = 0;
+        if (a.ai.state !== "entering") a.ai.state = "suppressed";
+      }
+      if (a.cover) {
+        a.cover.fire = false;
+        a.cover.burstUntil = 0;
+        a.cover.state = "suppressed";
+      }
+    }
     if (a.hp <= 0) {
       if (a.kind === "player" && a.model === "sniper") this.endSniping();
       a.dead = true;
+      a.stagger = a.staggerDuration = a.staggerGrace = 0;
       a.deathTime = this.time;
       if (a.kind === "enemy" && this.arena) this.arena.kills++;
       a.killedBy = source;
@@ -916,7 +938,7 @@ export class Simulation {
   }
 
   throwGrenade(point: Vec2, actor = this.grenadeThrower): boolean {
-    if (!actor || actor.dead || actor.grenadeCooldown > 0 || !this.supports(actor, "grenade")) return false;
+    if (!actor || actor.dead || this.isDisrupted(actor) || actor.grenadeCooldown > 0 || !this.supports(actor, "grenade")) return false;
     const from = this.grenadeOrigin(actor, point);
     const { velocity } = grenadeVelocity(from, point);
     const body = this.world.createRigidBody(
@@ -1031,7 +1053,7 @@ export class Simulation {
   }
 
   isDisrupted(a: Actor) {
-    return this.time < a.disruptedUntil;
+    return !a.dead && a.stagger > 0;
   }
 
   step() {
@@ -1051,12 +1073,17 @@ export class Simulation {
         a.firing = false;
         continue;
       }
+      const wasStaggered = this.isDisrupted(a);
+      a.stagger = Math.max(0, a.stagger - STEP * (a.braced ? STAGGER.bracedRecovery : 1));
+      a.staggerGrace = wasStaggered && a.stagger === 0
+        ? STAGGER.grace : Math.max(0, a.staggerGrace - STEP);
       const drag = Math.exp(-KINETIC.drag * STEP);
       a.knockback.x *= drag;
       a.knockback.z *= drag;
       const velocity = a.body.linvel();
       a.braceTime =
         a.braced &&
+        !this.isDisrupted(a) &&
         Math.hypot(velocity.x, velocity.z) < 0.3 &&
         a.stability > 0.8
           ? Math.min(RIFLE.settle, a.braceTime + STEP)
@@ -1083,7 +1110,7 @@ export class Simulation {
             ? !!a.ai?.fire
             : a.cover && this.sniping ? a.cover.fire
             : selected && this.trigger && this.weapon !== "grenade" && this.followsOrder(a, this.weapon)) &&
-          state.reload === 0;
+          state.reload === 0 && !this.isDisrupted(a);
         a.spooling = a.weapon === "minigun" && fire && state.ammo > 0;
         if (a.weapon === "minigun") {
           const previousSpin = a.spin;
@@ -1175,7 +1202,7 @@ export class Simulation {
       a.path.shift();
     let dx = 0,
       dz = 0;
-    if (a.path.length && !a.braced) {
+    if (a.path.length && !a.braced && !this.isDisrupted(a)) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
       const speed = Math.min(a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2, distance * 5);
@@ -1368,6 +1395,8 @@ export class Simulation {
         knockback: { ...a.knockback },
         velocity: vcopy(a.body.linvel()),
         disrupted: this.isDisrupted(a),
+        stagger: a.stagger,
+        staggerGrace: a.staggerGrace,
         killedBy: a.killedBy,
         ammo: a.ammo,
         reload: a.reload,

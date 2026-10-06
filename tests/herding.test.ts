@@ -34,7 +34,7 @@ describe("kinetic combat and recovery", () => {
     expect(enemy.hp).toBeGreaterThan(0);
     expect(start.z - enemy.body.translation().z).toBeGreaterThan(2);
     expect(Math.abs(enemy.body.translation().x - start.x)).toBeLessThan(0.2);
-    expect(sim.isDisrupted(enemy)).toBe(false);
+    expect(sim.isDisrupted(enemy)).toBe(true);
 
     // A second firing angle redirects pressure across the floor instead of
     // selecting a fixed east-west displacement or teleporting the target.
@@ -86,7 +86,6 @@ describe("kinetic combat and recovery", () => {
       expect(enemy.moveTarget).toEqual(goal);
       expect(enemy.path.length).toBeGreaterThan(0);
       expect(enemy.dead).toBe(false);
-      expect(sim.isDisrupted(enemy)).toBe(false);
     }
     const [gun, minigun] = outcomes;
     expect(minigun.retreat).toBeGreaterThan(gun.retreat + 3);
@@ -139,7 +138,6 @@ describe("kinetic combat and recovery", () => {
       expect(enemy.hp).toBeLessThan(enemy.maxHp - 70);
       expect(enemy.body.translation().z).toBeLessThan(-8.5);
       expect(enemy.moveTarget).toEqual({ x: enemy.spawn.x, z: 8 });
-      expect(sim.isDisrupted(enemy)).toBe(false);
     }
   });
 
@@ -203,7 +201,7 @@ describe("kinetic combat and recovery", () => {
     expect(Math.hypot(target.knockback.x, target.knockback.z)).toBeLessThan(0.001);
   });
 
-  test("an AI machine gunner returns fire while consecutive hits keep it sliding", () => {
+  test("an AI machine gunner returns fire between staggers while consecutive hits keep it sliding", () => {
     sim.arena!.countdown = 0;
     sim.step();
     const enemy = sim.arena!.enemies[0];
@@ -219,16 +217,20 @@ describe("kinetic combat and recovery", () => {
     sim.setBrace(true);
     sim.trigger = true;
     let firingWhileSliding = false;
+    let staggeredWhileSliding = false;
     ticks(sim, 2.5, () => {
       track(sim, enemy);
       if (enemy.firing && Math.hypot(enemy.body.linvel().x, enemy.body.linvel().z) > 1)
         firingWhileSliding = true;
+      if (sim.isDisrupted(enemy) && Math.hypot(enemy.body.linvel().x, enemy.body.linvel().z) > 1)
+        staggeredWhileSliding = true;
     });
     expect(sim.hits).toBeGreaterThan(25);
     expect(sim.time - enemy.hitTime).toBeLessThan(0.15);
     expect(enemy.body.translation().z).toBeLessThan(-12);
     expect(sim.arena!.enemyShots).toBeGreaterThanOrEqual(5);
     expect(firingWhileSliding).toBe(true);
+    expect(staggeredWhileSliding).toBe(true);
     expect(sim.primary.hp).toBeLessThan(sim.primary.maxHp);
     expect(sim.isDisrupted(enemy)).toBe(false);
   });

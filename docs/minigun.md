@@ -16,7 +16,7 @@ Hold **Space** to brace. The minigun uses actual 3D muzzle height, spread, balli
 
 **Q** issues an automatic-fire order when machine gunners and SPINDLE are selected together: each uses its own gun, magazine, cadence and reload. Machine gunners fire immediately; SPINDLE joins after winding. The minigun readout shows its belt and winding/coasting status. Selecting an assault robot gives its machine gun readout. With NEEDLE, Q retains the machine-gun/pistol cycle. E and G appear only for eligible selected robots. BOLT participates in the existing round-robin grenade order. Automatic kills from either gun count toward the Proving Ground plate drill.
 
-SPINDLE's model has an ammunition drum, feeding hardware, armour shoulders and six visibly rotating barrels. Rotation follows simulated motor speed, including coast and interrupted wind-up. Elevation guides and muzzle flashes use its actual weapon reach.
+SPINDLE's model has an ammunition drum, feeding hardware, armour shoulders and six visibly rotating barrels. Rotation follows simulated motor speed, including coast and interrupted wind-up. Stagger immediately stops bullets and powered acceleration; the motor coasts rather than snapping to zero. A held trigger resumes from retained spin once the robot recovers. Bracing clears stagger 2.5× faster. Elevation guides and muzzle flashes use its actual weapon reach.
 
 ## Edited sound fragments
 
