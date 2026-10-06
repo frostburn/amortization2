@@ -1,4 +1,4 @@
-import { FIREARMS, distance2, type Vec3 } from "./config";
+import { AUTOMATIC_AIM, FIREARMS, distance2, type Vec3 } from "./config";
 import type { Actor, Simulation } from "./simulation";
 
 export type CoverBrain = {
@@ -51,7 +51,9 @@ export function updateCoverFire(sim: Simulation) {
       let target: number | null = null;
       for (const enemy of candidates) {
         const q = enemy.body.translation();
-        for (const height of [0.25, 0.7]) {
+        const heights = a.weapon === "gun" || a.weapon === "minigun"
+          ? [AUTOMATIC_AIM.bodyOffset, 0.25] : [0.25, AUTOMATIC_AIM.bodyOffset];
+        for (const height of heights) {
           const aim = { x: q.x, y: q.y + height, z: q.z };
           const muzzle = sim.muzzle(a, aim);
           if (Math.hypot(aim.x - muzzle.x, aim.y - muzzle.y, aim.z - muzzle.z) > FIREARMS[a.weapon].range) continue;

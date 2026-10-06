@@ -1,4 +1,4 @@
-import { PISTOL, RIFLE, ROBOT_MODELS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
+import { AUTOMATIC_AIM, PISTOL, RIFLE, ROBOT_MODELS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
 import { ARENA_ENTRIES } from "./ranges";
 import { segmentClear } from "./navigation";
 import type { Actor, Simulation } from "./simulation";
@@ -172,7 +172,9 @@ export class ArenaCombat {
       }
       brain.visible = false;
       // Low cover can expose a chassis's upper body; tall cover still needs a flank.
-      for (const height of [0.25, 0.7]) {
+      const heights = a.weapon === "gun" || a.weapon === "minigun"
+        ? [AUTOMATIC_AIM.bodyOffset, 0.25] : [0.25, AUTOMATIC_AIM.bodyOffset];
+      for (const height of heights) {
         const aim = { x: q.x, y: q.y + height, z: q.z };
         if (sim.fireRay(a, sim.muzzle(a, aim), aim)?.collider.handle === target.collider.handle) {
           brain.aim = aim;

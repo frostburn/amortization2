@@ -837,11 +837,15 @@ export class Simulation {
     if (!a.dead) {
       const mass = a.body.mass();
       const previous = a.model ? a.knockback : a.body.linvel();
+      const limit = source === "minigun" ? KINETIC.minigunMaxSpeed : KINETIC.maxSpeed;
+      // A weaker hit must not brake momentum already imparted by the minigun.
+      const maxSpeed = Math.max(limit, Math.hypot(previous.x, previous.z));
+      const retainedLimit = Math.max(limit, Math.hypot(a.knockback.x, a.knockback.z));
       const next = { x: previous.x + applied.x / mass, z: previous.z + applied.z / mass };
       const speed = Math.hypot(next.x, next.z);
-      if (speed > KINETIC.maxSpeed) {
-        next.x *= KINETIC.maxSpeed / speed;
-        next.z *= KINETIC.maxSpeed / speed;
+      if (speed > maxSpeed) {
+        next.x *= maxSpeed / speed;
+        next.z *= maxSpeed / speed;
       }
       applied.x = (next.x - previous.x) * mass;
       applied.z = (next.z - previous.z) * mass;
@@ -852,9 +856,9 @@ export class Simulation {
         z: a.knockback.z + applied.z / mass,
       };
       const retainedSpeed = Math.hypot(a.knockback.x, a.knockback.z);
-      if (retainedSpeed > KINETIC.maxSpeed) {
-        a.knockback.x *= KINETIC.maxSpeed / retainedSpeed;
-        a.knockback.z *= KINETIC.maxSpeed / retainedSpeed;
+      if (retainedSpeed > retainedLimit) {
+        a.knockback.x *= retainedLimit / retainedSpeed;
+        a.knockback.z *= retainedLimit / retainedSpeed;
       }
     }
     a.body.applyImpulseAtPoint(applied, point, true);

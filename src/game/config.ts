@@ -43,7 +43,7 @@ export const MINIGUN = {
   interval: 1 / 30,
   reload: 3.8,
   range: 65,
-  damage: 3,
+  damage: 5,
   muzzle: 1.18,
   windUp: 0.5,
   coast: 0.7,
@@ -59,13 +59,16 @@ export const FIREARMS = {
 };
 export type Firearm = keyof typeof FIREARMS;
 export type Weapon = Firearm | "grenade";
+// Upper-chest fire clears the arena's 1.25–1.3 m barriers without cursor chasing.
+export const AUTOMATIC_AIM = { height: 1.65, bodyOffset: 0.7 };
 // Automatic fire buys ground before it kills. Motor control must preserve this
 // external velocity rather than treating it as a walking error every frame.
 export const KINETIC = {
-  impulse: { gun: 180, minigun: 84, pistol: 36, rifle: 180 },
+  impulse: { gun: 180, minigun: 180, pistol: 36, rifle: 180 },
   bracedBullet: 0.6,
   drag: 3.2,
   maxSpeed: 7,
+  minigunMaxSpeed: 11,
 };
 export const FRIENDLY_FIRE = {
   gun: false, pistol: false, minigun: false, rifle: true, grenade: true,
