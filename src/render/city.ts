@@ -3,6 +3,7 @@ import { BUILDING_KIT, type BuildingSpec, type CityDistrict } from "../game/city
 import type { Simulation } from "../game/simulation";
 import { batchRigid, block, panel, surface, tube } from "./primitives";
 import { WaterView } from "./water";
+import { makeStreets } from "./streets";
 
 type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
   bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
@@ -133,39 +134,14 @@ export class CityView {
   private ray = new THREE.Ray();
   private intersection = new THREE.Vector3();
   constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true) {
-    const ground = new THREE.Group(), asphalt = surface(0x424c50), paving = surface(0x9c9f94);
+    const ground = new THREE.Group(), paving = surface(0x9c9f94);
     paving.map = texture;
-    const white = surface(0xd3cdbc), yellow = surface(0xb7a166), dark = surface(0x344347, 0.4);
+    const white = surface(0xd3cdbc), dark = surface(0x344347, 0.4);
     const leaf = surface(0x566f53), earth = surface(0x737767);
     const extent = district.ground;
     block(ground, extent.right - extent.left, 0.16, extent.front - extent.back,
       (extent.left + extent.right) / 2, -0.1, (extent.back + extent.front) / 2, earth);
-    // Broad civic forecourts and the quay use the same reusable paving palette.
-    for (const plaza of district.plazas) block(ground, plaza.w, 0.025, plaza.d, plaza.x, 0.018, plaza.z, paving);
-    // Road/sidewalk segments and intersections are authored district data.
-    for (const street of district.streets) {
-      const alongX = street.axis === "x", offset = (street.width + street.sidewalk) / 2;
-      const x = alongX ? street.center : street.at, z = alongX ? street.at : street.center;
-      block(ground, alongX ? street.length : street.width, 0.025, alongX ? street.width : street.length, x, 0, z, asphalt);
-      for (const side of [-1, 1]) block(ground, alongX ? street.length : street.sidewalk, 0.03,
-        alongX ? street.sidewalk : street.length, x + (alongX ? 0 : side * offset), 0.018,
-        z + (alongX ? side * offset : 0), paving);
-      for (let t = -street.length / 2; t < street.length / 2; t += 7)
-        block(ground, alongX ? 2.8 : 0.12, 0.008, alongX ? 0.12 : 2.8,
-          x + (alongX ? t : 0), 0.022, z + (alongX ? 0 : t), yellow);
-    }
-    const intersections = district.streets.filter(s => s.axis === "x").flatMap(horizontal =>
-      district.streets.filter(s => s.axis === "z").map(vertical => ({ x: vertical.at, z: horizontal.at })));
-    for (const junction of intersections) {
-      block(ground, 11.5, 0.009, 28, junction.x, 0.041, junction.z, asphalt);
-      block(ground, 28, 0.009, 11.5, junction.x, 0.042, junction.z, asphalt);
-    }
-    for (const junction of district.junctions) {
-      for (const s of [-1, 1]) for (let i = -5; i <= 5; i++) {
-        block(ground, 0.52, 0.006, 2.5, junction.x + i * 0.9, 0.05, junction.z + s * 9, white);
-        block(ground, 2.5, 0.006, 0.52, junction.x + s * 9, 0.05, junction.z + i * 0.9, white);
-      }
-    }
+    ground.add(makeStreets(district, texture));
     for (const f of district.furniture) {
       if (f.fixture === "signal") {
         tube(ground, 0.035, 1.65, f.x, 0.825, f.z, dark);
