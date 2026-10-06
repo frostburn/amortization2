@@ -24,7 +24,7 @@ import {
   type Firearm,
 } from "./config";
 import { CityLife } from "./civilians";
-import { findPath, segmentClear } from "./navigation";
+import { NavigationGrid, segmentClear } from "./navigation";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat, type EnemyBrain } from "./arena";
 import { startCoverFire, stopCoverFire, updateCoverFire, type CoverBrain } from "./cover";
@@ -57,6 +57,7 @@ export interface Actor {
   braceTime: number;
   path: Vec2[];
   moveTarget?: Vec2;
+  replanAt?: number;
   hitTime: number;
   stagger: number;
   staggerDuration: number;
@@ -139,6 +140,7 @@ export class Simulation {
   private rifleAim?: Vec3;
   private randomState = 1729;
   private nextId = 100;
+  private navigation!: NavigationGrid;
 
   static async create(range: RangeId = "proving", fourthModel: RobotModel = "sniper") {
     await RAPIER.init();
@@ -156,6 +158,7 @@ export class Simulation {
   reset(range: RangeId = this.range, fourthModel: RobotModel = this.fourthModel) {
     this.range = range;
     this.fourthModel = fourthModel;
+    this.navigation = new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
     this.world.timestep = STEP;
@@ -504,6 +507,11 @@ export class Simulation {
     return [
       ...this.layout.barriers,
       ...this.layout.platforms,
+      ...this.dynamicNavigationBoxes(includeTargets),
+    ];
+  }
+  private dynamicNavigationBoxes(includeTargets = true) {
+    return [
       ...this.props.map((p) => ({
         x: p.body.translation().x,
         z: p.body.translation().z,
@@ -604,7 +612,8 @@ export class Simulation {
   }
   navigate(actor: Actor, point: Vec2, queue = false) {
     const start = queue && actor.path.length ? actor.path.at(-1)! : actor.body.translation();
-    const path = findPath(start, point, this.navigationBoxes(), 0.55, this.layout.bounds);
+    const path = this.navigation.findPath(start, point, this.dynamicNavigationBoxes());
+    actor.replanAt = this.time;
     actor.moveTarget = path.at(-1);
     actor.path = queue ? [...actor.path, ...path] : path;
   }
@@ -1199,14 +1208,17 @@ export class Simulation {
     const p = a.body.translation(),
       v = a.body.linvel();
     // Recover the assigned corner if another hull or an impact displaces an arrival.
-    if (!a.path.length && a.moveTarget && distance2(p, a.moveTarget) > 0.15)
-      a.path = findPath(
-        p,
-        a.moveTarget,
-        this.navigationBoxes(),
-        0.55,
-        this.layout.bounds,
-      );
+    if (!a.path.length && a.moveTarget && distance2(p, a.moveTarget) > 0.15 && this.time >= (a.replanAt ?? 0)) {
+      a.path = this.navigation.findPath(p, a.moveTarget, this.dynamicNavigationBoxes());
+      // Failed recovery must not repeat an unreachable search every physics tick.
+      a.replanAt = this.time + (a.path.length ? 0 : 0.5);
+    }
+    // Local yielding may carry a robot past a planned turn. Advance to a visible
+    // waypoint instead of doubling back into a squadmate already at that corner.
+    if (a.path.length > 1) {
+      const boxes = this.navigationBoxes();
+      while (a.path.length > 1 && segmentClear(p, a.path[1], boxes)) a.path.shift();
+    }
     while (
       a.path.length &&
       distance2(p, a.path[0]) < (a.path.length === 1 ? 0.08 : 0.14)

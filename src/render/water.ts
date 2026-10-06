@@ -7,7 +7,7 @@ export class WaterView {
   root = new THREE.Group();
   private time = { value: 0 };
   constructor(water: WaterFeature) {
-    const stone = surface(0xb9b5a2), paving = surface(0x929d98), steel = surface(0x43565b, 0.4);
+    const stone = surface(0xb9b5a2), steel = surface(0x43565b, 0.4);
     const structure = new THREE.Group();
     for (const b of waterSolids(water).filter(b => !b.navigationOnly)) {
       if (b.h < 0.9) block(structure, b.w, b.h, b.d, b.x, b.h / 2, b.z, stone);
@@ -19,11 +19,11 @@ export class WaterView {
       }
     }
     for (const crossing of water.crossings) {
-      block(structure, water.w + 1.8, 0.06, crossing.width, water.x, 0.06, crossing.z, paving);
-      // Expansion joints and two contrasting walking strips read as a bridge.
+      // The street kit supplies asphalt and sidewalks across the bridge too.
+      // Keep the supporting slab below those surfaces, rather than paving over traffic lanes.
+      block(structure, water.w + 1.8, 0.12, crossing.width, water.x, -0.075, crossing.z, stone);
       for (const side of [-1, 1]) {
-        block(structure, 0.06, 0.005, crossing.width, water.x + side * water.w / 2, 0.093, crossing.z, steel);
-        block(structure, water.w + 1.8, 0.005, 0.25, water.x, 0.094,
+        block(structure, water.w + 1.8, 0.004, 0.25, water.x, 0.035,
           crossing.z + side * (crossing.width / 2 - 2.7), stone);
       }
     }

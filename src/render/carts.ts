@@ -19,16 +19,18 @@ function cartBody() {
 }
 
 /** Six wheels, a low battery base and three independent parcel compartments. */
-function crateBody() {
+export function crateBody() {
   const body = new THREE.Group(), shell = surface(0xbfc7c2), rubber = surface(0x252e31), steel = surface(0x677779, 0.5);
   const interior = surface(0x394648), parcel = surface(0xa6936d);
-  block(body, 0.92, 0.19, 1.12, 0, -0.35, 0, rubber);
+  block(body, 0.92, 0.09, 1.12, 0, -0.445, 0, rubber);
   block(body, 0.94, 0.12, 1.12, 0, 0.56, 0, shell);
-  block(body, 0.94, 0.85, 0.08, 0, 0.06, -0.52, shell);
-  for (const x of [-0.44, 0.44]) block(body, 0.06, 0.96, 1.06, x, 0.07, 0, shell);
-  block(body, 0.82, 0.93, 0.08, 0, 0.06, 0.32, interior);
-  for (const y of [-0.38, -0.06, 0.26, 0.58]) block(body, 0.85, 0.035, 1.06, 0, y, 0, steel);
-  for (const y of [-0.22, 0.10, 0.42]) block(body, 0.55, 0.18, 0.20, 0, y - 0.04, 0.40, parcel);
+  block(body, 0.82, 0.9, 0.08, 0, 0.05, -0.52, shell);
+  for (const x of [-0.44, 0.44]) block(body, 0.06, 0.9, 1.12, x, 0.05, 0, shell);
+  // Shelves fit inside the cabinet, recessed from the shell's exposed edges.
+  // The roof closes the top compartment itself.
+  block(body, 0.80, 0.86, 0.04, 0, 0.05, -0.45, interior);
+  for (const y of [-0.38, -0.06, 0.26]) block(body, 0.80, 0.035, 0.94, 0, y, 0.03, steel);
+  for (const y of [-0.22, 0.10, 0.42]) block(body, 0.55, 0.14, 0.32, 0, y + 0.01, 0.22, parcel);
   for (const x of [-0.5, 0.5]) {
     block(body, 0.07, 0.1, 1.02, x, -0.39, 0, steel);
     for (const z of [-0.44, 0, 0.44]) {
@@ -36,8 +38,8 @@ function crateBody() {
       const hub = tube(body, 0.11, 0.135, x, -0.41, z, steel, 10); hub.rotation.z = Math.PI / 2;
     }
   }
-  block(body, 0.8, 0.07, 0.1, 0, -0.33, 0.62, rubber);
-  for (const x of [-0.3, 0.3]) block(body, 0.07, 0.05, 0.04, x, 0.53, 0.59, rubber);
+  block(body, 0.8, 0.07, 0.1, 0, -0.425, 0.60, rubber);
+  for (const x of [-0.3, 0.3]) block(body, 0.07, 0.05, 0.04, x, 0.585, 0.59, rubber);
   block(body, 0.18, 0.07, 0.07, 0, 0.65, 0.18, rubber);
   return body;
 }
