@@ -36,6 +36,7 @@ const silver = material(0x7e8885, 0.65, 0.4);
 const yellow = material(AMBER, 0.1, 0.7);
 const shell = material(0x557d78, 0.4, 0.55);
 const sniperShell = material(0x97aaa0, 0.5, 0.45);
+const minigunShell = material(0x9b8753, 0.5, 0.5);
 const orange = material(ORANGE, 0.25, 0.7);
 const pale = material(0xc8c5ae, 0.1, 0.8);
 const glow = new THREE.MeshBasicMaterial({ color: MINT });
@@ -138,6 +139,7 @@ type ActorVisual = {
   bipod?: THREE.Group;
   primaryGun?: THREE.Group;
   pistol?: THREE.Group;
+  barrels?: THREE.Group;
   dead: boolean;
 };
 type Particle = {
@@ -704,6 +706,7 @@ export class RangeScene {
       yellow,
       shell,
       sniperShell,
+      minigunShell,
       orange,
       pale,
       glow,
@@ -821,9 +824,11 @@ export class RangeScene {
     const legs: THREE.Group[] = [];
     const friend = a.kind === "player";
     const sniper = a.model === "sniper";
-    const bodyMat = friend ? sniper ? sniperShell : shell : orange;
+    const minigunner = a.model === "minigunner";
+    const bodyMat = friend ? sniper ? sniperShell : minigunner ? minigunShell : shell : orange;
     let bipod: THREE.Group | undefined;
     let primaryGun: THREE.Group | undefined, pistol: THREE.Group | undefined;
+    let barrels: THREE.Group | undefined;
     if (sniper) model.scale.x = 0.74;
     if (a.model || a.kind === "heavy") {
       for (const x of [-0.24, 0.24]) {
@@ -844,6 +849,12 @@ export class RangeScene {
       box(torso, 0.74, 0.55, 0.44, 0, 0.24, 0, bodyMat);
       box(torso, 0.54, 0.2, 0.08, 0, 0.35, 0.25, pale);
       box(torso, 0.4, 0.42, 0.23, 0, 0.24, -0.3, dark);
+      if (minigunner) {
+        box(torso, 0.95, 0.23, 0.52, 0, 0.45, 0, bodyMat);
+        const pack = cylinder(torso, 0.32, 0.7, 0, 0.22, -0.47, metal);
+        pack.rotation.z = Math.PI / 2;
+        for (let i = 0; i < 5; i++) box(torso, 0.1, 0.12, 0.1, 0.48, 0.14 + i * 0.08, -0.2 + i * 0.1, yellow);
+      }
       box(torso, 0.42, 0.3, 0.35, 0, 0.7, 0.02, bodyMat);
       box(torso, 0.34, 0.065, 0.03, 0, 0.73, 0.207, friend ? glow : pale);
       for (const sign of [-1, 1]) {
@@ -884,7 +895,25 @@ export class RangeScene {
           silver,
         );
         barrel.rotation.x = Math.PI / 2;
-        if (sniper) {
+        if (minigunner) {
+          primaryGun.remove(barrel);
+          const housing = cylinder(primaryGun, 0.19, 0.36, 0.28, 0.3, 0.48, metal);
+          housing.rotation.x = Math.PI / 2;
+          barrels = new THREE.Group();
+          barrels.position.set(0.28, 0.3, 0.83);
+          primaryGun.add(barrels);
+          for (let i = 0; i < 6; i++) {
+            const angle = i * Math.PI / 3;
+            const tube = cylinder(barrels, 0.035, 0.7, Math.cos(angle) * 0.11, Math.sin(angle) * 0.11, 0, silver);
+            tube.rotation.x = Math.PI / 2;
+          }
+          for (const z of [-0.23, 0.27]) {
+            const collar = cylinder(barrels, 0.155, 0.07, 0, 0, z, dark);
+            collar.rotation.x = Math.PI / 2;
+          }
+          this.batchRigidPart(barrels);
+          box(primaryGun, 0.2, 0.13, 0.2, 0.28, 0.51, 0.42, yellow);
+        } else if (sniper) {
           box(primaryGun, 0.12, 0.28, 0.2, 0.28, 0.11, 0.56, metal);
           const optic = cylinder(primaryGun, 0.085, 0.36, 0.28, 0.49, 0.6, dark);
           optic.rotation.x = Math.PI / 2;
@@ -975,7 +1004,7 @@ export class RangeScene {
     this.dynamic.add(health);
     health.visible = false;
     this.dynamic.add(root);
-    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, dead: false };
+    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, barrels, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -1261,7 +1290,7 @@ export class RangeScene {
       let count = 0;
       for (const operator of this.sim.active) {
         if (
-          !this.sim.supports(operator, this.sim.weapon)
+          !this.sim.followsOrder(operator, this.sim.weapon)
         )
           continue;
         const { from, to } = this.sim.aimTrace(operator);
@@ -1484,8 +1513,7 @@ export class RangeScene {
       });
       const aim = this.sim.actorAim(a);
       const aimingFirearm = a.model === "sniper" || !!a.cover || a.kind === "enemy" || (
-        a.model === "assault" && this.sim.selected.has(a.id) &&
-        this.sim.weapon === "gun"
+        this.sim.selected.has(a.id) && this.sim.weapon !== "grenade" && this.sim.followsOrder(a, this.sim.weapon)
       );
       v.torso.rotation.x = a.dead
         ? 0
@@ -1501,6 +1529,7 @@ export class RangeScene {
       if (v.primaryGun) v.primaryGun.visible = a.weapon !== "pistol";
       if (v.pistol) v.pistol.visible = a.weapon === "pistol";
       if (v.bipod) v.bipod.visible = a.braced && a.weapon === "rifle" && !a.dead;
+      if (v.barrels && !a.dead) v.barrels.rotation.z += delta * a.spin * Math.PI * 10;
       v.flash.position.z = FIREARMS[a.weapon].muzzle;
       v.torso.rotation.z = a.dead
         ? 0

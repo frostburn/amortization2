@@ -83,11 +83,26 @@ button:disabled {
   color: #9ba8a3;
 }
 .range-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font:
     600 17px ui-monospace,
     monospace;
   letter-spacing: 4px;
 }
+.header-loadout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 9px ui-monospace, monospace;
+  letter-spacing: 1px;
+  color: #9ba8a3;
+}
+.loadout-choice { margin-top: 12px; }
+.loadout-description { color: var(--mint); font-size: 12px; line-height: 1.6; margin: 12px 0 4px; }
+.loadout-note { color: #9ba8a3; font: 10px ui-monospace, monospace; margin: 0 0 20px; }
+.minigunner-unit .unit-role { color: var(--amber); }
 .topbar nav {
   display: flex;
   align-items: center;
@@ -867,6 +882,7 @@ a:hover {
   .range-title {
     display: block;
   }
+  .header-loadout { display: none; }
   .range-title select {
     font-size: 9px;
     padding: 7px 5px;

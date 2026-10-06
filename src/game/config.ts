@@ -38,6 +38,16 @@ export const PISTOL = {
   damage: 22,
   muzzle: 0.66,
 };
+export const MINIGUN = {
+  magazine: 240,
+  interval: 1 / 30,
+  reload: 3.8,
+  range: 65,
+  damage: 9,
+  muzzle: 1.18,
+  windUp: 0.5,
+  coast: 0.7,
+};
 export const FIREARMS = {
   gun: {
     magazine: MAGAZINE, interval: SHOT_INTERVAL, reload: RELOAD_SECONDS,
@@ -45,17 +55,22 @@ export const FIREARMS = {
   },
   rifle: RIFLE,
   pistol: PISTOL,
+  minigun: MINIGUN,
 };
 export type Firearm = keyof typeof FIREARMS;
 export type Weapon = Firearm | "grenade";
 export const FRIENDLY_FIRE = {
-  gun: false, pistol: false, rifle: true, grenade: true,
+  gun: false, pistol: false, minigun: false, rifle: true, grenade: true,
 } as const;
 export const ROBOT_MODELS = {
   assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun", weapons: ["gun", "grenade"] },
   sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },
+  minigunner: { name: "SPINDLE", hp: 200, mass: 130, weapon: "minigun", weapons: ["minigun"] },
 } as const;
 export type RobotModel = keyof typeof ROBOT_MODELS;
+export const squadName = (id: number, model: RobotModel | null) =>
+  id === 4 ? model === "sniper" ? "NEEDLE" : model === "minigunner" ? "SPINDLE" : "BOLT"
+    : SQUAD_NAMES[id - 1];
 export type RangeBounds = {
   left: number;
   right: number;

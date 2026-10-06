@@ -8,6 +8,7 @@ import {
   GRENADE_COOLDOWN,
   GRENADE_FUSE,
   PISTOL,
+  MINIGUN,
   RIFLE,
   ROBOT_MODELS,
   STEP,
@@ -47,6 +48,8 @@ export interface Actor {
   grenadeCooldown: number;
   shotWait: number;
   firing: boolean;
+  spin: number;
+  spooling: boolean;
   braced: boolean;
   braceTime: number;
   path: Vec2[];
@@ -85,6 +88,7 @@ export type GameEvent =
       from: Vec3;
       to: Vec3;
       hit: boolean;
+      impact: boolean;
       material: "metal" | "concrete";
       normal: Vec3;
     }
@@ -112,6 +116,7 @@ export class Simulation {
   sniping = false;
   weapon: Weapon = "gun";
   range: RangeId;
+  fourthModel: RobotModel;
   arena?: ArenaCombat;
   time = 0;
   shots = 0;
@@ -127,20 +132,22 @@ export class Simulation {
   private randomState = 1729;
   private nextId = 100;
 
-  static async create(range: RangeId = "proving") {
+  static async create(range: RangeId = "proving", fourthModel: RobotModel = "sniper") {
     await RAPIER.init();
-    return new Simulation(range);
+    return new Simulation(range, fourthModel);
   }
-  private constructor(range: RangeId) {
+  private constructor(range: RangeId, fourthModel: RobotModel) {
     this.range = range;
+    this.fourthModel = fourthModel;
     this.reset();
   }
   get layout() {
     return RANGES[this.range];
   }
 
-  reset(range: RangeId = this.range) {
+  reset(range: RangeId = this.range, fourthModel: RobotModel = this.fourthModel) {
     this.range = range;
+    this.fourthModel = fourthModel;
     this.world?.free();
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
     this.world.timestep = STEP;
@@ -151,7 +158,7 @@ export class Simulation {
     this.selected = new Set(range === "arena" ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
     this.trigger = false;
     this.sniping = false;
-    this.weapon = range === "long" ? "rifle" : "gun";
+    this.weapon = range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
     this.aim =
       range === "long" ? { x: 58, y: 3.25, z: 0 }
         : range === "arena" ? { x: 0, y: 1.25, z: -14 }
@@ -234,7 +241,7 @@ export class Simulation {
     const robot = player || kind === "enemy";
     const model: RobotModel | null = robot
       ? enemyModel ?? (id === 4
-        ? "sniper"
+        ? this.fourthModel
         : "assault")
       : null;
     const yaw =
@@ -294,6 +301,8 @@ export class Simulation {
       grenadeCooldown: 0,
       shotWait: 0,
       firing: false,
+      spin: 0,
+      spooling: false,
       braced: false,
       braceTime: 0,
       path: [],
@@ -346,14 +355,22 @@ export class Simulation {
   supports(a: Actor, weapon: Weapon) {
     return !!a.model && (ROBOT_MODELS[a.model].weapons as readonly Weapon[]).includes(weapon);
   }
+  followsOrder(a: Actor, weapon: Weapon) {
+    return weapon === "gun" || weapon === "minigun"
+      ? this.supports(a, "gun") || this.supports(a, "minigun")
+      : this.supports(a, weapon);
+  }
   get closeWeapon(): Firearm {
-    if (this.weapon === "pistol" && this.canUse("pistol")) return "pistol";
-    return this.active.some((a) => a.model === "assault") ? "gun" : "pistol";
+    return this.weapon === "pistol" && this.canUse("pistol") ? "pistol" : this.closeWeapons[0] ?? "gun";
+  }
+  get closeWeapons(): Firearm[] {
+    return (["minigun", "gun", "pistol"] as const).filter((weapon) => this.canUse(weapon) &&
+      (weapon !== "gun" || !this.canUse("minigun")));
   }
   get nextCloseWeapon(): Firearm {
-    if (this.weapon === "gun" && this.canUse("pistol")) return "pistol";
-    if (this.weapon === "pistol" && this.canUse("gun")) return "gun";
-    return this.closeWeapon;
+    const close = this.closeWeapons;
+    const index = close.indexOf(this.weapon === "gun" && this.canUse("minigun") ? "minigun" : this.weapon as Firearm);
+    return close[(index + 1) % close.length] ?? "gun";
   }
   canUse(weapon: Weapon) {
     return this.active.some((a) => this.supports(a, weapon));
@@ -366,9 +383,14 @@ export class Simulation {
     this.weapon = weapon;
     if (weapon !== "grenade")
       for (const a of this.active)
-        if (this.supports(a, weapon)) a.weapon = weapon;
+        if (this.followsOrder(a, weapon))
+          a.weapon = weapon === "gun" || weapon === "minigun" ? ROBOT_MODELS[a.model!].weapon : weapon;
     this.trigger = false;
-    for (const a of this.squad) a.firing = false;
+    for (const a of this.squad) {
+      a.firing = false;
+      a.spin = 0;
+      a.spooling = false;
+    }
     return true;
   }
   private matchWeapon() {
@@ -419,6 +441,8 @@ export class Simulation {
     this.endSniping();
     for (const a of this.squad) {
       a.firing = false;
+      a.spin = 0;
+      a.spooling = false;
       a.braced = false;
       a.braceTime = 0;
     }
@@ -450,10 +474,12 @@ export class Simulation {
     this.sniping = false;
     this.trigger = false;
     stopCoverFire(this);
-    const operator = this.squad.find((a) => a.model === "sniper")!;
-    operator.braced = false;
-    operator.braceTime = 0;
-    operator.firing = false;
+    const operator = this.squad.find((a) => a.model === "sniper");
+    if (operator) {
+      operator.braced = false;
+      operator.braceTime = 0;
+      operator.firing = false;
+    }
   }
   private navigationBoxes(includeTargets = true) {
     return [
@@ -566,7 +592,8 @@ export class Simulation {
 
   reloadSelected() {
     for (const a of this.active) {
-      const weapon = this.weapon === "grenade" ? a.weapon : this.weapon;
+      if (this.weapon !== "grenade" && !this.followsOrder(a, this.weapon)) continue;
+      const weapon = this.weapon === "grenade" || this.weapon === "gun" || this.weapon === "minigun" ? a.weapon : this.weapon;
       if (this.supports(a, weapon)) this.reloadActor(a, weapon);
     }
   }
@@ -575,6 +602,7 @@ export class Simulation {
     if (state.reload > 0 || state.ammo === this.magazine(a, weapon) || a.dead) return;
     state.reload = this.reloadDuration(a, weapon);
     a.firing = false;
+    a.spooling = false;
     this.events.push({
       type: "reload",
       actor: a.id,
@@ -689,9 +717,12 @@ export class Simulation {
 
   shoot(a: Actor, weapon: Firearm = a.weapon) {
     const state = this.ammunition(a, weapon);
-    if (a.dead || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0) return;
+    if (a.dead || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0 || (weapon === "minigun" && a.spin < 1)) return;
     const covering = a.kind === "player" && this.sniping && !!a.cover;
-    if (!this.supports(a, weapon) || (a.kind === "player" && !covering && this.weapon !== weapon)) return;
+    const automaticOrder = (this.weapon === "gun" || this.weapon === "minigun") &&
+      (weapon === "gun" || weapon === "minigun");
+    if (!this.supports(a, weapon) || (a.kind === "player" && !covering &&
+      this.weapon !== weapon && !automaticOrder)) return;
     const spec = FIREARMS[weapon], rifle = weapon === "rifle", pistol = weapon === "pistol";
     const aim = this.actorAim(a);
     const from = this.muzzle(a, aim, weapon);
@@ -704,7 +735,7 @@ export class Simulation {
     const spread = (a.braced
       ? 0.005
       : 0.008 + a.recoil * 0.011 + (a.path.length ? 0.014 : 0))
-      + (a.kind === "enemy" ? 0.02 : pistol ? 0.007 : 0);
+      + (a.kind === "enemy" ? 0.02 : pistol ? 0.007 : weapon === "minigun" && !a.braced ? 0.01 : 0);
     const dir = rifle
       ? this.rifleDirection(a)
       : {
@@ -735,9 +766,9 @@ export class Simulation {
         target,
         spec.damage,
         {
-          x: dir.x * (rifle ? 180 : pistol ? 24 : 48),
+          x: dir.x * (rifle ? 180 : pistol ? 24 : weapon === "minigun" ? 36 : 48),
           y: dir.y * (rifle ? 24 : pistol ? 6 : 12),
-          z: dir.z * (rifle ? 180 : pistol ? 24 : 48),
+          z: dir.z * (rifle ? 180 : pistol ? 24 : weapon === "minigun" ? 36 : 48),
         },
         to,
         weapon,
@@ -767,7 +798,7 @@ export class Simulation {
       else this.shots++;
     }
     else if (this.arena) this.arena.enemyShots++;
-    const recoil = rifle ? (a.braced ? 12 : RIFLE.recoil) : a.braced ? 1 : pistol ? 8 : 5;
+    const recoil = rifle ? (a.braced ? 12 : RIFLE.recoil) : a.braced ? 1 : pistol || weapon === "minigun" ? 8 : 5;
     a.body.applyImpulse({ x: -dir.x * recoil, y: 0, z: -dir.z * recoil }, true);
     this.events.push({
       type: "shot",
@@ -776,6 +807,7 @@ export class Simulation {
       from,
       to,
       hit: hitOpponent,
+      impact: !!hit,
       material:
         target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
       normal: hit ? vcopy(hit.normal) : { x: 0, y: 1, z: 0 },
@@ -810,6 +842,8 @@ export class Simulation {
       if (a.kind === "enemy" && this.arena) this.arena.kills++;
       a.killedBy = source;
       a.firing = false;
+      a.spin = 0;
+      a.spooling = false;
       a.cover = undefined;
       a.path = [];
       // Hand the visible facing to physics before toppling. Living robots may
@@ -974,7 +1008,12 @@ export class Simulation {
       a.recoil = Math.max(0, a.recoil - STEP * 1.1);
       a.shotWait = Math.max(-STEP, a.shotWait - STEP);
       a.pistol.shotWait = Math.max(-STEP, a.pistol.shotWait - STEP);
-      if (a.dead) continue;
+      if (a.dead) {
+        a.spin = 0;
+        a.spooling = false;
+        a.firing = false;
+        continue;
+      }
       const velocity = a.body.linvel();
       a.braceTime =
         a.braced &&
@@ -989,7 +1028,7 @@ export class Simulation {
           this.maxDisplacement,
           distance2(a.body.translation(), a.spawn),
         );
-      for (const weapon of [a.model === "sniper" ? "rifle" : "gun", "pistol"] as const) {
+      for (const weapon of [a.model ? ROBOT_MODELS[a.model].weapon : "gun", "pistol"] as const) {
         const state = this.ammunition(a, weapon);
         if (state.reload > 0) {
           state.reload = Math.max(0, state.reload - STEP);
@@ -1003,10 +1042,17 @@ export class Simulation {
           (a.kind === "enemy"
             ? !!a.ai?.fire
             : a.cover && this.sniping ? a.cover.fire
-            : selected && this.trigger && this.weapon === a.weapon && this.supports(a, this.weapon)) &&
+            : selected && this.trigger && this.weapon !== "grenade" && this.followsOrder(a, this.weapon)) &&
           state.reload === 0;
-        a.firing = fire && state.ammo > 0;
-        if (fire && state.shotWait <= 0 && state.ammo > 0) {
+        a.spooling = a.weapon === "minigun" && fire && state.ammo > 0;
+        if (a.weapon === "minigun") {
+          const previousSpin = a.spin;
+          a.spin = clamp(a.spin + STEP * (a.spooling ? 1 / MINIGUN.windUp : -1 / MINIGUN.coast), 0, 1);
+          if (a.spin > 1 - 1e-8) a.spin = 1;
+          if (a.spin === 1 && previousSpin < 1) state.shotWait = Math.max(0, state.shotWait);
+        } else a.spin = 0;
+        a.firing = fire && state.ammo > 0 && (a.weapon !== "minigun" || a.spin === 1);
+        if (a.firing && state.shotWait <= 0) {
           this.shoot(a);
         }
         if (fire && state.ammo === 0) this.reloadActor(a);
@@ -1092,7 +1138,7 @@ export class Simulation {
     if (a.path.length && !a.braced) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
-      const speed = Math.min(a.firing ? 2.6 : 4.2, distance * 5);
+      const speed = Math.min(a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2, distance * 5);
       const forwardX = (target.x - p.x) / distance,
         forwardZ = (target.z - p.z) / distance;
       dx = forwardX * speed;
@@ -1217,7 +1263,7 @@ export class Simulation {
     const checks = {
       gun:
         plates.length > 0 &&
-        plates.every((a) => a.dead && a.killedBy === "gun"),
+        plates.every((a) => a.dead && (a.killedBy === "gun" || a.killedBy === "minigun")),
       impulse: this.maxDisplacement >= 2,
       grenade:
         blast.length > 0 &&
@@ -1242,6 +1288,7 @@ export class Simulation {
   inspect() {
     return {
       range: this.range,
+      fourthModel: this.fourthModel,
       arena: this.arena?.inspect() ?? null,
       aim: vcopy(this.aim),
       time: this.time,
@@ -1284,6 +1331,8 @@ export class Simulation {
         grenadeCooldown: a.grenadeCooldown,
         braced: a.braced,
         firing: a.firing,
+        spin: a.spin,
+        spooling: a.spooling,
         braceProgress: a.braceTime / RIFLE.settle,
         shotWait: Math.max(0, a.shotWait),
         position: vcopy(a.body.translation()),

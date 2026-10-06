@@ -14,7 +14,7 @@ The playable yard is approximately 44 × 32 metres, viewed through a panning, zo
 | 02 / Displacement | Two reinforced robot targets, one moving plate, crates | Can a stream of hits move a target without making it unreadable? |
 | 03 / Fragments    | Three targets in a concrete bay, loose props           | Can a thrown grenade exploit a route that direct fire cannot?    |
 
-Four squad members start across the apron. LATCH now starts at the grenade bay; NEEDLE carries a rifle and pistol and has no grenades. All lanes share one simulation, so units can cross between drills. Completion records persist until reset. There is no score pressure or limited ammunition reserve in this range.
+Four squad members start across the apron. LATCH starts at the grenade bay. Robot 4 can be NEEDLE, SPINDLE or BOLT; see the [fourth-slot and minigun design](minigun.md). Both automatic weapons count toward the plate drill. All lanes share one simulation, so units can cross between drills. Completion records persist until reset. There is no score pressure or limited ammunition reserve in this range.
 
 ## Initial tuning
 
