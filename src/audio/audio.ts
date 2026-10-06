@@ -6,7 +6,17 @@ import rifleNearUrl from "../../sounds/855602__qubodup__sniper-shot-from-wood-an
 import rifleFarUrl from "../../sounds/855606__qubodup__sniper-shot-in-field-1-m2010-enhanced-sniper-rifle-esr.flac?url";
 import rifleReloadUrl from "../../sounds/855601__qubodup__putting.flac?url";
 import pistolUrl from "../../sounds/854226__qubodup__m4a1-rifle-shot-5.wav?url";
-import { clamp, type Vec3 } from "../game/config";
+import minigunUpUrl from "../../sounds/minigun/spin-up.wav?url";
+import minigunMotorUrl from "../../sounds/minigun/motor-loop.wav?url";
+import minigunDownUrl from "../../sounds/minigun/spin-down.wav?url";
+import minigunStartUrl from "../../sounds/minigun/fire-start.wav?url";
+import minigunLoopUrl from "../../sounds/minigun/fire-loop.wav?url";
+import minigunTailUrl from "../../sounds/minigun/fire-tail.wav?url";
+import impact1Url from "../../sounds/minigun/impact-1.wav?url";
+import impact2Url from "../../sounds/minigun/impact-2.wav?url";
+import impact3Url from "../../sounds/minigun/impact-3.wav?url";
+import flybyUrl from "../../sounds/855248__qubodup__real-bullet-flyby-sound.flac?url";
+import { MINIGUN, clamp, type Vec3 } from "../game/config";
 import type { GameEvent, Simulation } from "../game/simulation";
 import { rifleMix } from "./spatial";
 
@@ -16,6 +26,8 @@ type Voice = {
   gain: GainNode;
   pan: StereoPannerNode;
 };
+type Layer = { sources: AudioBufferSourceNode[]; gain: GainNode; pan: StereoPannerNode };
+type RotaryVoice = { motor: Layer; phase: "up" | "down"; fire?: Layer; spin: number };
 
 export class RangeAudio {
   context?: AudioContext;
@@ -23,6 +35,8 @@ export class RangeAudio {
   private effects?: DynamicsCompressorNode;
   private buffers = new Map<string, AudioBuffer>();
   private voices = new Map<number, Voice>();
+  private rotary = new Map<number, RotaryVoice>();
+  private transients = new Set<AudioScheduledSourceNode>();
   private pending?: Promise<void>;
   private noise?: AudioBuffer;
   muted = false;
@@ -32,6 +46,9 @@ export class RangeAudio {
   private listener: Vec3 = { x: 0, y: 28, z: 35.5 };
   private lastRifle?: ReturnType<typeof rifleMix>;
   private pistolShots = 0;
+  private impactSerial = 0;
+  private nextImpact = 0;
+  private nextFlyby = 0;
 
   setListener(position: Vec3) {
     this.listener = { ...position };
@@ -67,6 +84,16 @@ export class RangeAudio {
         rifleFar: rifleFarUrl,
         rifleReload: rifleReloadUrl,
         pistol: pistolUrl,
+        minigunUp: minigunUpUrl,
+        minigunMotor: minigunMotorUrl,
+        minigunDown: minigunDownUrl,
+        minigunStart: minigunStartUrl,
+        minigunLoop: minigunLoopUrl,
+        minigunTail: minigunTailUrl,
+        impact1: impact1Url,
+        impact2: impact2Url,
+        impact3: impact3Url,
+        flyby: flybyUrl,
       }).map(async ([key, url]) => {
         const response = await fetch(url);
         if (!response.ok)
@@ -127,7 +154,9 @@ export class RangeAudio {
     source.buffer = buffer;
     source.playbackRate.value = rate;
     source.connect(amp);
+    this.transients.add(source);
     source.onended = () => {
+      this.transients.delete(source);
       source.disconnect();
       amp.disconnect();
       pan.disconnect();
@@ -137,9 +166,14 @@ export class RangeAudio {
 
   update(sim: Simulation, paused: boolean) {
     if (!this.ready || !this.context) return;
+    if (paused) {
+      this.stop();
+      return;
+    }
     const firing = paused
       ? []
       : sim.actors.filter((a) => a.firing && !a.dead && a.weapon === "gun" && !!a.model);
+    const automaticVoices = Math.max(1, firing.length + sim.actors.filter((a) => a.firing && !a.dead && a.weapon === "minigun").length);
     for (const id of this.voices.keys())
       if (!firing.some((a) => a.id === id))
         this.stopGun(
@@ -161,12 +195,82 @@ export class RangeAudio {
           0.05,
         );
         voice.gain.gain.setTargetAtTime(
-          0.42 / Math.sqrt(firing.length) * this.distanceGain(position),
+          0.42 / Math.sqrt(automaticVoices) * this.distanceGain(position),
           this.context.currentTime,
           0.02,
         );
       }
     }
+    const rotating = sim.actors.filter((a) => a.model && !a.dead && a.weapon === "minigun" && a.spin > 0);
+    const normalization = 1 / Math.sqrt(Math.max(1, firing.length + rotating.filter((a) => a.firing).length));
+    for (const [id, voice] of this.rotary) {
+      if (rotating.some((a) => a.id === id)) continue;
+      this.stopLayer(voice.motor);
+      if (voice.fire) this.stopLayer(voice.fire);
+      this.rotary.delete(id);
+    }
+    for (const a of rotating) {
+      const position = a.body.translation(), phase = a.spooling ? "up" : "down";
+      let voice = this.rotary.get(a.id);
+      const gain = this.distanceGain(position) * normalization;
+      if (!voice || voice.phase !== phase) {
+        if (voice) this.stopLayer(voice.motor);
+        const motor = this.startLayer(
+          phase === "up" ? "minigunUp" : "minigunDown",
+          phase === "up" ? "minigunMotor" : undefined,
+          position, 0.3 * gain,
+          phase === "up" ? a.spin * MINIGUN.windUp : (1 - a.spin) * MINIGUN.coast,
+        );
+        if (voice) { voice.motor = motor; voice.phase = phase; }
+        else { voice = { motor, phase, spin: a.spin }; this.rotary.set(a.id, voice); }
+      }
+      voice.spin = a.spin;
+      if (a.firing && !voice.fire)
+        voice.fire = this.startLayer("minigunStart", "minigunLoop", position, 0.55 * gain);
+      else if (!a.firing && voice.fire) {
+        this.stopLayer(voice.fire, 0.003);
+        voice.fire = undefined;
+        this.sample("minigunTail", position, 0.45 * gain);
+      }
+      this.moveLayer(voice.motor, position, 0.3 * gain);
+      if (voice.fire) this.moveLayer(voice.fire, position, 0.55 * gain);
+    }
+  }
+
+  private startLayer(attack: string, loop: string | undefined, position: Vec3, gain: number, offset = 0): Layer {
+    const ctx = this.context!, { amp, pan } = this.bus(position, gain);
+    const first = ctx.createBufferSource();
+    first.buffer = this.buffers.get(attack)!;
+    const skip = clamp(offset, 0, first.buffer.duration - 1 / first.buffer.sampleRate);
+    const sources = [first];
+    first.connect(amp);
+    first.start(ctx.currentTime, skip);
+    if (loop) {
+      const sustain = ctx.createBufferSource();
+      sustain.buffer = this.buffers.get(loop)!;
+      sustain.loop = true;
+      sustain.connect(amp);
+      sustain.start(ctx.currentTime + first.buffer.duration - skip);
+      sources.push(sustain);
+    }
+    for (const source of sources) source.onended = () => source.disconnect();
+    sources.at(-1)!.onended = () => {
+      sources.at(-1)!.disconnect();
+      amp.disconnect();
+      pan.disconnect();
+    };
+    return { sources, gain: amp, pan };
+  }
+  private moveLayer(layer: Layer, position: Vec3, gain: number) {
+    const now = this.context!.currentTime;
+    layer.gain.gain.setTargetAtTime(gain, now, 0.02);
+    layer.pan.pan.setTargetAtTime(clamp((position.x - this.listener.x) / 32, -0.8, 0.8), now, 0.04);
+  }
+  private stopLayer(layer: Layer, fade = 0.008) {
+    const now = this.context!.currentTime;
+    layer.gain.gain.cancelScheduledValues(now);
+    layer.gain.gain.setTargetAtTime(0, now, fade / 3);
+    for (const source of layer.sources) source.stop(now + fade);
   }
 
   private startGun(id: number, position: Vec3) {
@@ -184,7 +288,7 @@ export class RangeAudio {
     start.onended = () => start.disconnect();
     this.voices.set(id, { start, loop, gain: amp, pan });
   }
-  private stopGun(id: number, position: Vec3) {
+  private stopGun(id: number, position: Vec3, tail = true) {
     const voice = this.voices.get(id);
     if (!voice || !this.context) return;
     const now = this.context.currentTime;
@@ -198,10 +302,17 @@ export class RangeAudio {
       voice.pan.disconnect();
     };
     this.voices.delete(id);
-    this.sample("end", position, 0.23);
+    if (tail) this.sample("end", position, 0.23 * this.distanceGain(position));
   }
   stop() {
-    for (const id of this.voices.keys()) this.stopGun(id, { x: 0, y: 0, z: 0 });
+    for (const id of this.voices.keys()) this.stopGun(id, { x: 0, y: 0, z: 0 }, false);
+    for (const voice of this.rotary.values()) {
+      this.stopLayer(voice.motor);
+      if (voice.fire) this.stopLayer(voice.fire, 0.003);
+    }
+    this.rotary.clear();
+    for (const source of this.transients) source.stop();
+    this.transients.clear();
   }
   private distanceGain(position: Vec3) {
     const distance = Math.hypot(position.x - this.listener.x, position.y - this.listener.y, position.z - this.listener.z);
@@ -212,6 +323,15 @@ export class RangeAudio {
     if (!this.context || !this.noise) return;
     const ctx = this.context,
       now = ctx.currentTime;
+    // A dense volley should not create hundreds of overlapping collision voices.
+    if (now < this.nextImpact) return;
+    this.nextImpact = now + 0.025;
+    strength *= this.distanceGain(position);
+    if (metal) {
+      this.sample(`impact${1 + this.impactSerial++ % 3}`, position, 0.23 * strength,
+        0.92 + Math.random() * 0.16);
+      return;
+    }
     const { amp, pan } = this.bus(position, 0.12 * strength);
     const source = ctx.createBufferSource();
     source.buffer = this.noise;
@@ -224,7 +344,9 @@ export class RangeAudio {
     source.connect(filter);
     filter.connect(amp);
     source.start(now, Math.random() * 0.5, 0.12);
+    this.transients.add(source);
     source.onended = () => {
+      this.transients.delete(source);
       source.disconnect();
       filter.disconnect();
       amp.disconnect();
@@ -252,8 +374,10 @@ export class RangeAudio {
     amp.gain.exponentialRampToValueAtTime(0.0001, now + seconds);
     osc.connect(amp);
     osc.start();
+    this.transients.add(osc);
     osc.stop(now + seconds);
     osc.onended = () => {
+      this.transients.delete(osc);
       osc.disconnect();
       amp.disconnect();
       pan.disconnect();
@@ -275,8 +399,9 @@ export class RangeAudio {
         this.sample("pistol", e.from, 0.5 * this.distanceGain(e.from));
         this.pistolShots++;
       }
-      if (e.hit || Math.random() < 0.3)
+      if (e.impact)
         this.impact(e.to, e.material === "metal");
+      this.flyby(e.from, e.to);
     } else if (e.type === "explosion") {
       this.sample("blast", e.position, 0.95, 0.97 + Math.random() * 0.06);
       this.tone(e.position, 75, 0.25, 0.35, 34);
@@ -287,6 +412,18 @@ export class RangeAudio {
       else this.impact(e.position, true, 0.8);
     } else if (e.type === "down") this.tone(e.position, 155, 0.11, 0.28, 70);
   }
+  private flyby(from: Vec3, to: Vec3) {
+    if (!this.context || this.context.currentTime < this.nextFlyby) return;
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+    const t = clamp(((this.listener.x - from.x) * dx + (this.listener.y - from.y) * dy +
+      (this.listener.z - from.z) * dz) / (dx * dx + dy * dy + dz * dz || 1), 0, 1);
+    const nearest = { x: from.x + t * dx, y: from.y + t * dy, z: from.z + t * dz };
+    const distance = Math.hypot(nearest.x - this.listener.x, nearest.y - this.listener.y, nearest.z - this.listener.z);
+    // Hear a pass only along the actual unobstructed segment, away from its muzzle.
+    if (distance > 2.5 || t < 0.02 || Math.hypot(from.x - nearest.x, from.y - nearest.y, from.z - nearest.z) < 3) return;
+    this.nextFlyby = this.context.currentTime + 0.12;
+    this.sample("flyby", nearest, 0.13 * (1 - distance / 3));
+  }
   inspect() {
     return {
       ready: this.ready,
@@ -295,6 +432,9 @@ export class RangeAudio {
       context: this.context?.state,
       buffers: [...this.buffers.keys()],
       loops: this.voices.size,
+      miniguns: [...this.rotary].map(([actor, voice]) => ({ actor, phase: voice.phase, spin: voice.spin, firing: !!voice.fire })),
+      transients: this.transients.size,
+      impacts: this.impactSerial,
       rifle: this.lastRifle,
       pistolShots: this.pistolShots,
     };

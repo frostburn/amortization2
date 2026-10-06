@@ -4,6 +4,9 @@ import {
   SQUAD_NAMES,
   RIFLE,
   PISTOL,
+  MINIGUN,
+  ROBOT_MODELS,
+  squadName,
 } from "./game/config";
 import type { Simulation } from "./game/simulation";
 import type { RangeAudio } from "./audio/audio";
@@ -19,21 +22,25 @@ const grenadeIcon =
   '<svg viewBox="0 0 36 44" aria-hidden="true"><path d="M15 5h8v7c7 3 9 9 8 17-1 8-6 12-13 12S6 37 5 29s2-14 9-17z" fill="currentColor"/><path d="M23 5h6l3 18M12 18v18m7-20v22m6-19v16M7 23h22M7 30h22" fill="none" stroke="#152023" stroke-width="1.5"/></svg>';
 const rifleIcon =
   '<svg viewBox="0 0 100 36" aria-hidden="true"><path d="M4 15h19l8-5h27v4h39v3H59v6H39l-6 10h-7l3-14H4zM43 6h19v5H43zM46 24h9v9h-9z" fill="currentColor"/></svg>';
+const minigunIcon =
+  '<svg viewBox="0 0 100 36" aria-hidden="true"><path d="M9 11h35v17H9zM23 3h16v8H23zM43 9h10v22H43zM53 11h44v4H53zm0 7h44v4H53zm0 7h44v4H53zM67 8h5v25h-5zM85 8h5v25h-5z" fill="currentColor"/></svg>';
 const rangeOptions =
   '<option value="proving">PROVING GROUND</option><option value="long">LONG RANGE</option><option value="arena">ENDLESS ARENA</option>';
+const loadoutOptions =
+  '<option value="sniper">NEEDLE · SNIPER</option><option value="minigunner">SPINDLE · MINIGUNNER</option><option value="assault">BOLT · MACHINE GUNNER</option>';
 
 export function mountUI() {
   document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <header class="topbar">
       <div class="brand"><h1>AMORTIZATION <span>II</span></h1><p>FUTURES CONTRACT</p></div>
-      <div class="range-title"><select id="range-select" aria-label="Choose combat floor">${rangeOptions}</select></div>
+      <div class="range-title"><select id="range-select" aria-label="Choose combat floor">${rangeOptions}</select><label class="header-loadout">ROBOT 4 <select id="loadout-select" aria-label="Choose fourth robot; restarts combat floor" title="Changing robot 4 restarts the combat floor">${loadoutOptions}</select></label></div>
       <nav aria-label="Range controls"><button id="reset" title="Reset the range (Shift+R)">RESET RANGE</button><button id="sound" aria-pressed="false" title="Toggle sound">SOUND ON</button><button id="help" aria-label="Help and settings">?</button></nav>
     </header>
     <main id="field">
-      <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, shift-drag to select a group, right-drag to steer, Q for machine gun or NEEDLE pistol, G for assault grenades, E for sniper rifle. Space toggles braced first-person sniping with the rifle; move the mouse to aim horizontally and vertically. Select robots with 1 to 4, or the squad with 5."></canvas><div id="selection-box" aria-hidden="true" hidden></div><div id="scope-label" aria-label="First-person rifle status" hidden></div>
+      <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, shift-drag to select a group, right-drag to steer, Q for automatic weapons or NEEDLE pistol, G for assault grenades, E for sniper rifle. Space toggles braced first-person sniping with the rifle; move the mouse to aim horizontally and vertically. Select robots with 1 to 4, or the squad with 5."></canvas><div id="selection-box" aria-hidden="true" hidden></div><div id="scope-label" aria-label="First-person rifle status" hidden></div>
       <aside id="drills" class="drills panel" aria-label="Range drills">
         <div class="panel-heading">RANGE DRILLS <span id="drill-count">0 / 3</span></div>
-        <div class="drill" id="drill-gun"><span class="check"></span><div>Machine gun<span class="detail" id="gun-progress">Clear six orange plates · 0 / 6</span></div></div>
+        <div class="drill" id="drill-gun"><span class="check"></span><div>Automatic fire<span class="detail" id="gun-progress">Clear six orange plates · 0 / 6</span></div></div>
         <div class="drill" id="drill-impulse"><span class="check"></span><div>Displacement<span class="detail" id="impulse-progress">Push a heavy target 2 m · 0.0 m</span></div></div>
         <div class="drill" id="drill-grenade"><span class="check"></span><div>Thrown grenade<span class="detail" id="grenade-progress">Clear the covered bay · 0 / 3</span></div></div>
         <div class="drill" id="drill-rifle" hidden><span class="check"></span><div>Precision rifle<span class="detail" id="rifle-progress">Clear 30, 60 and 90 m targets · 0 / 3</span></div></div>
@@ -52,7 +59,7 @@ export function mountUI() {
       <div class="weapons" aria-label="Choose weapon"><button class="weapon selected" id="gun" aria-pressed="true"><span class="weapon-icon" id="close-icon">${gunIcon}</span><span class="weapon-name"><span id="close-name">MACHINE GUN</span><small id="close-status">Q · 14 ROUNDS / SEC</small></span><span class="ammo"><b id="ammo">90</b><span id="ammo-limit"> / 90</span></span><i id="reload-progress" class="reload-progress"></i></button><button class="weapon rifle" id="rifle" aria-pressed="false"><span class="weapon-icon">${rifleIcon}</span><span class="weapon-name">SNIPER RIFLE<small id="rifle-status">E · SPACE TO BRACE</small></span><span class="ammo"><b id="rifle-ammo">${RIFLE.magazine}</b><span> / ${RIFLE.magazine}</span></span><i id="rifle-reload-progress" class="reload-progress"></i></button><button class="weapon grenade" id="grenade" aria-pressed="false"><span class="weapon-icon">${grenadeIcon}</span><span class="weapon-name">GRENADE<small id="grenade-status">G · 2.4 SEC FUSE</small></span></button></div>
       <div class="quick-controls"><span><kbd>LMB</kbd> FIRE</span><span><kbd>RMB</kbd> <i id="move-action">MOVE</i></span><span><kbd>SPACE</kbd> <i id="brace-action">BRACE</i></span><span><kbd>R</kbd> RELOAD</span></div>
     </footer>
-    <dialog id="menu"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location">AMORTIZATION II</p><h2 id="menu-title">Proving ground</h2><p id="menu-intro">Test sustained fire, displacement, and grenades. Take NEEDLE to the long range, or fight endless AI squads in the arena. NEEDLE carries a rifle and pistol, with no grenades. Grenades and sniper shots can hit allies. Machine gun and pistol fire cannot.</p><label class="range-choice">COMBAT FLOOR <select id="menu-range" aria-label="Choose range before entering">${rangeOptions}</select></label><div class="brief-controls"><p><kbd>LMB</kbd><span>Hold to fire. Grenade clicks rotate through ready assault robots (${GRENADE_COOLDOWN} s each).</span></p><p><kbd>RMB</kbd><span>Drag to steer selected robots. Shift-click queues a move. In sniping, return to the overhead view.</span></p><p><kbd>⇧ + LMB</kbd><span>Drag a box to select a group. Shift-click toggles a robot.</span></p><p><kbd>1–4</kbd><span>Select a robot. <kbd>4</kbd> is NEEDLE. <kbd>5</kbd> selects the squad.</span></p><p><kbd>Q / E / G</kbd><span>Machine gun or NEEDLE pistol / sniper rifle / assault grenades. <kbd>R</kbd> reloads.</span></p><p><kbd>SPACE</kbd><span>Rifle: toggle braced first-person sniping; move the mouse to turn and aim in both axes; wheel adjusts the scope. The rest of the squad follows its movement orders and provides automatic cover fire. Space or Esc returns the cursor and releases automatic cover. Aim settles in ${RIFLE.settle} s. Machine gun and pistol: hold to brace.</span></p><p><kbd>WASD</kbd><span>Pan the overhead view. Wheel zooms. <kbd>F</kbd> centres the robot. <kbd>Esc</kbd> leaves sniping; press again to pause.</span></p></div><div class="settings"><label>Volume <input id="volume" type="range" min="0" max="100" value="60" aria-label="Master volume" /></label><label class="motion"><input id="motion" type="checkbox" /> Reduce motion</label></div><fieldset class="aim-settings"><legend>SNIPER AIM</legend><label><input id="invert-x" type="checkbox" /> Invert X axis</label><label><input id="invert-y" type="checkbox" /> Invert Y axis</label><p>Reverse horizontal and vertical mouse aiming independently.</p></fieldset><p class="audio-credit">Sound recordings: qubodup / Freesound · CC0<br/><a href="https://github.com/frostburn/amortization2" target="_blank" rel="noreferrer">Source, credits &amp; issue reports ↗</a></p><button id="resume" class="primary">ENTER RANGE <span>↗</span></button><p class="desktop-note">Keyboard and mouse recommended. Headphones welcome.</p></div></dialog>`;
+    <dialog id="menu"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location">AMORTIZATION II</p><h2 id="menu-title">Proving ground</h2><p id="menu-intro">Choose a fourth robot to join ANCHOR, ROOK and LATCH. Test sustained fire, displacement and grenades, or fight endless squads in the arena. Grenades and sniper shots can hit allies. Automatic weapons and pistol fire cannot.</p><label class="range-choice">COMBAT FLOOR <select id="menu-range" aria-label="Choose range before entering">${rangeOptions}</select></label><label class="range-choice loadout-choice">ROBOT 4 <select id="menu-loadout" aria-label="Choose fourth squad member">${loadoutOptions}</select></label><p id="loadout-description" class="loadout-description"></p><p class="loadout-note">Changing robot 4 restarts the combat floor.</p><div class="brief-controls"><p><kbd>LMB</kbd><span>Hold to fire. Grenade clicks rotate through ready assault robots (${GRENADE_COOLDOWN} s each).</span></p><p><kbd>RMB</kbd><span>Drag to steer selected robots. Shift-click queues a move. In sniping, return to the overhead view.</span></p><p><kbd>⇧ + LMB</kbd><span>Drag a box to select a group. Shift-click toggles a robot.</span></p><p><kbd>1–4</kbd><span>Select a robot. <kbd>4</kbd> is your chosen fourth member. <kbd>5</kbd> selects the squad.</span></p><p><kbd>Q / E / G</kbd><span>Automatic weapons or NEEDLE pistol / sniper rifle / assault grenades. Machine guns and minigun fire together when selected. Hold LMB through the minigun wind-up. <kbd>R</kbd> reloads.</span></p><p><kbd>SPACE</kbd><span>Rifle: toggle braced first-person sniping; move the mouse to turn and aim in both axes; wheel adjusts the scope. The rest of the squad follows its movement orders and provides automatic cover fire. Space or Esc returns the cursor and releases automatic cover. Aim settles in ${RIFLE.settle} s. Automatic weapons and pistol: hold to brace.</span></p><p><kbd>WASD</kbd><span>Pan the overhead view. Wheel zooms. <kbd>F</kbd> centres the robot. <kbd>Esc</kbd> leaves sniping; press again to pause.</span></p></div><div class="settings"><label>Volume <input id="volume" type="range" min="0" max="100" value="60" aria-label="Master volume" /></label><label class="motion"><input id="motion" type="checkbox" /> Reduce motion</label></div><fieldset class="aim-settings"><legend>SNIPER AIM</legend><label><input id="invert-x" type="checkbox" /> Invert X axis</label><label><input id="invert-y" type="checkbox" /> Invert Y axis</label><p>Reverse horizontal and vertical mouse aiming independently.</p></fieldset><p class="audio-credit">Sound recordings: qubodup / Freesound · CC0<br/><a href="https://github.com/frostburn/amortization2" target="_blank" rel="noreferrer">Source, credits &amp; issue reports ↗</a></p><button id="resume" class="primary">ENTER RANGE <span>↗</span></button><p class="desktop-note">Keyboard and mouse recommended. Headphones welcome.</p></div></dialog>`;
   return {
     canvas: document.querySelector<HTMLCanvasElement>("#range")!,
     dialog: document.querySelector<HTMLDialogElement>("#menu")!,
@@ -72,9 +79,8 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     sim.shots ? `${Math.round((sim.hits / sim.shots) * 100)}%` : "—",
   );
   const close = sim.closeWeapon;
-  const gunner = close === "pistol" ? sim.squad[3]
-      : sim.active.find((a) => a.model === "assault") ?? sim.squad[0],
-    rifle = sim.rifleOperator ?? sim.squad[3],
+  const gunner = sim.active.find((a) => sim.supports(a, close)) ?? sim.squad.find((a) => sim.supports(a, close)) ?? sim.squad[0],
+    rifle = sim.rifleOperator ?? sim.squad.find((a) => a.model === "sniper") ?? sim.squad[3],
     current = sim.weapon === "rifle" ? rifle : gunner,
     currentState = sim.ammunition(current, sim.weapon === "rifle" ? "rifle" : close),
     reloading = currentState.reload > 0;
@@ -82,18 +88,23 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
   const closeButton = document.getElementById("gun") as HTMLButtonElement;
   if (closeButton.dataset.weapon !== close) {
     closeButton.dataset.weapon = close;
-    document.getElementById("close-icon")!.innerHTML = close === "pistol" ? pistolIcon : gunIcon;
+    document.getElementById("close-icon")!.innerHTML = close === "pistol" ? pistolIcon : close === "minigun" ? minigunIcon : gunIcon;
   }
-  const mixedArms = sim.canUse("gun") && sim.canUse("pistol");
-  closeButton.setAttribute("aria-label", mixedArms ? `Cycle machine gun and pistol (Q); ${close === "pistol" ? "pistol" : "machine gun"} equipped`
-    : close === "pistol" ? "NEEDLE pistol (Q)" : "Assault machine gun (Q)");
-  text("close-name", close === "pistol" ? "PISTOL" : "MACHINE GUN");
+  const mixedArms = sim.closeWeapons.length > 1;
+  const closeName = close === "pistol" ? "PISTOL" : close === "minigun" ? "MINIGUN" : "MACHINE GUN";
+  const automaticGroup = sim.canUse("gun") && sim.canUse("minigun");
+  closeButton.setAttribute("aria-label", mixedArms ? `Cycle automatic weapon and pistol (Q); ${closeName.toLowerCase()} equipped`
+    : `${closeName} (Q)${automaticGroup ? "; selected machine gunners also fire" : ""}`);
+  text("close-name", closeName);
   text("close-status", closeState.reload > 0 ? `RELOAD · ${closeState.reload.toFixed(1)} s`
+    : close === "minigun" ? gunner.spooling && gunner.spin < 1 ? `SPIN-UP · ${Math.round(gunner.spin * 100)}%`
+      : gunner.firing ? "30 ROUNDS / SEC" : gunner.spin > 0 ? `COASTING · ${Math.round(gunner.spin * 100)}%`
+      : automaticGroup ? "Q · GROUP AUTOMATIC FIRE" : "Q · HOLD LMB TO SPIN UP"
     : mixedArms ? `Q · SWITCH TO ${close === "pistol" ? "MACHINE GUN" : "PISTOL"}`
     : close === "pistol" ? `Q · ${PISTOL.range} m · NEEDLE ONLY` : "Q · 14 ROUNDS / SEC");
   text("ammo", closeState.ammo);
   text("ammo-limit", ` / ${sim.magazine(gunner, close)}`);
-  text("rifle-ammo", rifle.ammo);
+  text("rifle-ammo", rifle.model === "sniper" ? rifle.ammo : "—");
   for (const [key, a, weapon, progress] of [
     ["gun", gunner, close, "reload-progress"],
     ["rifle", rifle, "rifle", "rifle-reload-progress"],
@@ -138,6 +149,8 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
     document.getElementById(`drill-${key}`)!.hidden = long;
   document.getElementById("drill-rifle")!.hidden = !long;
   document.getElementById("sight-controls")!.hidden = !long;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-sight]"))
+    button.disabled = sim.fourthModel !== "sniper" || sim.squad[3].dead;
   text(
     "rifle-progress",
     sim.actors.some(
@@ -149,16 +162,24 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
   text(
     "range-note",
     long
-      ? "Sight a target, then press Space for braced first-person sniping. Mouse aims in both axes; LMB fires."
+      ? sim.fourthModel === "sniper" ? "Sight a target, then press Space for braced first-person sniping. Mouse aims in both axes; LMB fires."
+        : "Choose NEEDLE as robot 4 for the precision rifle drill."
       : "Unlimited range supplies. Reset to go again.",
   );
   for (const id of ["range-select", "menu-range"])
     (document.getElementById(id) as HTMLSelectElement).value = sim.range;
+  for (const id of ["loadout-select", "menu-loadout"])
+    (document.getElementById(id) as HTMLSelectElement).value = sim.fourthModel;
+  text("loadout-description", sim.fourthModel === "sniper"
+    ? "NEEDLE · 64 integrity. Long-range rifle and pistol. Space toggles braced sniping. No grenades."
+    : sim.fourthModel === "minigunner"
+      ? `SPINDLE · 200 integrity. Heavy, slower chassis. ${MINIGUN.windUp} s wind-up, 30 rounds/s, 240-round belt. Hold Space to brace. No grenades.`
+      : "BOLT · 160 integrity. Machine gun and grenades. Same speed and loadout as the other assault robots.");
   text(
     "gun-progress",
-    sim.actors.some((a) => a.kind === "plate" && a.dead && a.killedBy !== "gun")
+    sim.actors.some((a) => a.kind === "plate" && a.dead && a.killedBy !== "gun" && a.killedBy !== "minigun")
       ? "Reset to restore gun targets"
-      : `Clear six orange plates · ${sim.actors.filter((a) => a.kind === "plate" && a.dead && a.killedBy === "gun").length} / 6`,
+      : `Clear six orange plates · ${sim.actors.filter((a) => a.kind === "plate" && a.dead && (a.killedBy === "gun" || a.killedBy === "minigun")).length} / 6`,
   );
   text(
     "impulse-progress",
@@ -189,16 +210,21 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
       `${(actor.hp / actor.maxHp) * 100}%`;
     button.classList.toggle("braced", actor.braced);
     const role = button.querySelector<HTMLElement>(".unit-role")!;
-    role.hidden = !actor.cover && actor.model !== "sniper";
-    role.textContent = actor.cover ? "COVER" : "SNIPER";
-    button.title = `${SQUAD_NAMES[id - 1]} · ${actor.model === "sniper" ? "LIGHT SNIPER" : "ASSAULT"} · ${Math.ceil(actor.hp)} / ${actor.maxHp} INTEGRITY${actor.cover ? " · AUTOMATIC COVER FIRE · MOVEMENT ORDERS ACTIVE" : ""}`;
+    role.hidden = !actor.cover && actor.model === "assault";
+    role.textContent = actor.cover ? "COVER" : actor.model === "minigunner" ? actor.spooling && actor.spin < 1 ? "WIND-UP" : actor.firing ? "FIRING" : "MINIGUN" : "SNIPER";
+    button.classList.toggle("sniper-unit", actor.model === "sniper");
+    button.classList.toggle("minigunner-unit", actor.model === "minigunner");
+    const name = squadName(id, actor.model);
+    button.querySelector<HTMLElement>(".unit-name")!.textContent = name;
+    button.setAttribute("aria-label", `Select ${name}, robot ${id}, ${ROBOT_MODELS[actor.model!].name}, ${Math.ceil(actor.hp)} integrity`);
+    button.title = `${name} · ${ROBOT_MODELS[actor.model!].name} · ${Math.ceil(actor.hp)} / ${actor.maxHp} INTEGRITY${actor.cover ? " · AUTOMATIC COVER FIRE · MOVEMENT ORDERS ACTIVE" : ""}`;
   }
   document
     .getElementById("all")!
     .classList.toggle("selected", sim.selected.size === sim.squad.length);
   for (const key of ["gun", "rifle", "grenade"] as const) {
     const weapon = key === "gun" ? close : key;
-    const selected = sim.weapon === weapon;
+    const selected = sim.weapon === weapon || key === "gun" && (sim.weapon === "gun" || sim.weapon === "minigun") && close !== "pistol";
     const el = document.getElementById(key)!;
     el.classList.toggle("selected", selected);
     el.setAttribute("aria-pressed", String(selected));
@@ -224,7 +250,7 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
   text(
     "grenade-status",
     thrower
-      ? `G · ${SQUAD_NAMES[thrower.id - 1]} READY`
+      ? `G · ${squadName(thrower.id, thrower.model)} READY`
       : sim.active.length
         ? `G · READY IN ${grenadeWait} s`
         : "NO GRENADE CARRIER",
@@ -252,7 +278,7 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
       ? "UNIT DISABLED · SELECT ANOTHER ROBOT OR RESET"
       : sim.weapon === "grenade"
         ? thrower
-          ? `GRENADE · ${SQUAD_NAMES[thrower.id - 1]} NEXT · ${GRENADE_FUSE} s FUSE · ${GRENADE_COOLDOWN} s COOLDOWN`
+          ? `GRENADE · ${squadName(thrower.id, thrower.model)} NEXT · ${GRENADE_FUSE} s FUSE · ${GRENADE_COOLDOWN} s COOLDOWN`
           : `GRENADES REARMING · READY IN ${grenadeWait} s`
         : sim.weapon === "rifle"
           ? !sim.rifleOperator
@@ -266,8 +292,10 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
                 : "UNBRACED · HEAVY RECOIL · SPACE TO SNIPE"
           : reloading
             ? "RELOADING · KEEP MOVING"
+            : close === "minigun" && gunner.spooling && gunner.spin < 1
+              ? `MINIGUN WIND-UP · ${Math.round(gunner.spin * 100)}% · KEEP HOLDING LMB`
             : sim.active.some((a) => a.braced)
               ? `BRACED${gunHeight} · RELEASE SPACE TO MOVE`
-              : `${sim.weapon === "pistol" ? "PISTOL" : "MACHINE GUN"}${gunHeight} · HOLD LMB TO FIRE`,
+              : `${closeName}${gunHeight} · ${automaticGroup ? "LMB FIRES SELECTED AUTOMATIC WEAPONS" : "HOLD LMB TO FIRE"}`,
   );
 }

@@ -1,4 +1,4 @@
-import { PISTOL, RIFLE, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
+import { PISTOL, RIFLE, ROBOT_MODELS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
 import { ARENA_ENTRIES } from "./ranges";
 import { segmentClear } from "./navigation";
 import type { Actor, Simulation } from "./simulation";
@@ -67,7 +67,7 @@ export class ArenaCombat {
       sim.trigger = false;
       for (const a of living) {
         a.hp = a.maxHp;
-        a.ammo = sim.magazine(a, a.model === "sniper" ? "rifle" : "gun");
+        a.ammo = sim.magazine(a, a.model ? ROBOT_MODELS[a.model].weapon : "gun");
         a.pistol.ammo = a.model === "sniper" ? PISTOL.magazine : 0;
         a.reload = a.pistol.reload = a.grenadeCooldown = a.recoil = 0;
         a.stability = 1;

@@ -7,6 +7,7 @@ import {
   type Vec2,
   type Vec3,
   type Weapon,
+  type RobotModel,
 } from "./game/config";
 import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
@@ -19,7 +20,12 @@ async function start() {
     import("./game/simulation"),
     import("./render/scene"),
   ]);
-  const sim = await Simulation.create();
+  let fourthModel: RobotModel = "sniper";
+  try {
+    const saved = JSON.parse(localStorage.getItem("amortization2.settings.v1") ?? "{}");
+    if (["sniper", "minigunner", "assault"].includes(saved.fourthModel)) fourthModel = saved.fourthModel;
+  } catch { /* Optional local preferences. */ }
+  const sim = await Simulation.create("proving", fourthModel);
   const scene = await RangeScene.create(canvas, sim);
   let paused = true,
     entered = false,
@@ -60,6 +66,7 @@ async function start() {
           reducedMotion: scene.reducedMotion,
           invertX: scene.scope.invertX,
           invertY: scene.scope.invertY,
+          fourthModel: sim.fourthModel,
         }),
       );
     } catch {
@@ -161,7 +168,8 @@ async function start() {
           : weapon === "pistol"
             ? "Select NEEDLE (4) to use its pistol."
             : weapon === "grenade"
-              ? "Assault robots carry grenades. NEEDLE does not."
+              ? "Assault robots carry grenades. Specialists do not."
+              : weapon === "minigun" ? "Choose SPINDLE as robot 4 to use the minigun."
               : "Select an assault robot to use the machine gun.",
       );
       return;
@@ -198,6 +206,24 @@ async function start() {
       .addEventListener("change", (e) =>
         switchRange((e.target as HTMLSelectElement).value as RangeId),
       );
+  for (const id of ["loadout-select", "menu-loadout"])
+    document.getElementById(id)!.addEventListener("change", (e) => {
+      const model = (e.target as HTMLSelectElement).value as RobotModel;
+      if (!["sniper", "minigunner", "assault"].includes(model) || model === sim.fourthModel) return;
+      exitSniping();
+      cancelDrags();
+      keys.clear();
+      audio.stop();
+      sim.reset(sim.range, model);
+      scene.resetDynamic();
+      scene.resetCamera();
+      pointer.inside = false;
+      accumulator = 0;
+      updateUI(sim, audio);
+      saveSettings();
+      toast("Squad changed. Combat floor restarted.");
+      if (!paused) canvas.focus();
+    });
   for (const button of document.querySelectorAll<HTMLButtonElement>(
     "[data-sight]",
   ))
@@ -205,7 +231,7 @@ async function start() {
       const target = sim.actors.filter((a) => a.kind === "precision")[
         Number(button.dataset.sight) / 30 - 1
       ];
-      if (!target || sim.squad[3].dead) return;
+      if (!target || sim.squad[3].dead || sim.fourthModel !== "sniper") return;
       const wasSniping = sim.sniping;
       sim.select(4);
       sim.chooseWeapon("rifle");
