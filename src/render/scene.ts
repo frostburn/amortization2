@@ -707,14 +707,19 @@ export class RangeScene {
   private configureRangeLighting() {
     const long = this.sim.range === "long";
     this.scene.fog = new THREE.Fog(0x242d30, 240, 340);
-    this.sun.position.set(long ? 10 : -18, long ? 70 : 38, long ? 30 : 15);
-    this.sun.target.position.set(long ? 45 : 0, 0, 0);
+    const district = this.sim.city?.district;
+    const centerX = district ? (district.bounds.left + district.bounds.right) / 2 : 0;
+    const centerZ = district ? (district.bounds.back + district.bounds.front) / 2 : 0;
+    this.sun.position.set(long ? 10 : centerX - 18, long ? 70 : 38, long ? 30 : centerZ + 15);
+    this.sun.target.position.set(long ? 45 : centerX, 0, centerZ);
     const camera = this.sun.shadow.camera;
-    camera.left = -(this.sim.range === "city" ? 110 : long ? 90 : this.sim.range === "arena" ? 76 : 46);
-    camera.right = this.sim.range === "city" ? 110 : long ? 90 : this.sim.range === "arena" ? 76 : 46;
-    camera.top = this.sim.range === "city" ? 95 : long ? 70 : this.sim.range === "arena" ? 60 : 40;
+    const cityExtent = district ? Math.hypot(district.ground.right - district.ground.left,
+      district.ground.front - district.ground.back) / 2 : 0;
+    camera.left = -(district ? cityExtent : long ? 90 : this.sim.range === "arena" ? 76 : 46);
+    camera.right = -camera.left;
+    camera.top = district ? cityExtent : long ? 70 : this.sim.range === "arena" ? 60 : 40;
     camera.bottom = -camera.top;
-    camera.far = 230;
+    camera.far = district ? cityExtent * 2 + 80 : 230;
     // The city shadow frustum covers much more ground per texel; offset the
     // receiver enough to avoid self-shadow speckling on broad building walls.
     this.sun.shadow.normalBias = this.sim.range === "city" ? 0.1 : 0.035;

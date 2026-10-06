@@ -18,6 +18,7 @@ import impact3Url from "../../sounds/minigun/impact-3.wav?url";
 import flybyUrl from "../../sounds/855248__qubodup__real-bullet-flyby-sound.flac?url";
 import { MINIGUN, clamp, type Vec2, type Vec3 } from "../game/config";
 import type { GameEvent, Simulation } from "../game/simulation";
+import { CIVILIAN_CHASSIS } from "../game/civilians";
 import { rifleMix, spatialPan } from "./spatial";
 
 type Voice = {
@@ -271,7 +272,8 @@ export class RangeAudio {
         voice = { sources, gain: amp, pan, filter }; this.cartMotors.set(c.id, voice);
         sources[1].onended = () => { sources.forEach(s => s.disconnect()); harmonic.disconnect(); filter.disconnect(); amp.disconnect(); pan.disconnect(); };
       }
-      const frequency = 150 + speed * 90 + (c.id % 7) * 5;
+      const pitch = CIVILIAN_CHASSIS[c.model].motorPitch;
+      const frequency = (150 + speed * 90 + (c.id % 7) * 5) * pitch;
       voice.sources[0].frequency.setTargetAtTime(frequency, ctx.currentTime, 0.15);
       voice.sources[1].frequency.setTargetAtTime(frequency * 4.03, ctx.currentTime, 0.15);
       voice.gain.gain.setTargetAtTime(0.025 * this.civilianVolume * Math.min(1, speed) * this.distanceGain(position), ctx.currentTime, 0.09);

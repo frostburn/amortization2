@@ -9,7 +9,7 @@ These are fictional products. Use several engineering references per category an
 | Model | Physical design | Everyday behavior | Disturbance response |
 | --- | --- | --- | --- |
 | CART | Knee-high six-wheeler, insulated cargo tub, corner cameras, flexible visibility mast, opening lid. | Restaurant pickup, pedestrian crossings, customer collection, charging. | Brakes, reroutes or awaits assistance. Bullet pressure and blasts can launch the light chassis; tipped units remain stranded. Cargo remains secured. |
-| CRATE | Larger six-wheel parcel cabinet with separately opening compartments. | Multiple apartment and locker stops. | Slow withdrawal; a failed wheel may strand it on the pavement. |
+| CRATE | Larger six-wheel parcel cabinet with three separately opening compartments, a low battery base and a camera strip. | Apartment, civic-building and depot stops; turns the cabinet toward collection and opens one compartment per visit. | Cancels collection and withdraws slowly. Its heavier hull takes less displacement than CART; tipped units remain stranded. |
 | KITE | Parcel multicopter, conspicuous rotors, skids and cargo cradle or lowering tether. | Depot-to-pad flights, brief hover, delivery, departure. | Aborts and leaves by a clear route. Damaged units lose stability or land hard. |
 | MICA | Compact budget biped, broad feet, exposed joint housings, modest grippers, small sensor head. | Shopping, shelf replenishment, bin handling, errands through stair-equipped buildings. | Sets down awkward loads, seeks shelter; getting up takes effort. |
 | PORTER | Full-height working biped with substantial hips, industrial hands and visible battery pack. | Tote handling, van unloading, equipment transport. | Stabilizes its load before withdrawing; can retrieve a lightweight disabled unit. |
@@ -40,4 +40,4 @@ These establish engineering categories, not predictions about 2040 capabilities:
 - [Ascento](https://www.ascento.ai/): outdoor patrol machines on articulated wheel legs.
 - [Wing delivery terms](https://wing.com/terms-global): hovering aircraft and tether delivery.
 
-The first playable civilian model is CART. Other cast members remain design work.
+CART and CRATE are playable in the city district. CRATE uses a 1.12 × 1.34 m chassis, 1.26 m high, with 115 kg mass, 80 integrity and a 1.2 m/s cruise. Nearby combat cancels collection, closes the compartment and reduces its withdrawal speed to 0.85 m/s. Its motor pitch is lower than CART's, within the same quiet civilian mix. The remaining cast members are design work.

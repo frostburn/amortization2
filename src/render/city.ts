@@ -1,7 +1,8 @@
 import * as THREE from "three";
-import { BUILDING_KIT, buildingSolid, type BuildingSpec, type CityDistrict } from "../game/city";
+import { BUILDING_KIT, type BuildingSpec, type CityDistrict } from "../game/city";
 import type { Simulation } from "../game/simulation";
 import { batchRigid, block, panel, surface, tube } from "./primitives";
+import { WaterView } from "./water";
 
 type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
   bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
@@ -52,13 +53,18 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
   const windows: Opening[] = [];
   const sideWindows: Opening[] = [];
   for (let f = 0; f < kit.floors; f++) {
-    for (const x of [-7.5, -3.75, 0, 3.75, 7.5]) windows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
+    for (const x of [-7.5, -3.75, 0, 3.75, 7.5].filter(x => Math.abs(x) + 1.18 < w / 2))
+      windows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
     for (const x of [-d / 4, d / 4]) sideWindows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
   }
   const shop = spec.prefab === "shop";
   const frontWindows = windows.filter(o => o.y !== 2 || (!shop && o.x !== 0));
   frontWindows.push({ x: 0, y: 1.5, w: 2.5, h: 3 });
   if (shop) for (const x of [-5.5, 5.5]) frontWindows.push({ x, y: 1.625, w: 6.7, h: 2.85 });
+  if (spec.prefab === "depot") {
+    frontWindows.length = 0;
+    for (const x of [-5.5, 5.5]) frontWindows.push({ x, y: 2.1, w: 6.2, h: 4.2 });
+  }
   for (const side of [-1, 1]) {
     const face = facade(w, h, side === 1 ? frontWindows : windows, wall, frame, glass);
     face.position.z = side * front; face.rotation.y = side === 1 ? 0 : Math.PI; root.add(face);
@@ -81,10 +87,31 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
         block(root, 5.5, 0.09, 0.1, x, shelf, front + 0.145, accent);
     }
   }
-  for (const x of [-5, 5]) {
-    block(root, 2.2, 0.9, 1.7, x, h + 0.9, -1.2, frame);
-    block(root, 1.9, 0.12, 1.4, x, h + 1.42, -1.2, roof);
-    for (let i = -3; i <= 3; i++) block(root, 1.8, 0.08, 0.07, x, h + 1.49, -1.2 + i * 0.16, trim);
+  if (spec.prefab === "depot") {
+    block(root, w - 0.6, 0.5, 0.2, 0, 4.85, front + 0.12, accent);
+    for (const x of [-5.5, 5.5]) for (let y = 0.6; y < 4.2; y += 0.6)
+      block(root, 5.9, 0.055, 0.03, x, y, front + 0.065, frame);
+    for (const z of [-5.5, 0, 5.5]) {
+      const rooflight = block(root, w - 1, 0.14, 2, 0, h + 0.65, z, glass);
+      rooflight.rotation.x = 0.22;
+    }
+  } else if (spec.prefab === "civic") {
+    block(root, 11.5, 0.3, 2.2, 0, 3.55, front + 0.75, accent);
+    for (const x of [-10.2, 10.2]) block(root, 0.55, h - 0.4, 0.28, x, (h - 0.4) / 2, front + 0.14, trim);
+    const clock = tube(root, 0.75, 0.08, 0, 7.85, front + 0.12, trim, 24); clock.rotation.x = Math.PI / 2;
+    block(root, 0.08, 0.48, 0.025, 0, 8.02, front + 0.17, frame);
+    block(root, 0.42, 0.08, 0.025, 0.16, 7.85, front + 0.17, frame);
+  } else if (spec.prefab === "pump") {
+    tube(root, 0.32, h + 1.8, -4.9, (h + 1.8) / 2, -4.7, frame, 12);
+    tube(root, 0.48, 0.15, -4.9, h + 1.8, -4.7, accent, 12);
+    const pipe = tube(root, 0.16, 5.5, -4.9, 0.7, 0, accent); pipe.rotation.x = Math.PI / 2;
+    block(root, 1.6, 0.7, 0.18, -3.8, 1.6, front + 0.1, frame);
+  }
+  const serviceZ = spec.prefab === "depot" ? -7.5 : -1.2;
+  for (const x of [-w * 0.227, w * 0.227]) {
+    block(root, 2.2, 0.9, 1.7, x, h + 0.9, serviceZ, frame);
+    block(root, 1.9, 0.12, 1.4, x, h + 1.42, serviceZ, roof);
+    for (let i = -3; i <= 3; i++) block(root, 1.8, 0.08, 0.07, x, h + 1.49, serviceZ + i * 0.16, trim);
   }
   batchRigid(root);
   let shutter: THREE.Mesh | undefined;
@@ -94,16 +121,15 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
     shutter.visible = false;
   }
   root.position.set(spec.x, 0, spec.z); root.rotation.y = spec.turn * Math.PI / 2;
-  const solid = buildingSolid(spec);
   return { spec, root, materials, shutter, opacity: 1, closed: 0,
-    bounds: new THREE.Box3(new THREE.Vector3(solid.x - solid.w / 2, 0, solid.z - solid.d / 2),
-      new THREE.Vector3(solid.x + solid.w / 2, solid.h + 1.5, solid.z + solid.d / 2)) };
+    bounds: new THREE.Box3().setFromObject(root) };
 }
 
 export class CityView {
   root = new THREE.Group();
   private buildings: BuildingView[];
   private signals: { mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>; axis: number }[] = [];
+  private water: WaterView[];
   private ray = new THREE.Ray();
   private intersection = new THREE.Vector3();
   constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true) {
@@ -111,7 +137,11 @@ export class CityView {
     paving.map = texture;
     const white = surface(0xd3cdbc), yellow = surface(0xb7a166), dark = surface(0x344347, 0.4);
     const leaf = surface(0x566f53), earth = surface(0x737767);
-    block(ground, 190, 0.16, 170, 0, -0.1, -6, earth);
+    const extent = district.ground;
+    block(ground, extent.right - extent.left, 0.16, extent.front - extent.back,
+      (extent.left + extent.right) / 2, -0.1, (extent.back + extent.front) / 2, earth);
+    // Broad civic forecourts and the quay use the same reusable paving palette.
+    for (const plaza of district.plazas) block(ground, plaza.w, 0.025, plaza.d, plaza.x, 0.018, plaza.z, paving);
     // Road/sidewalk segments and intersections are authored district data.
     for (const street of district.streets) {
       const alongX = street.axis === "x", offset = (street.width + street.sidewalk) / 2;
@@ -158,6 +188,8 @@ export class CityView {
       }
     }
     batchRigid(ground); this.root.add(ground);
+    this.water = district.water.map(spec => new WaterView(spec));
+    this.water.forEach(w => this.root.add(w.root));
     const background = new THREE.Group(), shared = new Map<string, THREE.MeshStandardMaterial>();
     this.buildings = [];
     for (const spec of district.buildings) {
@@ -170,6 +202,7 @@ export class CityView {
 
   update(sim: Simulation, camera: THREE.Camera, delta: number) {
     if (!sim.city) return;
+    this.water.forEach(w => w.update(sim.time));
     for (const signal of this.signals) signal.mesh.material.color.setHex(signal.axis === sim.city.crossing ? 0x87d5b5 : 0xb78159);
     for (const b of this.buildings) {
       const obscures = !sim.sniping && !b.spec.backdrop && sim.active.some(a => {
