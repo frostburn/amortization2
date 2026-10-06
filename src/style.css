@@ -410,6 +410,13 @@ button:disabled {
 .unit.braced {
   border-color: var(--amber);
 }
+.unit.staggered {
+  border-color: #ffd28a;
+  background: #382c22;
+}
+.unit.staggered .unit-role {
+  color: #ffd28a;
+}
 .disabled-unit {
   opacity: 0.45;
 }

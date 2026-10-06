@@ -41,6 +41,12 @@ export function updateCoverFire(sim: Simulation) {
     const brain = a.cover;
     if (!brain || a.dead) continue;
     brain.fire = false;
+    if (sim.isDisrupted(a)) {
+      brain.state = "suppressed";
+      brain.burstUntil = 0;
+      continue;
+    }
+    if (brain.state === "suppressed") brain.nextThink = sim.time;
     if (sim.time >= brain.nextThink) {
       brain.nextThink = sim.time + 0.15;
       const p = a.body.translation();
@@ -78,8 +84,8 @@ export function updateCoverFire(sim: Simulation) {
     }
     const ammo = sim.ammunition(a);
     if (ammo.ammo === 0) sim.reloadActor(a);
-    if (ammo.reload > 0 || sim.isDisrupted(a)) {
-      brain.state = ammo.reload > 0 ? "reloading" : "suppressed";
+    if (ammo.reload > 0) {
+      brain.state = "reloading";
       brain.burstUntil = 0;
       brain.nextAttack = Math.max(brain.nextAttack, sim.time + 0.4);
       continue;

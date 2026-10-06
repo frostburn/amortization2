@@ -70,6 +70,12 @@ export const KINETIC = {
   maxSpeed: 7,
   minigunMaxSpeed: 11,
 };
+export const STAGGER = {
+  duration: { gun: 0.18, minigun: 0.2, pistol: 0.22, rifle: 0.4, grenade: 0.65 },
+  bracedRecovery: 2.5,
+  grace: 0.12,
+};
+export const ENEMY_BRACE_WAVE = 3;
 export const FRIENDLY_FIRE = {
   gun: false, pistol: false, minigun: false, rifle: true, grenade: true,
 } as const;

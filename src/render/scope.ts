@@ -134,7 +134,8 @@ export class SniperView {
     this.camera.updateProjectionMatrix();
     this.orient(sim);
     this.material.uniforms.aspect.value = this.camera.aspect;
-    const ready = operator.braceTime >= RIFLE.settle && operator.reload === 0;
+    const staggered = sim.isDisrupted(operator);
+    const ready = !staggered && operator.braceTime >= RIFLE.settle && operator.reload === 0;
     this.material.uniforms.ink.value.setHex(ready ? 0x9be6cd : 0xd3a24f);
     this.label.dataset.state = ready ? "ready" : "unsteady";
     const heightDifference = sim.aim.y - this.camera.position.y;
@@ -142,7 +143,7 @@ export class SniperView {
       new THREE.Vector3().copy(sim.aim),
     );
     const covering = sim.squad.filter((a) => !a.dead && a.cover).length;
-    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"} · ${covering} COVERING${captured ? "" : " · CLICK TO CAPTURE"}`;
+    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${staggered ? "STAGGER" : operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"} · ${covering} COVERING${captured ? "" : " · CLICK TO CAPTURE"}`;
 
     const visibility = hiddenObjects.map((o) => o.visible);
     hiddenObjects.forEach((o) => (o.visible = false));

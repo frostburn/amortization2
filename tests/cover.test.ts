@@ -168,7 +168,7 @@ describe("friendly fire and sniper support", () => {
     expect(gunner.path).toHaveLength(0);
   });
 
-  test("support keeps returning fire through repeated bullet pressure", () => {
+  test("support pauses for staggers and returns fire between repeated bullet hits", () => {
     const gunner = sim.squad[0];
     gunner.body.setTranslation({ x: -7, y: 0.98, z: 10 }, true);
     const enemy = sim.addEnemy("assault", { x: -7, z: -10 });
@@ -177,12 +177,21 @@ describe("friendly fire and sniper support", () => {
     sim.select(4);
     sim.chooseWeapon("rifle");
     sim.toggleSniping();
+    let staggeredFrames = 0, firingFrames = 0;
     for (let i = 0; i < 2 / STEP; i++) {
       if (i % 4 === 0)
         sim.damage(gunner, 1, { x: 0, y: 0, z: 108 }, gunner.body.translation(), "gun");
       sim.step();
+      if (sim.isDisrupted(gunner)) {
+        staggeredFrames++;
+        expect(gunner.firing).toBe(false);
+        expect(gunner.cover?.fire).toBe(false);
+      }
+      if (gunner.firing) firingFrames++;
     }
     expect(sim.coverShots).toBeGreaterThan(0);
+    expect(staggeredFrames).toBeGreaterThan(30);
+    expect(firingFrames).toBeGreaterThan(0);
     expect(enemy.hp).toBeLessThan(enemy.maxHp);
     expect(gunner.body.translation().z).toBeGreaterThan(12);
     expect(sim.isDisrupted(gunner)).toBe(false);

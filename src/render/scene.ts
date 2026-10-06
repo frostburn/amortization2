@@ -1518,7 +1518,8 @@ export class RangeScene {
       }
       const velocity = a.body.linvel(),
         speed = Math.hypot(velocity.x, velocity.z);
-      const stride = a.dead || a.braced ? 0 : Math.min(0.5, speed * 0.12);
+      const stagger = this.sim.isDisrupted(a) ? a.stagger / a.staggerDuration : 0;
+      const stride = a.dead || a.braced || stagger > 0 ? 0 : Math.min(0.5, speed * 0.12);
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
       });
@@ -1545,13 +1546,20 @@ export class RangeScene {
       v.torso.rotation.z = a.dead
         ? 0
         : Math.sin(elapsed * 35) * (1 - a.stability) * 0.1;
+      if (stagger > 0) {
+        const length = Math.hypot(a.knockback.x, a.knockback.z) || 1;
+        const forward = (a.knockback.x * Math.sin(a.yaw) + a.knockback.z * Math.cos(a.yaw)) / length;
+        const sideways = (a.knockback.x * Math.cos(a.yaw) - a.knockback.z * Math.sin(a.yaw)) / length;
+        v.torso.rotation.x += stagger * forward * 0.28;
+        v.torso.rotation.z -= stagger * sideways * 0.23;
+      }
       v.ring.visible =
         !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)));
       v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
-        a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced ? AMBER : MINT,
+        stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced ? AMBER : MINT,
       );
-      v.ring.scale.setScalar(a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
+      v.ring.scale.setScalar(stagger > 0 ? 1 + stagger * 0.2 : a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
       v.health.visible =
         !a.dead &&
         (a.kind === "enemy" || (a.hp < a.maxHp &&
