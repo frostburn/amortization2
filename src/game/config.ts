@@ -43,7 +43,7 @@ export const MINIGUN = {
   interval: 1 / 30,
   reload: 3.8,
   range: 65,
-  damage: 5,
+  damage: 6,
   muzzle: 1.18,
   windUp: 0.5,
   coast: 0.7,
@@ -64,11 +64,11 @@ export const AUTOMATIC_AIM = { height: 1.65, bodyOffset: 0.7 };
 // Automatic fire buys ground before it kills. Motor control must preserve this
 // external velocity rather than treating it as a walking error every frame.
 export const KINETIC = {
-  impulse: { gun: 180, minigun: 180, pistol: 36, rifle: 180 },
+  impulse: { gun: 180, minigun: 240, pistol: 36, rifle: 180 },
   bracedBullet: 0.6,
   drag: 3.2,
   maxSpeed: 7,
-  minigunMaxSpeed: 11,
+  minigunMaxSpeed: 13,
 };
 export const STAGGER = {
   duration: { gun: 0.18, minigun: 0.2, pistol: 0.22, rifle: 0.4, grenade: 0.65 },

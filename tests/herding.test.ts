@@ -70,26 +70,29 @@ describe("kinetic combat and recovery", () => {
       sim.reset("arena", model);
       sim.arena!.countdown = 100;
       sim.select(4);
-      sim.primary.body.setTranslation({ x: -30, y: 0.96, z: 12 }, true);
-      const enemy = sim.addEnemy("assault", { x: -30, z: -8 });
+      sim.primary.body.setTranslation({ x: -30, y: 0.96, z: 28 }, true);
+      const enemy = sim.addEnemy("assault", { x: -30, z: 8 });
       // Extra durability isolates pressure over the same trigger hold, including
       // the minigun's cold wind-up, without a corpse ending either measurement.
       enemy.hp = enemy.maxHp = 1000;
-      const goal = { x: -30, z: 8 };
+      const goal = { x: -30, z: 24 };
       enemy.path = [goal];
       enemy.moveTarget = goal;
       sim.world.step();
       sim.setBrace(true);
       sim.trigger = true;
-      ticks(sim, 2.5, () => track(sim, enemy));
-      outcomes.push({ retreat: -8 - enemy.body.translation().z, damage: 1000 - enemy.hp, hits: sim.hits });
+      ticks(sim, 2, () => track(sim, enemy));
+      outcomes.push({ retreat: 8 - enemy.body.translation().z, damage: 1000 - enemy.hp, hits: sim.hits });
       expect(enemy.moveTarget).toEqual(goal);
       expect(enemy.path.length).toBeGreaterThan(0);
       expect(enemy.dead).toBe(false);
     }
     const [gun, minigun] = outcomes;
-    expect(minigun.retreat).toBeGreaterThan(gun.retreat + 3);
-    expect(minigun.damage).toBeGreaterThan(gun.damage * 1.35);
+    expect(minigun.retreat).toBeGreaterThan(gun.retreat * 2.5);
+    // Keep the comparison away from the back wall rather than measuring where
+    // the collider stops two differently powered volleys.
+    expect(minigun.retreat).toBeLessThan(43);
+    expect(minigun.damage).toBeGreaterThan(gun.damage * 1.6);
     expect(minigun.hits).toBeGreaterThan(gun.hits * 1.5);
   });
 

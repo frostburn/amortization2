@@ -169,7 +169,7 @@ async function start() {
             ? "Select NEEDLE (4) to use its pistol."
             : weapon === "grenade"
               ? "Assault robots carry grenades. Specialists do not."
-              : weapon === "minigun" ? "Choose SPINDLE as robot 4 to use the minigun."
+              : weapon === "minigun" ? "Choose the twin-minigun squad, then select ROOK (2) or SPINDLE (4)."
               : "Select an assault robot to use the machine gun.",
       );
       return;
