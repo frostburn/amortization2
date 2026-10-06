@@ -43,6 +43,7 @@ export class RangeAudio {
   private noise?: AudioBuffer;
   muted = false;
   volume = 0.6;
+  civilianVolume = 0.4;
   failed = false;
   ready = false;
   private listener: Vec3 = { x: 0, y: 28, z: 35.5 };
@@ -131,6 +132,9 @@ export class RangeAudio {
   setMuted(value: boolean) {
     this.muted = value;
     this.setVolume(this.volume);
+  }
+  setCivilianVolume(volume: number) {
+    if (Number.isFinite(volume)) this.civilianVolume = clamp(volume, 0, 1);
   }
 
   private bus(position: Vec3, gain: number) {
@@ -244,7 +248,7 @@ export class RangeAudio {
 
   private updateCarts(sim: Simulation) {
     const ctx = this.context!;
-    const moving = (sim.city?.carts ?? []).filter(c => c.hp > 0 && Math.hypot(c.body.linvel().x, c.body.linvel().z) > 0.08)
+    const moving = (sim.city?.carts ?? []).filter(c => c.hp > 0 && !c.impactUntil && this.civilianVolume > 0 && Math.hypot(c.body.linvel().x, c.body.linvel().z) > 0.08)
       .sort((a, b) => {
         const pa = a.body.translation(), pb = b.body.translation();
         return Math.hypot(pa.x - this.listener.x, pa.z - this.listener.z) - Math.hypot(pb.x - this.listener.x, pb.z - this.listener.z);
@@ -270,7 +274,7 @@ export class RangeAudio {
       const frequency = 150 + speed * 90 + (c.id % 7) * 5;
       voice.sources[0].frequency.setTargetAtTime(frequency, ctx.currentTime, 0.15);
       voice.sources[1].frequency.setTargetAtTime(frequency * 4.03, ctx.currentTime, 0.15);
-      voice.gain.gain.setTargetAtTime(0.025 * Math.min(1, speed) * this.distanceGain(position), ctx.currentTime, 0.09);
+      voice.gain.gain.setTargetAtTime(0.025 * this.civilianVolume * Math.min(1, speed) * this.distanceGain(position), ctx.currentTime, 0.09);
       voice.pan.pan.setTargetAtTime(spatialPan(position, this.listener, this.listenerRight), ctx.currentTime, 0.08);
     }
   }
@@ -474,6 +478,8 @@ export class RangeAudio {
       ready: this.ready,
       failed: this.failed,
       muted: this.muted,
+      volume: this.volume,
+      civilianVolume: this.civilianVolume,
       context: this.context?.state,
       buffers: [...this.buffers.keys()],
       loops: this.voices.size,

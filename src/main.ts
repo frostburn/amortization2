@@ -64,6 +64,7 @@ async function start() {
         JSON.stringify({
           muted: audio.muted,
           volume: audio.volume,
+          civilianVolume: audio.civilianVolume,
           reducedMotion: scene.reducedMotion,
           auxLabels: scene.auxLabels,
           invertX: scene.scope.invertX,
@@ -81,6 +82,7 @@ async function start() {
     );
     if (typeof settings.muted === "boolean") audio.setMuted(settings.muted);
     if (typeof settings.volume === "number") audio.setVolume(settings.volume);
+    if (typeof settings.civilianVolume === "number") audio.setCivilianVolume(settings.civilianVolume);
     if (typeof settings.auxLabels === "boolean") scene.auxLabels = settings.auxLabels;
     if (typeof settings.invertX === "boolean")
       scene.scope.invertX = settings.invertX;
@@ -97,6 +99,8 @@ async function start() {
   }
   const volume = document.querySelector<HTMLInputElement>("#volume")!;
   volume.value = String(Math.round(audio.volume * 100));
+  const civilianVolume = document.querySelector<HTMLInputElement>("#civilian-volume")!;
+  civilianVolume.value = String(Math.round(audio.civilianVolume * 100));
   const motion = document.querySelector<HTMLInputElement>("#motion")!;
   motion.checked = scene.reducedMotion;
   const auxLabels = document.querySelector<HTMLInputElement>("#aux-labels")!;
@@ -112,6 +116,10 @@ async function start() {
   });
   volume.addEventListener("input", () => {
     audio.setVolume(Number(volume.value) / 100);
+    saveSettings();
+  });
+  civilianVolume.addEventListener("input", () => {
+    audio.setCivilianVolume(Number(civilianVolume.value) / 100);
     saveSettings();
   });
   motion.addEventListener("change", () => {

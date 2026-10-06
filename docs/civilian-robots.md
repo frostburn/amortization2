@@ -8,7 +8,7 @@ These are fictional products. Use several engineering references per category an
 
 | Model | Physical design | Everyday behavior | Disturbance response |
 | --- | --- | --- | --- |
-| CART | Knee-high six-wheeler, insulated cargo tub, corner cameras, flexible visibility mast, opening lid. | Restaurant pickup, pedestrian crossings, customer collection, charging. | Brakes, reroutes or awaits assistance. Cargo remains secured. |
+| CART | Knee-high six-wheeler, insulated cargo tub, corner cameras, flexible visibility mast, opening lid. | Restaurant pickup, pedestrian crossings, customer collection, charging. | Brakes, reroutes or awaits assistance. Bullet pressure and blasts can launch the light chassis; tipped units remain stranded. Cargo remains secured. |
 | CRATE | Larger six-wheel parcel cabinet with separately opening compartments. | Multiple apartment and locker stops. | Slow withdrawal; a failed wheel may strand it on the pavement. |
 | KITE | Parcel multicopter, conspicuous rotors, skids and cargo cradle or lowering tether. | Depot-to-pad flights, brief hover, delivery, departure. | Aborts and leaves by a clear route. Damaged units lose stability or land hard. |
 | MICA | Compact budget biped, broad feet, exposed joint housings, modest grippers, small sensor head. | Shopping, shelf replenishment, bin handling, errands through stair-equipped buildings. | Sets down awkward loads, seeks shelter; getting up takes effort. |

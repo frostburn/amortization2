@@ -91,6 +91,14 @@ describe("city district", () => {
     if (weapon === "minigun") a.spin = 1;
     sim.world.step(); sim.aim = { x: 0, y: 0.35, z: 5 }; sim.shoot(a);
     expect(c.hp).toBeLessThan(CART.hp); expect(sim.shots).toBe(1); expect(sim.hits).toBe(0);
+    if (weapon !== "pistol") {
+      expect(c.state).toBe("tumbling");
+      ticks(sim, 0.25);
+      expect(c.body.translation().y).toBeGreaterThan(0.5);
+      expect(c.body.translation().z).toBeGreaterThan(6);
+      expect(Math.hypot(c.body.rotation().x, c.body.rotation().z)).toBeGreaterThan(0.2);
+      expect(c.hp).toBeGreaterThan(0);
+    }
   });
 
   test("manual rifle hits neutral hulls without hostile accuracy credit", () => {
@@ -104,6 +112,9 @@ describe("city district", () => {
     expect(c.hp).toBe(0); expect(c.state).toBe("disabled");
     expect(sim.shots).toBe(1); expect(sim.hits).toBe(0); expect(sim.coverHits).toBe(0);
     expect(sim.events.some(e => e.type === "shot" && !e.hit && e.material === "metal")).toBe(true);
+    ticks(sim, 0.25);
+    expect(c.body.translation().y).toBeGreaterThan(0.9);
+    expect(c.body.translation().z).toBeGreaterThan(6.5);
   });
 
   test("neutral blast damage respects cover and never increments hostile hits", () => {
@@ -116,6 +127,62 @@ describe("city district", () => {
     sim.world.step(); sim.explode(grenade);
     expect(exposed.hp).toBe(0); expect(protectedCart.hp).toBe(CART.hp);
     expect(sim.grenadeHits).toBe(0);
+    expect(protectedCart.alertUntil).toBeCloseTo(sim.time + 12);
+    expect(sim.city!.closedUntil.get("grocer")).toBeCloseTo(sim.time + 14);
+    sim.city!.disturb(exposed.body.translation());
+    expect(protectedCart.alertUntil).toBeCloseTo(sim.time + 12);
+    expect(sim.city!.closedUntil.get("grocer")).toBeCloseTo(sim.time + 14);
+    ticks(sim, 0.35);
+    expect(exposed.body.translation().y).toBeGreaterThan(1.7);
+    expect(exposed.body.translation().x).toBeLessThan(-46);
+    expect(Math.hypot(exposed.body.rotation().x, exposed.body.rotation().z)).toBeGreaterThan(0.2);
+    expect(protectedCart.body.translation().y).toBeLessThan(0.4);
+  });
+
+  test("later shots and blasts can launch a disabled hull again without another down event", () => {
+    const c = sim.city!.carts[0], a = sim.squad[0];
+    sim.city!.damage(c, CART.hp, { x: 0, y: 0, z: 0 }, c.body.translation());
+    const downEvents = sim.events.filter(e => e.type === "down").length;
+    c.body.setTranslation({ x: 0, y: 0.32, z: 5 }, true);
+    a.body.setTranslation({ x: 0, y: 0.98, z: 0 }, true);
+    sim.world.step(); sim.select(1); sim.aim = { x: 0, y: 0.35, z: 5 }; sim.shoot(a);
+    expect(c.hp).toBe(0); expect(c.body.linvel().z).toBeGreaterThan(4);
+    ticks(sim, 0.25);
+    expect(c.body.translation().y).toBeGreaterThan(0.5);
+    const p = c.body.translation();
+    sim.city!.blast({ x: p.x - 1.5, y: p.y, z: p.z });
+    expect(c.body.linvel().x).toBeGreaterThan(8);
+    ticks(sim, 0.25);
+    expect(c.body.translation().y).toBeGreaterThan(1.5);
+    expect(sim.events.filter(e => e.type === "down")).toHaveLength(downEvents);
+  });
+
+  test("a wall stops a launched CART and its drive cannot right it in midair", () => {
+    const c = sim.city!.carts[0], a = sim.squad[0];
+    c.body.setTranslation({ x: -27, y: 0.32, z: -12 }, true);
+    a.body.setTranslation({ x: -27, y: 0.98, z: -6 }, true);
+    sim.world.step(); sim.select(1); sim.aim = { x: -27, y: 0.35, z: -12 }; sim.shoot(a);
+    ticks(sim, 0.3);
+    expect(c.state).toBe("tumbling");
+    expect(Math.hypot(c.body.rotation().x, c.body.rotation().z)).toBeGreaterThan(0.2);
+    ticks(sim, 3);
+    expect(c.body.translation().z).toBeGreaterThan(-13.7);
+    expect(c.body.translation().y).toBeLessThan(0.8);
+    expect(c.hp).toBeGreaterThan(0);
+  });
+
+  test("upright survivors resume service after settling; tipped survivors stay stranded", () => {
+    const [upright, tipped] = sim.city!.carts;
+    for (const c of [upright, tipped]) {
+      sim.city!.damage(c, 1, { x: 0, y: 0, z: 0 }, c.body.translation());
+      c.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      c.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+    tipped.body.setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }, true);
+    ticks(sim, 5);
+    expect(upright.impactUntil).toBe(0); expect(upright.distance).toBeGreaterThan(2);
+    expect(tipped.state).toBe("stranded"); expect(tipped.hp).toBeGreaterThan(0);
+    expect(Math.hypot(tipped.body.linvel().x, tipped.body.linvel().z)).toBeLessThan(0.2);
   });
 
   test("reset and floor changes remove old civilian bodies and rebuild deterministic activity", () => {

@@ -50,7 +50,8 @@ export class CartFleet {
         .slerp(new THREE.Quaternion(q.x, q.y, q.z, q.w), alpha);
       this.pose.compose(this.position, this.rotation, this.scale);
       this.parts.forEach(part => part.setMatrixAt(i, this.pose)); this.light.setMatrixAt(i, this.pose);
-      this.light.setColorAt(i, new THREE.Color(!c.hp ? 0x292b29 : c.state === "alert" ? Math.sin(time * 9) > 0 ? 0xe3b55e : 0x4c4434 : 0xbad4c6));
+      const alarm = c.state === "alert" || c.state === "tumbling" || c.state === "stranded";
+      this.light.setColorAt(i, new THREE.Color(!c.hp ? 0x292b29 : alarm ? Math.sin(time * 9) > 0 ? 0xe3b55e : 0x4c4434 : 0xbad4c6));
       this.openings[i] = THREE.MathUtils.damp(this.openings[i], c.state === "delivery" ? 0.95 : 0, 7, delta);
       this.hinge.makeRotationX(-this.openings[i]); this.hinge.setPosition(0, 0.285, -0.43);
       this.lid.setMatrixAt(i, this.pose.clone().multiply(this.hinge));

@@ -418,7 +418,7 @@ export class RangeScene {
     if (this.sim.city) {
       tex.repeat.set(30, 26);
       floorMat.dispose();
-      this.cityView = new CityView(this.sim.city.district, tex);
+      this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
       return;
     }
@@ -715,6 +715,9 @@ export class RangeScene {
     camera.top = this.sim.range === "city" ? 95 : long ? 70 : this.sim.range === "arena" ? 60 : 40;
     camera.bottom = -camera.top;
     camera.far = 230;
+    // The city shadow frustum covers much more ground per texel; offset the
+    // receiver enough to avoid self-shadow speckling on broad building walls.
+    this.sun.shadow.normalBias = this.sim.range === "city" ? 0.1 : 0.035;
     camera.updateProjectionMatrix();
   }
 

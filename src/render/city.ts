@@ -1,54 +1,84 @@
 import * as THREE from "three";
 import { BUILDING_KIT, buildingSolid, type BuildingSpec, type CityDistrict } from "../game/city";
 import type { Simulation } from "../game/simulation";
-import { batchRigid, block, surface, tube } from "./primitives";
+import { batchRigid, block, panel, surface, tube } from "./primitives";
 
 type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
   bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
 
+type Opening = { x: number; y: number; w: number; h: number };
+/** Exterior wall faces around actual openings, with recessed panes and frame rings. */
+function facade(w: number, h: number, openings: Opening[], wall: THREE.Material, frame: THREE.Material, glass: THREE.Material) {
+  const root = new THREE.Group();
+  const levels = [...new Set([0, h, ...openings.flatMap(o => [o.y - o.h / 2, o.y + o.h / 2])])].sort((a, b) => a - b);
+  for (let i = 1; i < levels.length; i++) {
+    const bottom = levels[i - 1], top = levels[i];
+    const gaps = openings.filter(o => o.y - o.h / 2 <= bottom && o.y + o.h / 2 >= top).sort((a, b) => a.x - b.x);
+    let left = -w / 2;
+    for (const gap of [...gaps, { x: w / 2, w: 0 }]) {
+      const right = gap.x - gap.w / 2;
+      if (right > left) panel(root, right - left, top - bottom, (left + right) / 2, (top + bottom) / 2, 0, wall);
+      left = Math.max(left, gap.x + gap.w / 2);
+    }
+  }
+  for (const o of openings) {
+    const border = 0.14;
+    for (const side of [-1, 1]) {
+      block(root, o.w, border, 0.12, o.x, o.y + side * (o.h - border) / 2, 0.06, frame);
+      block(root, border, o.h - border * 2, 0.12, o.x + side * (o.w - border) / 2, o.y, 0.06, frame);
+    }
+    panel(root, o.w - border * 2, o.h - border * 2, o.x, o.y, 0.04, glass);
+  }
+  return root;
+}
+
 // A small reusable kit: repeated window bays, storefront, service roof and shutter.
-export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.MeshStandardMaterial>): BuildingView {
+export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.MeshStandardMaterial>, coverage = true): BuildingView {
   const paint = (color: number, metalness = 0, roughness = 0.85) => {
     const key = `${color}/${metalness}/${roughness}`;
     const mat = shared?.get(key) ?? surface(color, metalness, roughness);
+    // MSAA coverage gives a smooth single-surface fade while retaining depth
+    // writes, without transparency sorting or noisy hashed fragments.
+    mat.alphaToCoverage = coverage;
     shared?.set(key, mat); return mat;
   };
   const kit = BUILDING_KIT[spec.prefab], root = new THREE.Group();
   const wall = paint(({ brick: 0x9a7667, sand: 0xb8ad92, slate: 0x7d8a88 })[spec.finish]);
+  wall.shadowSide = THREE.DoubleSide;
   const frame = paint(0x49585b, 0.4), glass = paint(0x354c52, 0.5, 0.35);
   const trim = paint(0xd0c9b2), accent = paint(spec.accent), roof = paint(0x656d6b);
   const materials = [wall, frame, glass, trim, accent, roof];
-  const { w, h, d } = kit, front = d / 2 + 0.02;
-  block(root, w, h, d, 0, h / 2, 0, wall);
+  const { w, h, d } = kit, front = d / 2;
+  const windows: Opening[] = [];
+  const sideWindows: Opening[] = [];
+  for (let f = 0; f < kit.floors; f++) {
+    for (const x of [-7.5, -3.75, 0, 3.75, 7.5]) windows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
+    for (const x of [-d / 4, d / 4]) sideWindows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
+  }
+  const shop = spec.prefab === "shop";
+  const frontWindows = windows.filter(o => o.y !== 2 || (!shop && o.x !== 0));
+  frontWindows.push({ x: 0, y: 1.5, w: 2.5, h: 3 });
+  if (shop) for (const x of [-5.5, 5.5]) frontWindows.push({ x, y: 1.625, w: 6.7, h: 2.85 });
+  for (const side of [-1, 1]) {
+    const face = facade(w, h, side === 1 ? frontWindows : windows, wall, frame, glass);
+    face.position.z = side * front; face.rotation.y = side === 1 ? 0 : Math.PI; root.add(face);
+    const end = facade(d, h, sideWindows, wall, frame, glass);
+    end.position.x = side * w / 2; end.rotation.y = side * Math.PI / 2; root.add(end);
+  }
+  block(root, w, 0.12, d, 0, 0.06, 0, wall);
   block(root, w + 0.25, 0.32, d + 0.25, 0, h + 0.16, 0, trim);
   block(root, w - 0.7, 0.18, d - 0.7, 0, h + 0.37, 0, roof);
   for (const x of [-w / 2 + 0.4, w / 2 - 0.4]) {
-    block(root, 0.32, h, 0.12, x, h / 2, front, trim);
-    block(root, 0.32, h, 0.12, x, h / 2, -front, trim);
+    block(root, 0.32, h, 0.12, x, h / 2, front + 0.09, trim);
+    block(root, 0.32, h, 0.12, x, h / 2, -front - 0.09, trim);
   }
-  for (let f = 0; f < kit.floors; f++) {
-    const y = 2 + f * 3.35;
-    for (const x of [-7.5, -3.75, 0, 3.75, 7.5]) for (const z of [-front, front]) {
-      block(root, 2.35, 2.1, 0.12, x, y, z, frame);
-      block(root, 2.08, 1.85, 0.15, x, y, z, glass);
-      block(root, 2.55, 0.12, 0.32, x, y - 1.08, z, trim);
-    }
-    for (const x of [-w / 2 - 0.02, w / 2 + 0.02]) for (const z of [-d / 4, d / 4]) {
-      block(root, 0.12, 2.1, 2.35, x, y, z, frame);
-      block(root, 0.15, 1.85, 2.08, x, y, z, glass);
-    }
-  }
-  block(root, 2.5, 3.0, 0.2, 0, 1.5, front + 0.12, frame);
-  block(root, 2.15, 2.75, 0.24, 0, 1.4, front + 0.12, glass);
-  block(root, 0.09, 2.75, 0.3, 0, 1.4, front + 0.12, trim);
-  if (spec.prefab === "shop") {
+  block(root, 0.09, 2.72, 0.05, 0, 1.5, front + 0.11, trim);
+  if (shop) {
     block(root, 16.8, 0.18, 2, 0, 3.45, front + 0.6, accent);
     block(root, 16.8, 0.5, 0.13, 0, 3.15, front + 1.55, accent);
     for (const x of [-5.5, 5.5]) {
-      block(root, 6.5, 2.7, 0.2, x, 1.6, front + 0.12, glass);
-      block(root, 6.7, 0.15, 0.32, x, 0.2, front + 0.2, trim);
       for (const shelf of [0.7, 1.2, 1.7])
-        block(root, 5.5, 0.09, 0.28, x, shelf, front + 0.25, accent);
+        block(root, 5.5, 0.09, 0.1, x, shelf, front + 0.145, accent);
     }
   }
   for (const x of [-5, 5]) {
@@ -76,7 +106,7 @@ export class CityView {
   private signals: { mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>; axis: number }[] = [];
   private ray = new THREE.Ray();
   private intersection = new THREE.Vector3();
-  constructor(district: CityDistrict, texture: THREE.Texture) {
+  constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true) {
     const ground = new THREE.Group(), asphalt = surface(0x424c50), paving = surface(0x9c9f94);
     paving.map = texture;
     const white = surface(0xd3cdbc), yellow = surface(0xb7a166), dark = surface(0x344347, 0.4);
@@ -131,7 +161,7 @@ export class CityView {
     const background = new THREE.Group(), shared = new Map<string, THREE.MeshStandardMaterial>();
     this.buildings = [];
     for (const spec of district.buildings) {
-      const building = makeBuilding(spec, spec.backdrop ? shared : undefined);
+      const building = makeBuilding(spec, spec.backdrop ? shared : undefined, coverage);
       if (spec.backdrop) background.add(building.root);
       else { this.buildings.push(building); this.root.add(building.root); }
     }
@@ -150,8 +180,10 @@ export class CityView {
       });
       b.opacity = sim.sniping ? 1 : THREE.MathUtils.damp(b.opacity, obscures ? 0.22 : 1, 9, delta);
       for (const mat of b.materials) {
-        mat.transparent = b.opacity < 0.995;
-        mat.opacity = b.opacity; mat.depthWrite = !mat.transparent;
+        const transparent = !this.coverage && b.opacity < 0.995;
+        if (mat.transparent !== transparent) { mat.transparent = transparent; mat.needsUpdate = true; }
+        mat.depthWrite = !transparent;
+        mat.opacity = b.opacity;
       }
       if (b.shutter) {
         b.closed = THREE.MathUtils.damp(b.closed, sim.city.isClosed(b.spec.id) ? 1 : 0, 5, delta);

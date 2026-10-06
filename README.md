@@ -59,7 +59,7 @@ Each wave adds robots up to three four-member squads, then continues indefinitel
 
 ## City district
 
-Choose **City District** for a 120 × 104 metre urban sandbox. Sixteen six-wheel CART delivery robots circulate between shops and homes, pause to open their lids, yield to the squad and observe crossing signals. Nearby gunfire interrupts deliveries and closes local shop shutters; activity resumes after quiet. Buildings, streets and furniture use reusable geometry and collision footprints. The district has no mission or enemy waves yet. See [city construction and behavior](docs/city-district.md) and [the civilian cast through 2040](docs/civilian-robots.md).
+Choose **City District** for a 120 × 104 metre urban sandbox. Sixteen six-wheel CART delivery robots circulate between shops and homes, pause to open their lids, yield to the squad and observe crossing signals. Nearby gunfire interrupts deliveries and closes local shop shutters; activity resumes after quiet. Hits launch and tumble the light CART chassis, including wrecks. Their motor mix is independently adjustable in the pause menu and defaults to 40% of its original level. Buildings, streets and furniture use reusable geometry and collision footprints. The district has no mission or enemy waves yet. See [city construction and behavior](docs/city-district.md) and [the civilian cast through 2040](docs/civilian-robots.md).
 
 ## Controls
 

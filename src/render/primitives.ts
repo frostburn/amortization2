@@ -10,6 +10,12 @@ export function block(parent: THREE.Object3D, w: number, h: number, d: number,
   mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true;
   parent.add(mesh); return mesh;
 }
+export function panel(parent: THREE.Object3D, w: number, h: number,
+  x: number, y: number, z: number, material: THREE.Material) {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
+  mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true;
+  parent.add(mesh); return mesh;
+}
 export function tube(parent: THREE.Object3D, r: number, h: number,
   x: number, y: number, z: number, material: THREE.Material, sides = 10) {
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, sides), material);

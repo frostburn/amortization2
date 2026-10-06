@@ -797,7 +797,9 @@ export class Simulation {
       }
     } else if (hit && this.city?.carts.some(c => c.collider.handle === hit.collider.handle)) {
       const cart = this.city.carts.find(c => c.collider.handle === hit.collider.handle)!;
-      this.city.damage(cart, spec.damage, { x: dir.x * 28, y: dir.y * 10, z: dir.z * 28 }, to);
+      const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
+      this.city.damage(cart, spec.damage, { x: dir.x * strength,
+        y: (Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
     } else if (hit?.collider.parent()?.isDynamic()) {
       hit.collider
         .parent()!
