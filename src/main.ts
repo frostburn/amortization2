@@ -49,8 +49,9 @@ async function start() {
   const selectionBox = document.getElementById("selection-box")!;
   const keys = new Set<string>();
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
-  const toast = (message: string) => {
+  const toast = (message: string, essential = false) => {
     const element = document.getElementById("toast")!;
+    element.classList.toggle("aux-label", !essential);
     element.textContent = message;
     element.classList.add("visible");
     clearTimeout(toastTimer);
@@ -64,6 +65,7 @@ async function start() {
           muted: audio.muted,
           volume: audio.volume,
           reducedMotion: scene.reducedMotion,
+          auxLabels: scene.auxLabels,
           invertX: scene.scope.invertX,
           invertY: scene.scope.invertY,
           fourthModel: sim.fourthModel,
@@ -79,6 +81,7 @@ async function start() {
     );
     if (typeof settings.muted === "boolean") audio.setMuted(settings.muted);
     if (typeof settings.volume === "number") audio.setVolume(settings.volume);
+    if (typeof settings.auxLabels === "boolean") scene.auxLabels = settings.auxLabels;
     if (typeof settings.invertX === "boolean")
       scene.scope.invertX = settings.invertX;
     if (typeof settings.invertY === "boolean")
@@ -96,6 +99,17 @@ async function start() {
   volume.value = String(Math.round(audio.volume * 100));
   const motion = document.querySelector<HTMLInputElement>("#motion")!;
   motion.checked = scene.reducedMotion;
+  const auxLabels = document.querySelector<HTMLInputElement>("#aux-labels")!;
+  auxLabels.checked = scene.auxLabels;
+  const applyAuxLabels = () => {
+    scene.auxLabels = auxLabels.checked;
+    document.getElementById("app")!.classList.toggle("aux-labels-off", !scene.auxLabels);
+  };
+  applyAuxLabels();
+  auxLabels.addEventListener("change", () => {
+    applyAuxLabels();
+    saveSettings();
+  });
   volume.addEventListener("input", () => {
     audio.setVolume(Number(volume.value) / 100);
     saveSettings();
@@ -171,6 +185,7 @@ async function start() {
               ? "Assault robots carry grenades. Specialists do not."
               : weapon === "minigun" ? "Choose the twin-minigun squad, then select ROOK (2) or SPINDLE (4)."
               : "Select an assault robot to use the machine gun.",
+        true,
       );
       return;
     }
@@ -266,6 +281,7 @@ async function start() {
       audio.failed = true;
       toast(
         "Audio is unavailable in this browser. The range is still playable.",
+        true,
       );
     }
     updateUI(sim, audio);
@@ -507,6 +523,7 @@ async function start() {
         else if (sim.active.length)
           toast(
             `Grenades rearming. Ready in ${sim.grenadeCooldown.toFixed(1)} s.`,
+            true,
           );
         updateUI(sim, audio);
       } else if (picked?.actor && picked.actor <= 4 && !e.ctrlKey)
@@ -631,6 +648,7 @@ async function start() {
         audio: audio.inspect(),
         scope: scene.scope.inspect(),
         aiming: scene.inspectAim(),
+        labels: scene.inspectLabels(),
         pointerCaptured: document.pointerLockElement === canvas,
         camera: {
           ...scene.inspectCamera(),
@@ -715,7 +733,7 @@ async function start() {
       audio.event(event);
       if (event.type === "drill" || event.type === "wave") toast(event.message);
       if (event.type === "throw" && sim.actors.find((a) => a.id === event.actor)?.kind === "enemy")
-        toast("Incoming grenade. Move or take cover.");
+        toast("Incoming grenade. Move or take cover.", true);
       if (event.type === "explosion")
         toast(
           event.team === "enemy" ? "Incoming grenade detonated."

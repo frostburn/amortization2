@@ -16,6 +16,17 @@
 [hidden] {
   display: none !important;
 }
+.aux-labels-off .aux-label,
+.aux-labels-off .range-note,
+.aux-labels-off #drills .detail {
+  display: none !important;
+}
+.aux-labels-off .grenade {
+  min-width: 0;
+}
+.grenade.rearming .weapon-icon {
+  opacity: 0.45;
+}
 body {
   margin: 0;
   overflow: hidden;
@@ -682,6 +693,7 @@ dialog h2 {
 }
 .settings {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 15px;

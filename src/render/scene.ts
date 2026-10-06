@@ -161,6 +161,7 @@ export class RangeScene {
   scope = new SniperView();
   private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
+  private environmentLabels = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
   private props = new Map<number, THREE.Group>();
@@ -279,6 +280,13 @@ export class RangeScene {
   private destinationAge = 99;
   private lightFlash = new THREE.PointLight(0xffd699, 0, 8, 2);
   reducedMotion = false;
+  get auxLabels() {
+    return this.environmentLabels.visible;
+  }
+  set auxLabels(enabled: boolean) {
+    this.environmentLabels.visible = enabled;
+    for (const marker of this.destinationMarkers) marker.number.visible = enabled;
+  }
   private shake = 0;
   private resizeObserver: ResizeObserver;
 
@@ -327,6 +335,7 @@ export class RangeScene {
       sun,
       sun.target,
       this.environment,
+      this.environmentLabels,
       this.dynamic,
       this.particleMesh,
       this.bulletMarks,
@@ -449,7 +458,7 @@ export class RangeScene {
         );
     }
     label(
-      this.environment,
+      this.environmentLabels,
       "PROVING GROUND",
       10.5,
       2.0,
@@ -460,7 +469,7 @@ export class RangeScene {
       "#283230",
     );
     label(
-      this.environment,
+      this.environmentLabels,
       "FUTURES CONTRACT",
       5,
       0.65,
@@ -483,11 +492,11 @@ export class RangeScene {
       [-1, "02", "DISPLACEMENT"],
       [14, "03", "FRAGMENTS"],
     ] as const) {
-      label(this.environment, num, 3.2, 1.8, x, 0.023, 5.7, true, "#c7994a");
-      label(this.environment, text, 8, 0.7, x, 0.026, 7.2, true, "#d8c796");
+      label(this.environmentLabels, num, 3.2, 1.8, x, 0.023, 5.7, true, "#c7994a");
+      label(this.environmentLabels, text, 8, 0.7, x, 0.026, 7.2, true, "#d8c796");
     }
     label(
-      this.environment,
+      this.environmentLabels,
       "FIRING LINE",
       6.5,
       0.7,
@@ -545,7 +554,7 @@ export class RangeScene {
     for (const platform of this.sim.layout.platforms) {
       this.makeBarrier(platform, concrete);
       const sign = label(
-        this.environment,
+        this.environmentLabels,
         `+${platform.h} m`,
         2.4,
         0.55,
@@ -584,7 +593,7 @@ export class RangeScene {
       stripe.rotation.y = -0.45;
     }
     label(
-      this.environment,
+      this.environmentLabels,
       "04 / LONG RANGE",
       16,
       1.1,
@@ -595,7 +604,7 @@ export class RangeScene {
       "#d8c796",
     );
     label(
-      this.environment,
+      this.environmentLabels,
       "FIRING LINE",
       7,
       0.6,
@@ -608,7 +617,7 @@ export class RangeScene {
     for (const [i, target] of this.sim.layout.targets.entries()) {
       const distance = (i + 1) * 30;
       label(
-        this.environment,
+        this.environmentLabels,
         `${distance} m`,
         5,
         1.4,
@@ -619,7 +628,7 @@ export class RangeScene {
         "#c7994a",
       );
       const plate = label(
-        this.environment,
+        this.environmentLabels,
         `${distance} m`,
         2.8,
         0.5,
@@ -642,7 +651,7 @@ export class RangeScene {
     for (const z of [-3, 3])
       box(this.environment, 144, 0.007, 0.016, 54, 0.009, z, dark);
     label(
-      this.environment,
+      this.environmentLabels,
       "PRECISION / BRACE BEFORE FIRING",
       18,
       0.8,
@@ -661,9 +670,9 @@ export class RangeScene {
       box(this.environment, 0.02, 0.006, 80, x, 0.012, 0, dark);
     for (let z = -36; z <= 36; z += 6)
       box(this.environment, 112, 0.006, 0.02, 0, 0.012, z, dark);
-    label(this.environment, "ARENA / LIVE FIRE", 13, 0.9, 0, 0.032, 32, true, "#d2bd8e");
+    label(this.environmentLabels, "ARENA / LIVE FIRE", 13, 0.9, 0, 0.032, 32, true, "#d2bd8e");
     for (const gate of ARENA_ENTRIES) {
-      label(this.environment, gate.name, 5, 0.7,
+      label(this.environmentLabels, gate.name, 5, 0.7,
         gate.x + gate.dx * 2.4, 0.032, gate.z + gate.dz * 2.4, true, "#c99b5b");
       for (const side of [-1, 1]) {
         const x = gate.x + gate.dz * side * 4.8,
@@ -713,7 +722,7 @@ export class RangeScene {
       targetPaint,
     ]);
     const materials = new Set<THREE.Material>();
-    this.environment.traverse((o) => {
+    for (const group of [this.environment, this.environmentLabels]) group.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       o.geometry.dispose();
       const list = Array.isArray(o.material) ? o.material : [o.material];
@@ -726,6 +735,7 @@ export class RangeScene {
         m.dispose();
       }
     this.environment.clear();
+    this.environmentLabels.clear();
     this.entryMarkers.clear();
     this.buildEnvironment(this.texture);
     this.configureRangeLighting();
@@ -1361,6 +1371,17 @@ export class RangeScene {
         id: a.id,
         pitch: this.actors.get(a.id)!.torso.rotation.x,
       })),
+    };
+  }
+
+  inspectLabels() {
+    const markers = this.destinationMarkers.filter((m) => this.destinations.visible && m.root.visible);
+    return {
+      enabled: this.auxLabels,
+      worldCount: this.environmentLabels.children.length,
+      worldVisible: this.environmentLabels.visible,
+      formationRings: markers.length,
+      formationNumbers: markers.filter((m) => m.number.visible).length,
     };
   }
 
