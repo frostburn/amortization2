@@ -633,6 +633,7 @@ async function start() {
         aiming: scene.inspectAim(),
         pointerCaptured: document.pointerLockElement === canvas,
         camera: {
+          ...scene.inspectCamera(),
           x: scene.listenerPosition.x,
           y: scene.listenerPosition.y,
           z: scene.listenerPosition.z,
@@ -708,7 +709,7 @@ async function start() {
       if (steps === 6) accumulator = Math.min(accumulator, STEP);
       scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag);
     } else scene.updateAim(ground, false);
-    audio.setListener(scene.listenerPosition);
+    audio.setListener(scene.listenerPosition, scene.listenerRight);
     for (const event of sim.events.splice(0)) {
       scene.event(event);
       audio.event(event);

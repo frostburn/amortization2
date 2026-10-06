@@ -154,7 +154,7 @@ describe("minigun and fourth squad member", () => {
         sim.aim = { ...target.body.translation(), y: target.body.translation().y + 0.25 };
         sim.step();
       }
-      expect(target.dead).toBe(true);
+      expect(target.dead, `plate ${target.id} has ${target.hp} HP at ${JSON.stringify(target.body.translation())}`).toBe(true);
       expect(target.killedBy).toBe("minigun");
     }
     expect(sim.drill.gun).toBe(true);

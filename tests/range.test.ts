@@ -379,7 +379,7 @@ describe("proving ground simulation", () => {
         sim.aim = { ...target.body.translation(), y: 1.25 };
         sim.step();
       }
-      expect(target.dead).toBe(true);
+      expect(target.dead, `plate ${target.id} has ${target.hp} HP at ${JSON.stringify(target.body.translation())}`).toBe(true);
     }
     expect(sim.drill.gun).toBe(true);
     sim.select(2);

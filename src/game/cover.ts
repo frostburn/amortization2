@@ -76,7 +76,7 @@ export function updateCoverFire(sim: Simulation) {
     }
     const ammo = sim.ammunition(a);
     if (ammo.ammo === 0) sim.reloadActor(a);
-    if (ammo.reload > 0 || a.stability < 0.55 || sim.time - a.hitTime < 0.25) {
+    if (ammo.reload > 0 || sim.isDisrupted(a)) {
       brain.state = ammo.reload > 0 ? "reloading" : "suppressed";
       brain.burstUntil = 0;
       brain.nextAttack = Math.max(brain.nextAttack, sim.time + 0.4);

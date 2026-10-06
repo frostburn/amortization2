@@ -8,7 +8,7 @@ Robot 4 is NEEDLE: a pale, narrow chassis with exposed joints, a long barrel, an
 | ------------------------------ | ------------ | ------------ |
 | Integrity                      | 160          | 64           |
 | Mass                           | 90 kg        | 48 kg        |
-| Gun damage against targets     | 14           | 140          |
+| Gun damage against targets     | 6            | 140          |
 | Gun reach                      | 65 m         | 140 m        |
 | Magazine                       | 90           | 5            |
 | Shot interval                  | 0.07145625 s | 1.4 s        |
@@ -23,7 +23,7 @@ NEEDLE’s pistol has 12 rounds, 22 damage, 28 m reach, a 0.35 s interval, a 1.6
 
 ## Horizontal lane
 
-The separate range spans x = −8…98 m and z = −9…9 m. NEEDLE starts at x = −2 m; targets stand at x = 28, 58, and 88 m, staggered across the lane so nearer plates do not hide the distant plate. These are nominal 30 / 60 / 90 m marks. The first target stands on the ground; the second and third stand on 2 m and 5 m concrete platforms. Their spawn heights and support colliders agree with the rendered decks. Platforms participate in navigation and stop low shots; live targets remain supported under gravity. The barrel pitches toward the aim, and the muzzle and shot use the full three-dimensional direction. Low side cover, a crate, the firing line, distance boards, and a backstop give scale and obstruction examples. No hostile AI is introduced.
+The separate range spans x = −18…126 m and z = −16…16 m, with a wide isometric overview and extra space around the firing lane. NEEDLE starts at x = −2 m; targets stand at x = 28, 58, and 88 m, staggered across the lane so nearer plates do not hide the distant plate. These are nominal 30 / 60 / 90 m marks. The first target stands on the ground; the second and third stand on 2 m and 5 m concrete platforms. Their spawn heights and support colliders agree with the rendered decks. Platforms participate in navigation and stop low shots; live targets remain supported under gravity. The barrel pitches toward the aim, and the muzzle and shot use the full three-dimensional direction. Low side cover, a crate, the firing line, distance boards, and a backstop give scale and obstruction examples. No hostile AI is introduced.
 
 The overview fits the full lane across the desktop viewport. The scene, collision geometry, destination placement, and navigation grid all use the chosen range's bounds. Switching ranges resets the drill, supplies, held input, and explosives, rebuilds the environment, and restores its overview. The original three drills remain available in Proving Ground. Only rifle kills complete the new three-target drill; a wrong-weapon kill requires a reset.
 

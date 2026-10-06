@@ -168,7 +168,29 @@ describe("friendly fire and sniper support", () => {
     expect(gunner.path).toHaveLength(0);
   });
 
-  test("support excludes casualties, reacts to hostile hits, reloads and stops on NEEDLE's death", () => {
+  test("support keeps returning fire through repeated bullet pressure", () => {
+    const gunner = sim.squad[0];
+    gunner.body.setTranslation({ x: -7, y: 0.98, z: 10 }, true);
+    const enemy = sim.addEnemy("assault", { x: -7, z: -10 });
+    enemy.hp = enemy.maxHp = 10000;
+    sim.world.step();
+    sim.select(4);
+    sim.chooseWeapon("rifle");
+    sim.toggleSniping();
+    for (let i = 0; i < 2 / STEP; i++) {
+      if (i % 4 === 0)
+        sim.damage(gunner, 1, { x: 0, y: 0, z: 108 }, gunner.body.translation(), "gun");
+      sim.step();
+    }
+    expect(sim.coverShots).toBeGreaterThan(0);
+    expect(enemy.hp).toBeLessThan(enemy.maxHp);
+    expect(gunner.body.translation().z).toBeGreaterThan(12);
+    expect(sim.isDisrupted(gunner)).toBe(false);
+    expect(sim.time - gunner.hitTime).toBeLessThan(0.1);
+    expect(gunner.cover?.state).not.toBe("suppressed");
+  });
+
+  test("support excludes casualties, recovers from a blast, reloads and stops on NEEDLE's death", () => {
     const gunner = sim.squad[0];
     gunner.body.setTranslation({ x: -7, y: 0.98, z: 10 }, true);
     gunner.ammo = 1;
@@ -180,7 +202,7 @@ describe("friendly fire and sniper support", () => {
     sim.select(4);
     sim.chooseWeapon("rifle");
     sim.toggleSniping();
-    sim.damage(gunner, 14, noImpulse, gunner.body.translation(), "gun");
+    sim.damage(gunner, 14, noImpulse, gunner.body.translation(), "grenade");
     ticks(sim, 0.2);
     expect(gunner.cover?.state).toBe("suppressed");
     expect(sim.coverShots).toBe(0);

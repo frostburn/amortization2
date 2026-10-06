@@ -2,6 +2,8 @@
 
 A desktop browser real-time tactics prototype about controlling a squad of machines. **Proving Ground** tests machine-gun fire, physical displacement, and thrown grenades. **Long Range** is a horizontal 30 / 60 / 90 metre lane for the fragile NEEDLE sniper model. **Endless Arena** pits the squad against incoming AI robot squads, with repairs between waves and a quick restart after defeat.
 
+The overhead view is true isometric: 45° yaw, 35.3° elevation, and world axes projected at 120°. Wider maps and a lower default zoom give the squad more room to manoeuvre. Automatic fire centres on **herding**: track an opponent to push it out of cover, change firing angle to redirect it, and regroup during a reload. Robots preserve bullet momentum while executing orders and can return fire while sliding. See [camera and kinetic combat tuning](docs/combat-feel.md).
+
 ## Run locally
 
 Use Node.js 24 and npm.
@@ -35,7 +37,7 @@ Four selected robots default to a 2 × 2 square; three form an equilateral trian
 
 ## Minigun
 
-SPINDLE has a heavy **200-integrity / 130 kg chassis**, a visibly rotating six-barrel gun and a 240-round belt. Hold LMB through a **0.5 s wind-up** to fire **30 rounds/s** at up to 65 m, with 9 damage per round and a 3.8 s reload. Release stops bullets immediately; the motor coasts for 0.7 s from full speed. Repress during the coast to wind up faster. Hold Space to brace and control recoil. SPINDLE walks at 3.2 m/s, reduced to 1.9 m/s while winding or firing. It receives a full 240-round survivor refit between arena waves. See [the minigun design and audio recipe](docs/minigun.md).
+SPINDLE has a heavy **200-integrity / 130 kg chassis**, a visibly rotating six-barrel gun and a 240-round belt. Hold LMB through a **0.5 s wind-up** to fire **30 rounds/s** at up to 65 m, with 3 damage per round and a 3.8 s reload. Release stops bullets immediately; the motor coasts for 0.7 s from full speed. Repress during the coast to wind up faster. Hold Space to brace and control recoil. SPINDLE walks at 3.2 m/s, reduced to 1.9 m/s while winding or firing. It receives a full 240-round survivor refit between arena waves. See [the minigun design and audio recipe](docs/minigun.md).
 
 ## Long Range
 
@@ -91,6 +93,7 @@ See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original fi
 TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and Web Audio. No backend is required.
 
 - [Range design and implementation](docs/proving-ground.md)
+- [Isometric camera and kinetic combat](docs/combat-feel.md)
 - [Sniper model, scope, and long range](docs/sniper-range.md)
 - [Arena waves and enemy combat](docs/arena.md)
 - [Squad choice, minigun and edited audio](docs/minigun.md)

@@ -9,6 +9,7 @@ import {
   GRENADE_FUSE,
   PISTOL,
   MINIGUN,
+  KINETIC,
   RIFLE,
   ROBOT_MODELS,
   STEP,
@@ -55,6 +56,8 @@ export interface Actor {
   path: Vec2[];
   moveTarget?: Vec2;
   hitTime: number;
+  disruptedUntil: number;
+  knockback: Vec2;
   dead: boolean;
   recoil: number;
   previous: Vec3;
@@ -176,11 +179,16 @@ export class Simulation {
     this.randomState = 1729;
     this.nextId = 100;
     this.drill = { gun: false, impulse: false, grenade: false, rifle: false };
+    const bounds = this.layout.bounds;
     const floor = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0),
+      RAPIER.RigidBodyDesc.fixed().setTranslation(
+        (bounds.left + bounds.right) / 2, -0.5, (bounds.back + bounds.front) / 2,
+      ),
     );
     this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(120, 0.5, 60).setFriction(0.8),
+      RAPIER.ColliderDesc.cuboid(
+        (bounds.right - bounds.left) / 2 + 24, 0.5, (bounds.front - bounds.back) / 2 + 24,
+      ).setFriction(0.8),
       floor,
     );
     for (const box of [...this.layout.barriers, ...this.layout.platforms]) {
@@ -307,6 +315,8 @@ export class Simulation {
       braceTime: 0,
       path: [],
       hitTime: -10,
+      disruptedUntil: -10,
+      knockback: { x: 0, z: 0 },
       dead: false,
       recoil: 0,
       previous: { x, y: elevation + 0.98, z },
@@ -732,10 +742,10 @@ export class Simulation {
       z: aim.z - from.z,
     };
     const length = Math.hypot(delta.x, delta.y, delta.z) || 1;
-    const spread = (a.braced
-      ? 0.005
-      : 0.008 + a.recoil * 0.011 + (a.path.length ? 0.014 : 0))
-      + (a.kind === "enemy" ? 0.02 : pistol ? 0.007 : weapon === "minigun" && !a.braced ? 0.01 : 0);
+    const speed = Math.hypot(a.body.linvel().x, a.body.linvel().z);
+    const spread = (a.braced ? 0.003 : 0.005 + a.recoil * 0.005 + (a.path.length ? 0.006 : 0))
+      + Math.min(0.006, speed * 0.001)
+      + (a.kind === "enemy" ? 0.012 : pistol ? 0.004 : weapon === "minigun" && !a.braced ? 0.006 : 0);
     const dir = rifle
       ? this.rifleDirection(a)
       : {
@@ -766,9 +776,9 @@ export class Simulation {
         target,
         spec.damage,
         {
-          x: dir.x * (rifle ? 180 : pistol ? 24 : weapon === "minigun" ? 36 : 48),
+          x: dir.x * KINETIC.impulse[weapon],
           y: dir.y * (rifle ? 24 : pistol ? 6 : 12),
-          z: dir.z * (rifle ? 180 : pistol ? 24 : weapon === "minigun" ? 36 : 48),
+          z: dir.z * KINETIC.impulse[weapon],
         },
         to,
         weapon,
@@ -821,20 +831,39 @@ export class Simulation {
     point: Vec3,
     source?: Weapon,
   ) {
-    const multiplier = a.braced ? 0.28 : 1;
-    a.body.applyImpulseAtPoint(
-      {
-        x: impulse.x * multiplier,
-        y: impulse.y * multiplier,
-        z: impulse.z * multiplier,
-      },
-      point,
-      true,
-    );
+    const bullet = source === "gun" || source === "minigun" || source === "pistol";
+    const multiplier = a.braced ? (bullet ? KINETIC.bracedBullet : 0.28) : 1;
+    const applied = { x: impulse.x * multiplier, y: impulse.y * multiplier, z: impulse.z * multiplier };
+    if (!a.dead) {
+      const mass = a.body.mass();
+      const previous = a.model ? a.knockback : a.body.linvel();
+      const next = { x: previous.x + applied.x / mass, z: previous.z + applied.z / mass };
+      const speed = Math.hypot(next.x, next.z);
+      if (speed > KINETIC.maxSpeed) {
+        next.x *= KINETIC.maxSpeed / speed;
+        next.z *= KINETIC.maxSpeed / speed;
+      }
+      applied.x = (next.x - previous.x) * mass;
+      applied.z = (next.z - previous.z) * mass;
+      // Passive targets need an actual-speed cap. Their lane controller must
+      // retain only the impact, not mistake its own walking velocity for it.
+      a.knockback = a.model ? next : {
+        x: a.knockback.x + applied.x / mass,
+        z: a.knockback.z + applied.z / mass,
+      };
+      const retainedSpeed = Math.hypot(a.knockback.x, a.knockback.z);
+      if (retainedSpeed > KINETIC.maxSpeed) {
+        a.knockback.x *= KINETIC.maxSpeed / retainedSpeed;
+        a.knockback.z *= KINETIC.maxSpeed / retainedSpeed;
+      }
+    }
+    a.body.applyImpulseAtPoint(applied, point, true);
     if (a.dead) return;
     a.hp = Math.max(0, a.hp - amount);
     a.hitTime = this.time;
-    a.stability = Math.max(0, a.stability - (a.braced ? 0.05 : 0.16));
+    a.stability = Math.max(0, a.stability - (bullet ? a.braced ? 0.012 : 0.025 : a.braced ? 0.05 : 0.16));
+    // Ordinary bullets jolt aim and position, but cannot continually postpone a burst.
+    if (!bullet) a.disruptedUntil = this.time + (source === "grenade" ? 0.5 : 0.25);
     if (a.hp <= 0) {
       if (a.kind === "player" && a.model === "sniper") this.endSniping();
       a.dead = true;
@@ -997,6 +1026,10 @@ export class Simulation {
     this.events.push({ type: "explosion", position: origin, affected, team: grenade.team });
   }
 
+  isDisrupted(a: Actor) {
+    return this.time < a.disruptedUntil;
+  }
+
   step() {
     this.time += STEP;
     this.arena?.update();
@@ -1014,6 +1047,9 @@ export class Simulation {
         a.firing = false;
         continue;
       }
+      const drag = Math.exp(-KINETIC.drag * STEP);
+      a.knockback.x *= drag;
+      a.knockback.z *= drag;
       const velocity = a.body.linvel();
       a.braceTime =
         a.braced &&
@@ -1021,8 +1057,8 @@ export class Simulation {
         a.stability > 0.8
           ? Math.min(RIFLE.settle, a.braceTime + STEP)
           : 0;
-      if (this.time - a.hitTime > 0.35)
-        a.stability = Math.min(1, a.stability + STEP * (a.braced ? 1.5 : 0.6));
+      if (!this.isDisrupted(a))
+        a.stability = Math.min(1, a.stability + STEP * (a.braced ? 1.5 : 0.8));
       if (a.kind === "heavy")
         this.maxDisplacement = Math.max(
           this.maxDisplacement,
@@ -1072,16 +1108,16 @@ export class Simulation {
             a.path[0].z - a.body.translation().z,
           );
         }
-      } else if (a.kind === "moving" && this.time - a.hitTime > 0.8) {
+      } else if (a.kind === "moving" && !this.isDisrupted(a)) {
         const p = a.body.translation(),
           vel = a.body.linvel();
         const desired =
           (a.spawn.x + Math.sin(this.time * 0.75) * 2.1 - p.x) * 2.4;
         a.body.applyImpulse(
           {
-            x: clamp(desired - vel.x, -0.3, 0.3) * a.body.mass(),
+            x: clamp(desired + a.knockback.x - vel.x, -0.3, 0.3) * a.body.mass(),
             y: 0,
-            z: clamp((a.spawn.z - p.z) * 2 - vel.z, -0.3, 0.3) * a.body.mass(),
+            z: clamp((a.spawn.z - p.z) * 2 + a.knockback.z - vel.z, -0.3, 0.3) * a.body.mass(),
           },
           true,
         );
@@ -1147,8 +1183,8 @@ export class Simulation {
     }
     // Finite acceleration preserves externally imparted velocity and permits lateral recovery.
     const acceleration = (a.braced ? 40 : 13) * (0.35 + a.stability * 0.65);
-    const ix = dx - v.x,
-      iz = dz - v.z,
+    const ix = dx + a.knockback.x - v.x,
+      iz = dz + a.knockback.z - v.z,
       length = Math.hypot(ix, iz) || 1;
     const amount = Math.min(length, acceleration * STEP) * a.body.mass();
     if (p.y < 1.1)
@@ -1325,6 +1361,9 @@ export class Simulation {
         hp: a.hp,
         maxHp: a.maxHp,
         stability: a.stability,
+        knockback: { ...a.knockback },
+        velocity: vcopy(a.body.linvel()),
+        disrupted: this.isDisrupted(a),
         killedBy: a.killedBy,
         ammo: a.ammo,
         reload: a.reload,
