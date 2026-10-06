@@ -8,7 +8,13 @@ import {
   type RangeBounds,
 } from "./config";
 
-export type RangeId = "proving" | "long";
+export type RangeId = "proving" | "long" | "arena";
+export const ARENA_ENTRIES = [
+  { name: "NORTH", x: 0, z: -20, dx: 0, dz: 1 },
+  { name: "EAST", x: 30, z: 0, dx: -1, dz: 0 },
+  { name: "SOUTH", x: 0, z: 20, dx: 0, dz: -1 },
+  { name: "WEST", x: -30, z: 0, dx: 1, dz: 0 },
+] as const;
 export type TargetKind = (typeof TARGET_SPAWNS)[number]["kind"] | "precision";
 type RangeDefinition = {
   name: string;
@@ -21,6 +27,38 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  arena: {
+    name: "ENDLESS ARENA",
+    bounds: { left: -32, right: 32, back: -22, front: 22 },
+    barriers: [
+      // Four broad entrances. The near wall stays low enough for the overhead camera.
+      ...[-19, 19].flatMap((x): BoxSpec[] => [
+        { x, z: -22.5, w: 26, d: 1, h: 3, style: "wall" },
+        { x, z: 22.5, w: 26, d: 1, h: 0.6, style: "wall" },
+      ]),
+      ...[-32.5, 32.5].flatMap((x): BoxSpec[] => [-14, 14].map((z) => ({
+        x, z, w: 1, d: 16, h: 2, style: "wall",
+      }))),
+      { x: 0, z: -6, w: 4, d: 3, h: 2.6, style: "crate" },
+      { x: -11, z: 0, w: 0.8, d: 9, h: 1.25, style: "barrier" },
+      { x: 11, z: 0, w: 0.8, d: 9, h: 1.25, style: "barrier" },
+      { x: 0, z: 6, w: 5, d: 0.8, h: 1.3, style: "barrier" },
+      { x: -19, z: -11, w: 3, d: 3, h: 2.5, style: "crate" },
+      { x: 19, z: -11, w: 3, d: 3, h: 2.5, style: "crate" },
+      { x: -19, z: 11, w: 6, d: 0.8, h: 1.3, style: "barrier" },
+      { x: 19, z: 11, w: 6, d: 0.8, h: 1.3, style: "barrier" },
+    ],
+    platforms: [],
+    players: [
+      { x: -1.1, z: 10.1 }, { x: -1.1, z: 7.9 },
+      { x: 1.1, z: 7.9 }, { x: 1.1, z: 10.1 },
+    ],
+    targets: [],
+    props: [
+      { x: -5, z: 0, w: 1.4, h: 1.3, d: 1.4, mass: 25 },
+      { x: 5, z: 0, w: 1.4, h: 1.3, d: 1.4, mass: 25 },
+    ],
+  },
   proving: {
     name: "PROVING GROUND",
     bounds: BOUNDS,
