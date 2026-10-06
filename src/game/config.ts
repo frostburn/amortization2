@@ -81,13 +81,13 @@ export const FRIENDLY_FIRE = {
 } as const;
 export const ROBOT_MODELS = {
   assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun", weapons: ["gun", "grenade"] },
-  sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },
-  minigunner: { name: "SPINDLE", hp: 200, mass: 130, weapon: "minigun", weapons: ["minigun"] },
+  sniper: { name: "SNIPER", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },
+  minigunner: { name: "MINIGUNNER", hp: 200, mass: 130, weapon: "minigun", weapons: ["minigun"] },
 } as const;
 export type RobotModel = keyof typeof ROBOT_MODELS;
 export const squadName = (id: number, model: RobotModel | null) =>
   id === 4 ? model === "sniper" ? "NEEDLE" : model === "minigunner" ? "SPINDLE" : "BOLT"
-    : SQUAD_NAMES[id - 1];
+    : id === 2 && model === "minigunner" ? "ROOK" : SQUAD_NAMES[id - 1];
 export type RangeBounds = {
   left: number;
   right: number;
@@ -133,7 +133,7 @@ export const TARGET_SPAWNS = [
   { x: 14.5, z: -9.5, kind: "blast" },
   { x: 13, z: -12, kind: "blast" },
 ] as const;
-export const SQUAD_NAMES = ["ANCHOR", "ROOK", "LATCH", "NEEDLE"];
+export const SQUAD_NAMES = ["ANCHOR", "BREECH", "LATCH", "NEEDLE"];
 export const PLAYER_SPAWNS = [
   { x: -14, z: 10 },
   { x: -4, z: 10 },

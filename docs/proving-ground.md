@@ -14,7 +14,7 @@ The playable yard is 66 × 48 metres, viewed through a panning, zooming isometri
 | 02 / Displacement | Two reinforced robot targets, one moving plate, crates | Can a stream of hits move a target without making it unreadable? |
 | 03 / Fragments    | Three targets in a concrete bay, loose props           | Can a thrown grenade exploit a route that direct fire cannot?    |
 
-Four squad members start across the apron. LATCH starts at the grenade bay. Choose a sniper, twin-minigun or machine-gun squad; the twin-minigun configuration converts ROOK (2) and robot 4 to minigunners. ANCHOR and LATCH retain grenades. See the [squad and minigun design](minigun.md). Both automatic weapons count toward the plate drill. All lanes share one simulation, so units can cross between drills. Completion records persist until reset. There is no score pressure or limited ammunition reserve in this range.
+Four squad members start across the apron. LATCH starts at the grenade bay. Choose a sniper, twin-minigun or machine-gun squad; the twin-minigun configuration replaces BREECH (2) with ROOK and robot 4 with SPINDLE, both minigunners. ANCHOR and LATCH retain grenades. See the [squad and minigun design](minigun.md). Both automatic weapons count toward the plate drill. All lanes share one simulation, so units can cross between drills. Completion records persist until reset. There is no score pressure or limited ammunition reserve in this range.
 
 ## Initial tuning
 
