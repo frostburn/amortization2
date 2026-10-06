@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Deterministic CC0 sound edit. Requires ffmpeg, Python, numpy and scipy.
+"""Deterministic CC0 sound edit. Requires ffmpeg with Rubber Band, numpy and scipy.
 
 Run from any directory: python scripts/build-minigun-sounds.py
 The checked-in 48 kHz mono PCM16 assets need no Python at runtime/build time.
 """
 from pathlib import Path
+import io
 import subprocess
 import wave
 
@@ -51,51 +52,86 @@ def mix_at(destination, sound, seconds, gain=1):
         destination[i:i + count] += sound[:count] * gain
 
 
-def save(name, x):
+def save(name, x, flac=False):
     assert np.isfinite(x).all() and np.max(np.abs(x)) < 1
-    with wave.open(str(OUT / f"{name}.wav"), "wb") as f:
+    destination = io.BytesIO() if flac else str(OUT / f"{name}.wav")
+    with wave.open(destination, "wb") as f:
         f.setnchannels(1)
         f.setsampwidth(2)
         f.setframerate(SR)
         f.writeframes(np.rint(x * 32767).astype("<i2").tobytes())
+    if flac:
+        # Auditions are not runtime assets. Lossless compression keeps their source
+        # files small without changing a sample or the WAVs imported by the game.
+        subprocess.run([
+            "ffmpeg", "-v", "error", "-y", "-f", "wav", "-i", "-",
+            "-map_metadata", "-1", "-compression_level", "12",
+            str(OUT / f"{name}.flac"),
+        ], input=destination.getvalue(), check=True)
     print(f"{name:20s} {len(x) / SR:.3f} s  peak {np.max(np.abs(x)):.3f}")
 
 
-def build():
-    OUT.mkdir(exist_ok=True)
-    # A stable two-second saw section, softened to keep the motor below the reports.
-    raw = filter_audio(read("185232")[2 * SR:4 * SR], [80, 2200], "bandpass")
-    # Circular overlap: the final crossfade joins the samples before the first frame.
-    n, overlap = round(0.8 * SR), round(0.08 * SR)
-    raw = raw[:n + overlap]
+def stretch(x, seconds, pitch=0.4):
+    """Keep the recorded motor sweep while shortening it independently of pitch."""
+    tempo = len(x) / SR / seconds
+    guard = round(0.3 * SR)
+    # Analysis windows need context around an edit. Discard this reflected handle
+    # afterwards, so a cut in the saw recording cannot become a stretched thump.
+    padded = fade(np.pad(x, (guard, guard), mode="reflect"), 0.02, 0.02)
+    edit = subprocess.run([
+        "ffmpeg", "-v", "error", "-f", "f64le", "-ar", str(SR), "-ac", "1",
+        "-i", "-", "-af",
+        f"rubberband=tempo={tempo}:pitch={pitch}:"
+        "transients=smooth:detector=soft:window=long:pitchq=quality",
+        "-f", "f64le", "-",
+    ], input=padded.astype("<f8").tobytes(), stdout=subprocess.PIPE, check=True)
+    result = np.frombuffer(edit.stdout, dtype="<f8").copy()
+    handle, length = round(guard / tempo), round(seconds * SR)
+    # Rubber Band's final analysis window can round the requested sample count.
+    # Correct only that rounding, rather than padding a silent transition/loop seam.
+    result = signal.resample(result, length + 2 * handle)
+    return result[handle:handle + length]
+
+
+def motor_fragments():
+    # olliehahn12's saw records an actual run-up, steady motor and coast-down.
+    # Keep those performances; do not manufacture both ramps from a steady loop.
+    source = read("262004")
+    section = lambda start, end: source[round(start * SR):round(end * SR)]
+
+    def body(x):
+        x = filter_audio(x, [65, 4200], "bandpass")
+        # Retain the audible gear whine, with more weight below it and less cutting hiss.
+        return x * 0.7 + filter_audio(x, 450, "lowpass") * 0.9
+
+    overlap = round(0.04 * SR)
+    raw = body(stretch(section(3.35, 4.31), 0.84))
     motor = raw[overlap:].copy()
     blend = np.linspace(0, 1, overlap)
     motor[-overlap:] = raw[-overlap:] * (1 - blend) + raw[:overlap] * blend
     motor -= np.mean(motor)
-    # Remove a possible endpoint discontinuity without creating a silent loop seam.
     correction = round(0.004 * SR)
     motor[-correction:] -= np.linspace(0, motor[-1] - motor[0], correction)
-    motor = level(motor, 0.64)
-    click = fade(level(read("67613"), 0.6), 0.0003, 0.004)
-    shake = fade(level(filter_audio(read("67614"), [120, 2800], "bandpass"), 0.4))
 
-    def ramp(seconds, start_rate, end_rate, end_at_zero=False):
-        length = round(seconds * SR)
-        rates = np.linspace(start_rate, end_rate, length)
-        phase = np.cumsum(rates) - rates[0]
-        if end_at_zero:
-            phase -= phase[-1]
-        return np.interp(phase % len(motor), np.arange(len(motor) + 1), np.r_[motor, motor[0]])
+    up = body(stretch(section(0.025, 2.15), 0.5))
+    down = body(stretch(section(7.22, 10), 0.7))
+    rms = lambda x: np.sqrt(np.mean(x * x))
+    # Match the powered ends to the loop, preserving each recording's natural envelope.
+    powered = round(0.08 * SR)
+    up *= rms(motor[:powered]) / rms(up[-powered:])
+    down *= rms(motor[:powered]) / rms(down[:powered])
+    up[-overlap:] = up[-overlap:] * (1 - blend) + motor[-overlap:] * blend
+    down[:overlap] = motor[:overlap] * (1 - blend) + down[:overlap] * blend
+    up = fade(up, 0.012, 0)
+    # The supplied recording ends before complete rest: taper the remaining room/motor tail.
+    down = fade(down, 0.004, 0.13)
+    gain = 0.7 / max(np.max(np.abs(x)) for x in (up, motor, down))
+    return up * gain, motor * gain, down * gain
 
-    up = ramp(0.5, 0.25, 1, True)
-    up *= np.linspace(0.12, 1, len(up))
-    up = fade(up, 0.008, 0)
-    mix_at(up, click, 0.03, 0.32)
-    mix_at(up, shake, 0.08, 0.07)
-    down = ramp(0.7, 1, 0.2)
-    down *= np.linspace(1, 0, len(down)) ** 0.8
-    down = fade(down, 0.006, 0.04)
-    mix_at(down, click, 0.64, 0.25)
+
+def build():
+    OUT.mkdir(exist_ok=True)
+    up, motor, down = motor_fragments()
     save("spin-up", up)
     save("motor-loop", motor)
     save("spin-down", down)
@@ -151,7 +187,7 @@ def build():
     demo = np.zeros(round(5.5 * SR))
     mix_at(demo, up, 0.1, 0.4)
     for i in range(3):
-        mix_at(demo, motor, 0.6 + i * 0.8, 0.32)
+        mix_at(demo, motor, 0.6 + i * 0.8, 0.4)
     mix_at(demo, attack, 0.6, 0.72)
     for i in range(4):
         mix_at(demo, sustain, 1 + i * 0.4, 0.72)
@@ -160,8 +196,18 @@ def build():
     mix_at(demo, down, 2.6, 0.4)
     mix_at(demo, fade(tail, 0.003, 0.04), 2.6, 0.72)
     mix_at(demo, fade(up[:round(0.18 * SR)], 0.008, 0.008), 3.8, 0.4)
-    mix_at(demo, down[round(0.7 * 0.64 * SR):], 3.98, 0.25)
-    save("demo", fade(demo, 0.005, 0.02))
+    mix_at(demo, down[round(0.7 * 0.64 * SR):], 3.98, 0.4)
+    save("demo", fade(demo, 0.005, 0.02), flac=True)
+
+    # Expose the motor on its own so the reports do not mask a sound-design audition.
+    motor_demo = np.zeros(round(4.4 * SR))
+    mix_at(motor_demo, up, 0.1, 0.8)
+    for i in range(2):
+        mix_at(motor_demo, motor, 0.6 + i * 0.8, 0.8)
+    mix_at(motor_demo, down, 2.2, 0.8)
+    mix_at(motor_demo, fade(up[:round(0.18 * SR)], 0.008, 0.008), 3.4, 0.8)
+    mix_at(motor_demo, down[round(0.7 * 0.64 * SR):], 3.58, 0.8)
+    save("motor-demo", fade(motor_demo, 0.005, 0.02), flac=True)
 
 
 if __name__ == "__main__":

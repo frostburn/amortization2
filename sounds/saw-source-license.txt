@@ -1,0 +1,13 @@
+Source: 262004__olliehahn12__saw.flac
+Title: saw
+Author/uploader: olliehahn12
+Source page: https://freesound.org/s/262004/
+License: Creative Commons Zero (CC0 1.0)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+Supplied separately by the project owner as a CC0 recording on 2026-10-06.
+The supplied AIFF attachment remains unchanged. The repository contains a
+working FLAC copy: stereo channels averaged to mono, resampled to 24 kHz and
+encoded as 16-bit PCM. Its recorded acceleration, steady motor and coast-down
+form the minigun's edited motor fragments. The edit
+recipe is scripts/build-minigun-sounds.py; derived WAVs are also CC0.
