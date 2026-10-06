@@ -251,7 +251,7 @@ export class Simulation {
     const player = kind === "player";
     const robot = player || kind === "enemy";
     const model: RobotModel | null = robot
-      ? enemyModel ?? (id === 4
+      ? enemyModel ?? (id === 4 || (id === 2 && this.fourthModel === "minigunner")
         ? this.fourthModel
         : "assault")
       : null;

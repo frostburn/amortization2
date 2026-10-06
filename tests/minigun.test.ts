@@ -8,7 +8,7 @@ const ticks = (sim: Simulation, count: number) => {
 };
 const rounds = (sim: Simulation, id = 4) => sim.events.filter((e) => e.type === "shot" && e.actor === id);
 
-describe("minigun and fourth squad member", () => {
+describe("miniguns and squad configuration", () => {
   let sim: Simulation;
   beforeEach(async () => {
     sim = await Simulation.create("proving", "minigunner");
@@ -26,17 +26,28 @@ describe("minigun and fourth squad member", () => {
     expect(sim.canUse("minigun")).toBe(true);
     expect(sim.canUse("rifle")).toBe(false);
     expect(sim.canUse("grenade")).toBe(false);
-    sim.reset("long");
-    expect(sim.weapon).toBe("minigun");
-    sim.reset("arena");
+    for (const range of ["proving", "long", "arena"] as const) {
+      sim.reset(range);
+      expect(sim.squad.map((a) => a.model)).toEqual(["assault", "minigunner", "assault", "minigunner"]);
+      sim.select(2);
+      expect(sim.primary.weapon).toBe("minigun");
+      expect(sim.primary.maxHp).toBe(200);
+      expect(sim.primary.body.mass()).toBeCloseTo(130);
+      expect(sim.canUse("grenade")).toBe(false);
+      expect(sim.canUse("rifle")).toBe(false);
+      sim.reset();
+      expect(sim.squad[1].model).toBe("minigunner");
+    }
     expect(sim.fourthModel).toBe("minigunner");
     expect(sim.active).toHaveLength(4);
     sim.reset("proving", "assault");
+    expect(sim.squad.every((a) => a.model === "assault")).toBe(true);
     sim.select(4);
     expect(sim.primary.weapon).toBe("gun");
     expect(sim.primary.maxHp).toBe(160);
     expect(sim.grenadeThrower?.id).toBe(4);
     sim.reset("long", "sniper");
+    expect(sim.squad.map((a) => a.model)).toEqual(["assault", "assault", "assault", "sniper"]);
     expect(sim.weapon).toBe("rifle");
     expect(sim.toggleSniping()).toBe(true);
     sim.reset("long", "minigunner");
@@ -117,16 +128,49 @@ describe("minigun and fourth squad member", () => {
     ticks(sim, 12);
     expect(sim.events.some((e) => e.type === "shot" && e.actor === 1 && e.weapon === "gun")).toBe(true);
     expect(rounds(sim)).toHaveLength(0);
+    expect(rounds(sim, 2)).toHaveLength(0);
     ticks(sim, 30);
     expect(rounds(sim).length).toBeGreaterThan(0);
-    expect(sim.squad.slice(0, 3).every((a) => a.weapon === "gun")).toBe(true);
+    expect(rounds(sim, 2)).toHaveLength(rounds(sim).length);
+    expect(sim.squad.map((a) => a.weapon)).toEqual(["gun", "minigun", "gun", "minigun"]);
     sim.trigger = false;
     sim.reloadSelected();
     expect(sim.squad[0].reload).toBe(FIREARMS.gun.reload);
+    expect(sim.squad[1].reload).toBe(MINIGUN.reload);
     expect(sim.squad[3].reload).toBe(MINIGUN.reload);
     ticks(sim, 231);
     expect(sim.squad[0].ammo).toBe(90);
+    expect(sim.squad[1].ammo).toBe(240);
     expect(sim.squad[3].ammo).toBe(240);
+  });
+
+  test("grenade rotation in the twin-minigun squad uses only ANCHOR and LATCH", () => {
+    sim.select(5);
+    expect(sim.chooseWeapon("grenade")).toBe(true);
+    expect(sim.throwGrenade(sim.aim)).toBe(true);
+    expect(sim.throwGrenade(sim.aim)).toBe(true);
+    expect(sim.throwGrenade(sim.aim)).toBe(false);
+    expect(sim.grenades.map((g) => g.owner)).toEqual([1, 3]);
+    expect(sim.squad.filter((a) => a.model === "minigunner").every((a) => a.grenadeCooldown === 0)).toBe(true);
+  });
+
+  test("a staggered ROOK coasts while SPINDLE keeps firing, then resumes held fire", () => {
+    sim.selectGroup([2, 4]);
+    sim.setBrace(true);
+    sim.trigger = true;
+    ticks(sim, 35);
+    const rook = sim.squad[1], spindle = sim.squad[3];
+    const before = [rook.ammo, spindle.ammo];
+    sim.damage(rook, 1, { x: 0, y: 0, z: 0 }, rook.body.translation(), "minigun");
+    ticks(sim, 3);
+    expect(rook.ammo).toBe(before[0]);
+    expect(rook.spin).toBeLessThan(1);
+    expect(rook.firing).toBe(false);
+    expect(spindle.ammo).toBeLessThan(before[1]);
+    expect(spindle.firing).toBe(true);
+    ticks(sim, 12);
+    expect(rook.ammo).toBeLessThan(before[0]);
+    expect(rook.firing).toBe(true);
   });
 
   test("selection, weapon changes and death stop the rotary weapon", () => {
@@ -199,20 +243,24 @@ describe("minigun and fourth squad member", () => {
     expect(ally.hp).toBe(allyHp);
   });
 
-  test("arena repair refills a minigun belt without resurrecting fallen squad members", () => {
+  test("arena repair refills both minigun belts without resurrecting fallen squad members", () => {
     sim.reset("arena");
     ticks(sim, 250);
-    const a = sim.squad[3];
-    a.ammo = 5;
-    a.hp = 100;
+    const gunners = [sim.squad[1], sim.squad[3]];
+    for (const a of gunners) {
+      a.ammo = 5;
+      a.hp = 100;
+    }
     const fallen = sim.squad[0];
     sim.damage(fallen, 1000, { x: 0, y: 0, z: 0 }, fallen.body.translation());
     for (const enemy of sim.arena!.enemies)
       sim.damage(enemy, 1000, { x: 0, y: 0, z: 0 }, enemy.body.translation());
     ticks(sim, 1);
     expect(sim.arena!.phase).toBe("intermission");
-    expect(a.ammo).toBe(240);
-    expect(a.hp).toBe(200);
+    for (const a of gunners) {
+      expect(a.ammo).toBe(240);
+      expect(a.hp).toBe(200);
+    }
     expect(fallen.dead).toBe(true);
   });
 });

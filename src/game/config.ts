@@ -43,7 +43,7 @@ export const MINIGUN = {
   interval: 1 / 30,
   reload: 3.8,
   range: 65,
-  damage: 5,
+  damage: 6,
   muzzle: 1.18,
   windUp: 0.5,
   coast: 0.7,
@@ -64,11 +64,11 @@ export const AUTOMATIC_AIM = { height: 1.65, bodyOffset: 0.7 };
 // Automatic fire buys ground before it kills. Motor control must preserve this
 // external velocity rather than treating it as a walking error every frame.
 export const KINETIC = {
-  impulse: { gun: 180, minigun: 180, pistol: 36, rifle: 180 },
+  impulse: { gun: 180, minigun: 240, pistol: 36, rifle: 180 },
   bracedBullet: 0.6,
   drag: 3.2,
   maxSpeed: 7,
-  minigunMaxSpeed: 11,
+  minigunMaxSpeed: 13,
 };
 export const STAGGER = {
   duration: { gun: 0.18, minigun: 0.2, pistol: 0.22, rifle: 0.4, grenade: 0.65 },
@@ -81,13 +81,13 @@ export const FRIENDLY_FIRE = {
 } as const;
 export const ROBOT_MODELS = {
   assault: { name: "ASSAULT", hp: 160, mass: 90, weapon: "gun", weapons: ["gun", "grenade"] },
-  sniper: { name: "NEEDLE", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },
-  minigunner: { name: "SPINDLE", hp: 200, mass: 130, weapon: "minigun", weapons: ["minigun"] },
+  sniper: { name: "SNIPER", hp: 64, mass: 48, weapon: "rifle", weapons: ["rifle", "pistol"] },
+  minigunner: { name: "MINIGUNNER", hp: 200, mass: 130, weapon: "minigun", weapons: ["minigun"] },
 } as const;
 export type RobotModel = keyof typeof ROBOT_MODELS;
 export const squadName = (id: number, model: RobotModel | null) =>
   id === 4 ? model === "sniper" ? "NEEDLE" : model === "minigunner" ? "SPINDLE" : "BOLT"
-    : SQUAD_NAMES[id - 1];
+    : id === 2 && model === "minigunner" ? "ROOK" : SQUAD_NAMES[id - 1];
 export type RangeBounds = {
   left: number;
   right: number;
@@ -133,7 +133,7 @@ export const TARGET_SPAWNS = [
   { x: 14.5, z: -9.5, kind: "blast" },
   { x: 13, z: -12, kind: "blast" },
 ] as const;
-export const SQUAD_NAMES = ["ANCHOR", "ROOK", "LATCH", "NEEDLE"];
+export const SQUAD_NAMES = ["ANCHOR", "BREECH", "LATCH", "NEEDLE"];
 export const PLAYER_SPAWNS = [
   { x: -14, z: 10 },
   { x: -4, z: 10 },
