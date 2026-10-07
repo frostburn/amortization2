@@ -23,6 +23,7 @@ import { CityView } from "./city";
 import { CartFleet } from "./carts";
 import { KiteFleet } from "./kites";
 import { PorterFleet, makeTote } from "./porters";
+import { TrafficFleet } from "./traffic";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
@@ -170,6 +171,7 @@ export class RangeScene {
   private cartFleet?: CartFleet;
   private kiteFleet?: KiteFleet;
   private porterFleet?: PorterFleet;
+  private trafficFleet?: TrafficFleet;
   private environmentLabels = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
@@ -1091,6 +1093,8 @@ export class RangeScene {
     this.kiteFleet = undefined;
     this.porterFleet?.dispose();
     this.porterFleet = undefined;
+    this.trafficFleet?.dispose();
+    this.trafficFleet = undefined;
     for (const visual of this.actors.values()) this.disposeActor(visual);
     // Props retain their shared primitive geometry and materials.
     this.dynamic.traverse((object) => {
@@ -1112,6 +1116,8 @@ export class RangeScene {
       this.dynamic.add(this.kiteFleet.root);
       this.porterFleet = new PorterFleet(this.sim.city.porters);
       this.dynamic.add(this.porterFleet.root);
+      this.trafficFleet = new TrafficFleet(this.sim.city.vehicles, this.cityView?.reflectionTexture);
+      this.dynamic.add(this.trafficFleet.root);
     }
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
@@ -1572,6 +1578,7 @@ export class RangeScene {
     this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
     this.kiteFleet?.update(alpha, paused ? 0 : delta);
     this.porterFleet?.update(alpha);
+    this.trafficFleet?.update(alpha, this.sim.time);
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
       this.camera.position.y += (Math.random() - 0.5) * this.shake;

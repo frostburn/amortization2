@@ -6,6 +6,7 @@ import { CargoWorkers, type CivilianPorter } from "./porters";
 import type { Simulation } from "./simulation";
 import { segmentClear } from "./navigation";
 import { CityWindows } from "./windows";
+import { StreetTraffic, VEHICLES, type CivilianVehicle } from "./traffic";
 
 export const CART = { width: 0.82, length: 0.94, height: 0.62, mass: 35, hp: 36, speed: 1.6,
   retreatSpeed: 1.6, turnSpeed: 2.6, clearance: 0.65, maxImpactSpeed: 14, maxSpin: 8, motorPitch: 1 };
@@ -49,6 +50,7 @@ export class CityLife {
   flights: ParcelFlights;
   workers: CargoWorkers;
   windows: CityWindows;
+  traffic: StreetTraffic;
   closedUntil = new Map<string, number>();
   constructor(private sim: Simulation, public district: CityDistrict) {
     this.windows = new CityWindows(sim, district);
@@ -78,11 +80,13 @@ export class CityLife {
     }
     this.flights = new ParcelFlights(sim, district);
     this.workers = new CargoWorkers(sim, district);
+    this.traffic = new StreetTraffic(sim, district);
   }
 
   get kites() { return this.flights.kites; }
   get porters() { return this.workers.porters; }
-  neutral(handle: number) { return this.flights.neutral(handle) ?? this.workers.neutral(handle) ?? this.carts.find(c => c.collider.handle === handle); }
+  get vehicles() { return this.traffic.cars; }
+  neutral(handle: number) { return this.traffic.neutral(handle) ?? this.flights.neutral(handle) ?? this.workers.neutral(handle) ?? this.carts.find(c => c.collider.handle === handle); }
 
   get crossing() { return Math.floor(this.sim.time / 10) % 2; }
   isClosed(id: string) { return (this.closedUntil.get(id) ?? 0) > this.sim.time; }
@@ -97,6 +101,7 @@ export class CityLife {
   disturb(from: Vec3, to: Vec3 = from, duration = 8) {
     this.flights.disturb(from, to, duration);
     this.workers.disturb(from, to, duration);
+    this.traffic.disturb(from, to, duration);
     for (const c of this.carts) {
       const p = c.body.translation();
       if (c.hp <= 0 || (distance2(p, from) > 18 && lineDistance(p, from, to) > 4)) continue;
@@ -127,7 +132,8 @@ export class CityLife {
     c.body.setLinearDamping(0.35); c.body.setAngularDamping(1.8);
   }
 
-  damage(c: CivilianCart | CivilianKite | CivilianPorter, damage: number, impulse: Vec3, point: Vec3) {
+  damage(c: CivilianCart | CivilianKite | CivilianPorter | CivilianVehicle, damage: number, impulse: Vec3, point: Vec3) {
+    if ("path" in c) { this.traffic.damage(c, damage, impulse, point); this.disturb(point); return; }
     if (c.model === "KITE") { this.flights.damage(c, damage, impulse, point); this.disturb(point); return; }
     if (c.model === "PORTER") { this.workers.damage(c, damage, impulse, point); this.disturb(point); return; }
     const chassis = CIVILIAN_CHASSIS[c.model];
@@ -155,6 +161,7 @@ export class CityLife {
     this.disturb(origin, origin, 12);
     this.flights.blast(origin);
     this.workers.blast(origin);
+    this.traffic.blast(origin);
     for (const c of this.carts) {
       const p = c.body.translation(), distance = Math.hypot(p.x - origin.x, p.y - origin.y, p.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;
@@ -171,6 +178,7 @@ export class CityLife {
   update() {
     this.flights.update();
     this.workers.update();
+    this.traffic.update();
     for (const c of this.carts) {
       const chassis = CIVILIAN_CHASSIS[c.model];
       const p = c.body.translation(), velocity = c.body.linvel();
@@ -227,6 +235,7 @@ export class CityLife {
         ...this.sim.actors.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.45, cart: false })),
         ...this.sim.props.map(a => ({ id: -a.id, p: a.body.translation(), radius: Math.max(a.w, a.d) / 2 + 0.8, cart: false })),
         ...this.porters.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.35, cart: false })),
+        ...this.vehicles.map(a => ({ id: -a.id, p: a.body.translation(), radius: VEHICLES[a.model].length / 2 + 0.7, cart: false })),
         ...this.carts.filter(other => other !== c).map(other => ({ id: other.id, p: other.body.translation(),
           radius: chassis.clearance + CIVILIAN_CHASSIS[other.model].clearance, cart: true })),
       ];
@@ -257,7 +266,7 @@ export class CityLife {
   }
 
   inspect() {
-    return { crossing: this.crossing, windows: this.windows.inspect(), kites: this.flights.inspect(), porters: this.workers.inspect(),
+    return { crossing: this.crossing, windows: this.windows.inspect(), kites: this.flights.inspect(), porters: this.workers.inspect(), vehicles: this.traffic.inspect(),
       closedShops: this.district.buildings.filter(b => this.isClosed(b.id)).map(b => b.id),
       carts: this.carts.map(c => ({ id: c.id, model: c.model, route: c.route.id, state: c.state, compartment: c.compartment,
         hp: c.hp, yaw: c.yaw, deliveries: c.deliveries, distance: c.distance,

@@ -25,6 +25,7 @@ import {
   type Firearm,
 } from "./config";
 import { CityLife } from "./civilians";
+import { vehicleFootprint } from "./traffic";
 import { dryGround } from "./city";
 import { NavigationGrid, segmentClear } from "./navigation";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
@@ -520,6 +521,7 @@ export class Simulation {
   }
   private dynamicNavigationBoxes(includeTargets = true) {
     return [
+      ...(this.city?.vehicles ?? []).filter(c => !c.hp || c.state === "stranded").map(vehicleFootprint),
       ...this.props.map((p) => ({
         x: p.body.translation().x,
         z: p.body.translation().z,

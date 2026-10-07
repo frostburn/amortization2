@@ -28,7 +28,7 @@ export const buildingSolid = (b: BuildingSpec): BoxSpec => {
 };
 export type DeliveryPoint = Vec2 & { stop?: number; building?: string };
 export type GroundCivilianModel = "CART" | "CRATE";
-export type CivilianModel = GroundCivilianModel | "KITE" | "PORTER";
+export type CivilianModel = GroundCivilianModel | "KITE" | "PORTER" | "CAB" | "VAN";
 export type CartRoute = { id: string; points: DeliveryPoint[]; count: number; color: number; model?: GroundCivilianModel };
 export type DeliveryPad = Vec2 & { id: string; color: number };
 /** Corridors are traversed at altitude; takeoff and final approach are vertical. */

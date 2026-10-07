@@ -177,6 +177,7 @@ export class CargoWorkers {
       const blockers = [
         ...this.sim.actors.map(a => ({ at: a.body.translation(), radius: 1.45 })),
         ...this.sim.city!.carts.map(c => ({ at: c.body.translation(), radius: 1.5 })),
+        ...this.sim.city!.vehicles.map(c => ({ at: c.body.translation(), radius: 3.6 })),
         ...this.porters.filter(other => other !== p).map(other => ({ at: other.body.translation(), radius: 1.25 })),
         ...this.sim.props.filter(prop => prop !== p.cargo).map(prop => ({ at: prop.body.translation(), radius: Math.max(prop.w, prop.d) / 2 + 0.9 })),
       ];
