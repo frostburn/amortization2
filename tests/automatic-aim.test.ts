@@ -74,6 +74,48 @@ describe("automatic upper-body aim", () => {
     expect(sim.hits).toBe(0);
   });
 
+  test.each([1, 4])("braced operator %s aims and fires at the ground without the cover-clearance lift", id => {
+    sim.select(id);
+    sim.primary.body.setTranslation({ x: 2, y: 0.96, z: 20 }, true);
+    for (let i = 0; i < 20; i++) sim.step();
+    const cursor = { x: 5, y: 0, z: 24 };
+    expect(pick(cursor).aim.y).toBeGreaterThan(1);
+    sim.setBrace(true); sim.primary.spin = 1;
+    sim.aim = pick(cursor).aim;
+    expect(sim.aim.y).toBeCloseTo(0, 4);
+    expect(sim.aim.x).toBeCloseTo(cursor.x, 4); expect(sim.aim.z).toBeCloseTo(cursor.z, 4);
+    const expected = sim.aimTrace(sim.primary).to;
+    sim.shoot(sim.primary);
+    const shot = sim.events.find(e => e.type === "shot")!;
+    if (shot.type !== "shot") throw Error("missing shot");
+    expect(shot.to.y).toBeCloseTo(0, 4);
+    expect(shot.to.x).toBeCloseTo(expected.x, 4); expect(shot.to.z).toBeCloseTo(expected.z, 4);
+    // Bracing does not change ground-only placement or unbraced clearance assistance.
+    expect(pick(cursor, true).aim.y).toBeGreaterThan(1);
+    sim.setBrace(false); expect(pick(cursor).aim.y).toBeGreaterThan(1);
+  });
+
+  test("bracing preserves the hovered leg height instead of raising it to the chest", () => {
+    sim.select(1);
+    const enemy = sim.addEnemy("assault", { x: 2, z: 20 });
+    for (let i = 0; i < 20; i++) sim.step();
+    const point = { ...enemy.body.translation(), y: enemy.body.translation().y - 0.4 };
+    const unbraced = pick(point);
+    sim.setBrace(true);
+    const braced = pick(point);
+    expect(braced.actor).toBe(enemy.id);
+    expect(braced.aim.y).toBeLessThan(unbraced.aim.y - 0.5);
+  });
+
+  test("NEEDLE's braced pistol also follows the ground surface", () => {
+    sim.reset("arena", "sniper"); sim.select(4); sim.chooseWeapon("pistol");
+    for (let i = 0; i < 20; i++) sim.step();
+    const cursor = { x: 5, y: 0, z: 24 };
+    expect(pick(cursor).aim.y).toBeGreaterThan(1);
+    sim.setBrace(true);
+    expect(pick(cursor).aim.y).toBeCloseTo(0, 4);
+  });
+
   test.each([1, 4])("operator %s can aim at and knock around a dropped PORTER tote", (id) => {
     sim.reset("port", "minigunner"); sim.select(id);
     const cargo = sim.city!.porters[0].cargo;

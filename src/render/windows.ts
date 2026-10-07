@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { WINDOW_BORDER, MULLION, openingPanes, wallPanels, type Facade, type PaneSpec } from "../game/facades";
-import { block, panel, surface } from "./primitives";
+import { block, panel } from "./primitives";
 
 /** Framed apertures, sills and transoms; glazing is separately instanced. */
 export function makeFacade(face: Facade, wall: THREE.Material, frame: THREE.Material, door: THREE.Material) {
@@ -27,35 +27,40 @@ export function makeFacade(face: Facade, wall: THREE.Material, frame: THREE.Mate
 /** One draw per building, independent of its pane count. No transparency sorting. */
 export class WindowView {
   readonly mesh: THREE.InstancedMesh;
-  readonly material = surface(0x678b98, 0.3, 0.2);
+  readonly material = new THREE.MeshPhysicalMaterial({
+    color: 0x24343b, roughness: 0.12, metalness: 0,
+    ior: 1.52, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 3.2,
+  });
   private hidden = new Set<string>();
+  private broken?: Set<string>;
   private revision = -1;
   private dummy = new THREE.Object3D();
   constructor(readonly panes: PaneSpec[], coverage = true) {
     this.material.side = THREE.DoubleSide; this.material.alphaToCoverage = coverage;
-    this.material.onBeforeCompile = shader => {
-      shader.vertexShader = "varying vec2 glassUv;\n" + shader.vertexShader.replace("#include <uv_vertex>", "#include <uv_vertex>\nglassUv = uv;");
-      shader.fragmentShader = "varying vec2 glassUv;\n" + shader.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
-        float diagonal = glassUv.x + glassUv.y * 0.65;
-        float sheen = smoothstep(0.35, 0.42, diagonal) * (1.0 - smoothstep(0.5, 0.57, diagonal));
-        sheen += 0.35 * smoothstep(0.65, 0.68, diagonal) * (1.0 - smoothstep(0.72, 0.75, diagonal));
-        diffuseColor.rgb *= 0.48 + glassUv.y * 0.55;
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.64, 0.78, 0.8), sheen * 0.65);`);
-    };
     this.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), this.material, panes.length);
+    this.mesh.userData.glazing = true;
     this.mesh.geometry.userData.owned = true;
-    panes.forEach((p,i) => {
-      this.dummy.position.set(p.x, p.y, p.z); this.dummy.rotation.set(p.pitch ?? 0, p.turn * Math.PI / 2, 0, "YXZ");
-      this.dummy.scale.set(p.w, p.h, 1); this.dummy.updateMatrix(); this.mesh.setMatrixAt(i, this.dummy.matrix);
-    });
+    panes.forEach((_,i) => this.restore(i));
     this.mesh.computeBoundingSphere();
   }
+  private restore(i: number) {
+    const p = this.panes[i];
+    this.dummy.position.set(p.x, p.y, p.z); this.dummy.rotation.set(p.pitch ?? 0, p.turn * Math.PI / 2, 0, "YXZ");
+    this.dummy.scale.set(p.w, p.h, 1); this.dummy.updateMatrix(); this.mesh.setMatrixAt(i, this.dummy.matrix);
+  }
   update(broken: Set<string>) {
-    if (broken.size === this.revision) return;
+    // Broken IDs only accumulate within a level. Reset supplies a new set,
+    // potentially with the same size before this view gets its next update.
+    if (broken === this.broken && broken.size === this.revision) return;
+    this.broken = broken;
     this.revision = broken.size;
-    for (const [i,p] of this.panes.entries()) if (broken.has(p.id) && !this.hidden.has(p.id)) {
-      this.mesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0)); this.hidden.add(p.id);
-      this.mesh.instanceMatrix.needsUpdate = true;
+    for (const [i,p] of this.panes.entries()) {
+      if (broken.has(p.id) && !this.hidden.has(p.id)) {
+        this.mesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0)); this.hidden.add(p.id);
+        this.mesh.instanceMatrix.needsUpdate = true;
+      } else if (!broken.has(p.id) && this.hidden.delete(p.id)) {
+        this.restore(i); this.mesh.instanceMatrix.needsUpdate = true;
+      }
     }
   }
 }

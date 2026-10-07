@@ -41,6 +41,7 @@ describe("breakable window panes", () => {
     const panes = sim.city!.windows.panes.filter(p => p.spec.id.startsWith("grocer/"));
     const view = new WindowView(panes.map(p => p.spec));
     try {
+      const intact = new Matrix4(); view.mesh.getMatrixAt(0, intact);
       const pane = panes[0]; sim.city!.windows.hit(pane.collider.handle, pane.spec, { x: 0, y: 0, z: 1 });
       view.update(sim.city!.windows.broken);
       const matrix = new Matrix4(); view.mesh.getMatrixAt(0, matrix);
@@ -51,6 +52,14 @@ describe("breakable window panes", () => {
       expect(sim.city!.windows.broken.has(pane.spec.id)).toBe(true);
       sim.reset(); expect(sim.city!.windows.broken.size).toBe(0);
       expect(sim.city!.windows.panes.every(p => !p.broken)).toBe(true);
+      view.update(sim.city!.windows.broken); view.mesh.getMatrixAt(0, matrix);
+      expect(matrix.elements).toEqual(intact.elements);
+      // A reset followed immediately by one new break has the same count, but
+      // the old opening must close while the newly shattered pane disappears.
+      view.update(new Set([panes[0].spec.id]));
+      view.update(new Set([panes[1].spec.id]));
+      view.mesh.getMatrixAt(0, matrix); expect(matrix.elements).toEqual(intact.elements);
+      view.mesh.getMatrixAt(1, matrix); expect(matrix.elements[0]).toBe(0);
     } finally { view.mesh.dispose(); view.mesh.geometry.dispose(); view.material.dispose(); }
   });
 

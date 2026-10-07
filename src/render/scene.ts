@@ -727,9 +727,11 @@ export class RangeScene {
     // receiver enough to avoid self-shadow speckling on broad building walls.
     this.sun.shadow.normalBias = this.sim.city ? 0.1 : 0.035;
     camera.updateProjectionMatrix();
+    this.cityView?.captureReflections(this.renderer, this.scene);
   }
 
   resetEnvironment() {
+    this.cityView?.disposeReflections();
     const shared = new Set<THREE.Material>([
       metal,
       dark,
@@ -1226,12 +1228,13 @@ export class RangeScene {
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
     const automatic = this.sim.weapon === "gun" || this.sim.weapon === "minigun";
-    let aim: Vec3 = { x: ground.x, y: automatic ? AUTOMATIC_AIM.height : 1.25, z: ground.z };
+    const braced = this.sim.active.some(a => a.braced && this.sim.followsOrder(a, this.sim.weapon));
+    let aim: Vec3 = { x: ground.x, y: braced && !grenade ? 0 : automatic ? AUTOMATIC_AIM.height : 1.25, z: ground.z };
     if (!grenade && hit && actor) {
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
-      // Hovering a leg must not dip an automatic burst back into low cover.
-      // Elevated targets retain their own height, including shots above this floor.
-      if (automatic && !actor.dead) {
+      // Unbraced automatic bursts clear low cover; bracing gives precise
+      // surface aim, including legs and the ground. Elevated hits keep their height.
+      if (automatic && !braced && !actor.dead) {
         const p = actor.body.translation(), upperBody = p.y + AUTOMATIC_AIM.bodyOffset;
         if (aim.y < upperBody)
           aim = { x: p.x, y: upperBody, z: p.z };
@@ -1244,7 +1247,7 @@ export class RangeScene {
       // Loose cargo keeps its physical hitbox when dropped. Aim at its actual
       // surface instead of applying the empty-ground height used to clear cover.
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
-    else if (!grenade && hit && this.sim.weapon === "rifle")
+    else if (!grenade && hit && (braced || this.sim.weapon === "rifle"))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     return { aim, ground, actor: actor?.id };
   }

@@ -53,7 +53,7 @@ describe("building facades", () => {
         const panes = sample(x, y);
         expect(panes).toHaveLength(1);
         expect((panes[0].object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>).material.color.getHex())
-          .toBe(i === 0 && prefab !== "depot" ? 0x678b98 : 0x656d6b);
+          .toBe(i === 0 && prefab !== "depot" ? 0x24343b : 0x656d6b);
         expect(panes[0].point.z).toBeCloseTo(front + 0.04, 4);
       }
       const wall = sample(prefab === "pump" ? 5.15 : 9, 2.12);

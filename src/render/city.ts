@@ -96,6 +96,7 @@ export class CityView {
   private signals: { mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>; axis: number }[] = [];
   private water: WaterView[];
   private glazing: WindowView[] = [];
+  private reflection?: THREE.WebGLRenderTarget;
   private ray = new THREE.Ray();
   private intersection = new THREE.Vector3();
   constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true) {
@@ -153,6 +154,42 @@ export class CityView {
       this.glazing.push(shipGlass); this.root.add(shipGlass.mesh);
     }
   }
+
+  /** Capture static scenery once per district; camera motion changes reflection
+   * direction without six extra scene renders on every combat frame. */
+  captureReflections(renderer: THREE.WebGLRenderer, source: THREE.Scene) {
+    if (this.reflection) return;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xb7c4ca);
+    scene.fog = new THREE.Fog(0xb7c4ca, 180, 320);
+    const scenery = this.root.clone(true);
+    scenery.traverse(o => { if (o.userData.glazing) o.visible = false; });
+    scene.add(scenery);
+    for (const light of source.children) if (light instanceof THREE.Light) {
+      const copy = light.clone(); copy.castShadow = false; scene.add(copy);
+      if (copy instanceof THREE.DirectionalLight) scene.add(copy.target);
+    }
+    const cube = new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType });
+    const camera = new THREE.CubeCamera(0.1, 400, cube);
+    camera.position.set(0, 6, 4); scene.add(camera);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const shadows = renderer.shadowMap.enabled;
+    try {
+      renderer.shadowMap.enabled = false;
+      camera.update(renderer, scene);
+      this.reflection = pmrem.fromCubemap(cube.texture);
+      for (const view of this.glazing) {
+        view.material.envMap = this.reflection.texture; view.material.needsUpdate = true;
+      }
+    } finally {
+      renderer.shadowMap.enabled = shadows;
+      cube.dispose(); pmrem.dispose();
+      // Clones share the live geometry/materials; only release their instance buffers.
+      scenery.traverse(o => { if (o instanceof THREE.InstancedMesh) o.dispose(); });
+    }
+  }
+
+  disposeReflections() { this.reflection?.dispose(); this.reflection = undefined; }
 
   update(sim: Simulation, camera: THREE.Camera, delta: number) {
     if (!sim.city) return;
