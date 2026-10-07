@@ -99,10 +99,11 @@ export type GameEvent =
       to: Vec3;
       hit: boolean;
       impact: boolean;
-      material: "metal" | "concrete";
+      material: "metal" | "concrete" | "glass";
       normal: Vec3;
     }
   | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" }
+  | { type: "glass"; position: Vec3; normal: Vec3 }
   | {
       type: "throw" | "bounce" | "reload" | "empty" | "down";
       position: Vec3;
@@ -202,7 +203,7 @@ export class Simulation {
       this.world.createCollider(RAPIER.ColliderDesc.cuboid(water.w / 2, 0.5, water.d / 2).setFriction(0.8), bed);
     }
     for (const box of [...this.layout.barriers, ...this.layout.platforms]) {
-      if (box.navigationOnly) continue;
+      if (box.navigationOnly || box.building) continue;
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, (box.y ?? 0) + box.h / 2, box.z),
       );
@@ -722,7 +723,7 @@ export class Simulation {
 
   rifleSpread(a: Actor) {
     return a.braced
-      ? 0.0006 + (1 - clamp(a.braceTime / RIFLE.settle, 0, 1)) * 0.024
+      ? (1 - clamp(a.braceTime / RIFLE.settle, 0, 1)) * 0.024
       : 0.04 + a.recoil * 0.055 + (1 - a.stability) * 0.02;
   }
 
@@ -763,7 +764,7 @@ export class Simulation {
     };
     const length = Math.hypot(delta.x, delta.y, delta.z) || 1;
     const speed = Math.hypot(a.body.linvel().x, a.body.linvel().z);
-    const spread = (a.braced ? 0.003 : 0.005 + a.recoil * 0.005 + (a.path.length ? 0.006 : 0))
+    const spread = a.braced ? 0 : (0.005 + a.recoil * 0.005 + (a.path.length ? 0.006 : 0))
       + Math.min(0.006, speed * 0.001)
       + (a.kind === "enemy" ? 0.012 : pistol ? 0.004 : weapon === "minigun" && !a.braced ? 0.006 : 0);
     const dir = rifle
@@ -791,7 +792,8 @@ export class Simulation {
     const target =
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
     const hitOpponent = !!target && !target.dead && this.team(target) !== this.team(a);
-    if (target && !target.dead) {
+    const glass = !!hit && !!this.city?.windows.hit(hit.collider.handle, to, hit.normal);
+    if (!glass && target && !target.dead) {
       this.damage(
         target,
         spec.damage,
@@ -807,12 +809,12 @@ export class Simulation {
         if (covering) this.coverHits++;
         else this.hits++;
       }
-    } else if (hit && this.city?.neutral(hit.collider.handle)) {
+    } else if (!glass && hit && this.city?.neutral(hit.collider.handle)) {
       const cart = this.city.neutral(hit.collider.handle)!;
       const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
       this.city.damage(cart, spec.damage, { x: dir.x * strength,
         y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
-    } else if (hit?.collider.parent()?.isDynamic()) {
+    } else if (!glass && hit?.collider.parent()?.isDynamic()) {
       // Break the grip before the shot impulse can transfer into PORTER's hull.
       if (rifle) {
         const porter = this.city?.porters.find(p => p.grip && p.cargo.body.handle === hit.collider.parent()!.handle);
@@ -850,7 +852,7 @@ export class Simulation {
       hit: hitOpponent,
       impact: !!hit,
       material:
-        target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
+        glass ? "glass" : target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
       normal: hit ? vcopy(hit.normal) : { x: 0, y: 1, z: 0 },
     });
   }
@@ -1076,6 +1078,7 @@ export class Simulation {
       );
     }
     this.city?.blast(origin);
+    this.city?.windows.blast(origin);
     this.events.push({ type: "explosion", position: origin, affected, team: grenade.team });
   }
 

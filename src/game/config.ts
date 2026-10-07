@@ -8,6 +8,7 @@ export type BoxSpec = {
   h: number;
   y?: number;
   navigationOnly?: boolean;
+  building?: string;
   style: "wall" | "barrier" | "crate";
 };
 export const STEP = 1 / 60;

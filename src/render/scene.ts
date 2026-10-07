@@ -155,6 +155,7 @@ type Particle = {
   size: number;
   color: THREE.Color;
   smoke: boolean;
+  shard: boolean;
 };
 type Trail = { mesh: THREE.Mesh; life: number };
 
@@ -182,6 +183,8 @@ export class RangeScene {
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
     400,
   );
+  private glassMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 3),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }), 400);
   private trails: Trail[] = [];
   private flashes = new Map<number, number>();
   private blastRings: { mesh: THREE.Mesh; age: number }[] = [];
@@ -340,11 +343,13 @@ export class RangeScene {
       this.environmentLabels,
       this.dynamic,
       this.particleMesh,
+      this.glassMesh,
       this.bulletMarks,
       this.lightFlash,
     );
     this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.particleMesh.count = 0;
+    this.glassMesh.count = 0;
     this.bulletMarks.count = 0;
     this.aimRing.rotation.x = this.blastPreview.rotation.x = -Math.PI / 2;
     this.aimGround.rotation.x = -Math.PI / 2;
@@ -741,6 +746,7 @@ export class RangeScene {
     const materials = new Set<THREE.Material>();
     for (const group of [this.environment, this.environmentLabels]) group.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
+      if (o instanceof THREE.InstancedMesh) o.dispose();
       o.geometry.dispose();
       const list = Array.isArray(o.material) ? o.material : [o.material];
       list.forEach((m) => materials.add(m));
@@ -1124,6 +1130,7 @@ export class RangeScene {
     }
     this.blastRings = [];
     this.particles = [];
+    this.glassMesh.count = 0;
     this.particleMesh.count = 0;
     this.markIndex = 0;
     this.bulletMarks.count = 0;
@@ -1230,6 +1237,8 @@ export class RangeScene {
           aim = { x: p.x, y: upperBody, z: p.z };
       }
     } else if (!grenade && hit && this.sim.city?.neutral(hit.collider.handle))
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    else if (!grenade && hit && this.sim.city?.windows.has(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle))
       // Loose cargo keeps its physical hitbox when dropped. Aim at its actual
@@ -1427,7 +1436,9 @@ export class RangeScene {
   }
 
   event(e: GameEvent) {
-    if (e.type === "shot") {
+    if (e.type === "glass") {
+      this.emit(e.position, 20, 0xa6cdd5, 3.4, false, 0.1, true);
+    } else if (e.type === "shot") {
       const from = new THREE.Vector3(e.from.x, e.from.y, e.from.z),
         to = new THREE.Vector3(e.to.x, e.to.y, e.to.z);
       const length = from.distanceTo(to);
@@ -1511,12 +1522,13 @@ export class RangeScene {
     speed: number,
     smoke: boolean,
     size: number,
+    shard = false,
   ) {
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= 400) this.particles.shift();
       const angle = Math.random() * Math.PI * 2,
         velocity = speed * (0.3 + Math.random() * 0.7),
-        life = smoke ? 0.65 + Math.random() * 0.8 : 0.13 + Math.random() * 0.32;
+        life = smoke ? 0.65 + Math.random() * 0.8 : shard ? 0.8 + Math.random() * 0.4 : 0.13 + Math.random() * 0.32;
       this.particles.push({
         p: new THREE.Vector3(
           position.x,
@@ -1533,6 +1545,7 @@ export class RangeScene {
         size: size * (0.5 + Math.random()),
         color: new THREE.Color(color),
         smoke,
+        shard,
       });
     }
   }
@@ -1593,6 +1606,10 @@ export class RangeScene {
       const aimingFirearm = a.model === "sniper" || !!a.cover || a.kind === "enemy" || (
         this.sim.selected.has(a.id) && this.sim.weapon !== "grenade" && this.sim.followsOrder(a, this.sim.weapon)
       );
+      // The supported upper body follows the reticle while the feet remain planted.
+      v.torso.rotation.order = "YXZ";
+      v.torso.rotation.y = a.braced && aimingFirearm && !a.dead
+        ? Math.atan2(aim.x - p.x, aim.z - p.z) - a.yaw : 0;
       v.torso.rotation.x = a.dead
         ? 0
         : aimingFirearm
@@ -1720,8 +1737,8 @@ export class RangeScene {
       return false;
     });
     this.particles = this.particles.filter((p) => p.life > 0);
-    this.particleMesh.count = this.particles.length;
-    this.particles.forEach((p, i) => {
+    this.particleMesh.count = this.glassMesh.count = 0;
+    this.particles.forEach(p => {
       p.life -= delta;
       p.p.addScaledVector(p.v, delta);
       p.v.y -= (p.smoke ? -0.6 : 10) * delta;
@@ -1734,6 +1751,7 @@ export class RangeScene {
       }
       this.dummy.position.copy(p.p);
       this.dummy.quaternion.identity();
+      if (p.shard) this.dummy.rotation.set(p.life * 12, p.life * 7, p.life * 15);
       this.dummy.scale.setScalar(
         Math.max(
           0.001,
@@ -1741,8 +1759,9 @@ export class RangeScene {
         ),
       );
       this.dummy.updateMatrix();
-      this.particleMesh.setMatrixAt(i, this.dummy.matrix);
-      this.particleMesh.setColorAt(
+      const mesh = p.shard ? this.glassMesh : this.particleMesh, i = mesh.count++;
+      mesh.setMatrixAt(i, this.dummy.matrix);
+      mesh.setColorAt(
         i,
         p.color
           .clone()
@@ -1752,6 +1771,8 @@ export class RangeScene {
     this.particleMesh.instanceMatrix.needsUpdate = true;
     if (this.particleMesh.instanceColor)
       this.particleMesh.instanceColor.needsUpdate = true;
+    this.glassMesh.instanceMatrix.needsUpdate = true;
+    if (this.glassMesh.instanceColor) this.glassMesh.instanceColor.needsUpdate = true;
     for (const b of this.blastRings) {
       b.age += delta;
       b.mesh.scale.setScalar(0.2 + b.age * 15);

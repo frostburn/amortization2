@@ -24,7 +24,7 @@ export type BuildingSpec = {
 export const buildingSolid = (b: BuildingSpec): BoxSpec => {
   const kit = BUILDING_KIT[b.prefab];
   return { x: b.x, z: b.z, w: b.turn % 2 ? kit.d : kit.w,
-    d: b.turn % 2 ? kit.w : kit.d, h: kit.h, style: "wall" };
+    d: b.turn % 2 ? kit.w : kit.d, h: kit.h, style: "wall", building: b.id };
 };
 export type DeliveryPoint = Vec2 & { stop?: number; building?: string };
 export type GroundCivilianModel = "CART" | "CRATE";

@@ -95,6 +95,23 @@ describe("automatic upper-body aim", () => {
     expect(pick({ ...cargo.body.translation() }, true).ground.y).toBe(0);
   });
 
+  test.each([1, 4])("braced operator %s converges on a hovered pane after an aim change", id => {
+    sim.reset("city", "minigunner"); sim.select(id);
+    const pane = sim.city!.windows.panes.find(p => p.spec.id === "grocer/0/1/0")!;
+    sim.primary.body.setTranslation({ x: pane.spec.x, y: 0.98, z: pane.spec.z + 8 }, true);
+    sim.world.step(); sim.setBrace(true); sim.primary.yaw = Math.PI / 2; sim.primary.spin = 1;
+    sim.aim = pick(pane.spec).aim;
+    expect(sim.aim.y).toBeLessThan(1.5);
+    const expected = sim.aimTrace(sim.primary).to;
+    sim.shoot(sim.primary);
+    const shot = sim.events.find(e => e.type === "shot")!;
+    if (shot.type !== "shot") throw Error("missing shot");
+    // Rapier's mesh intersections use float32; compare well below a millimetre.
+    expect(shot.to.x).toBeCloseTo(expected.x, 4); expect(shot.to.y).toBeCloseTo(expected.y, 4);
+    expect(shot.to.z).toBeCloseTo(expected.z, 4);
+    expect(sim.city!.windows.broken.has(pane.spec.id)).toBe(true);
+  });
+
   test("elevated silhouettes keep their height while movement and grenades use the ground", () => {
     sim.reset("long", "sniper");
     sim.select(1);
