@@ -941,7 +941,7 @@ a:hover {
     height: 27px;
     top: 3px;
   }
-  .unit.minigunner-unit svg { height: 27px; }
+  .unit.minigunner-unit svg { height: 25px; }
   .unit-name {
     bottom: 7px;
     font-size: 9px;
