@@ -4,6 +4,7 @@ import type { RangeId } from "../game/ranges";
 export const TACTICAL_CAMERA_OFFSET = { x: 48, y: 48, z: 48 };
 const views = {
   city: { halfHeight: 35, halfWidth: 53 },
+  port: { halfHeight: 36, halfWidth: 55 },
   proving: { halfHeight: 24, halfWidth: 34 },
   arena: { halfHeight: 28, halfWidth: 44 },
   long: { halfHeight: 40, halfWidth: 66 },

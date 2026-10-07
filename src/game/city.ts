@@ -1,4 +1,5 @@
 import type { BoxSpec, RangeBounds, Vec2 } from "./config";
+import type { PortLayout } from "./port";
 
 // Metres. Templates are shared by visual construction, collision and navigation.
 export const BUILDING_KIT = {
@@ -27,12 +28,15 @@ export const buildingSolid = (b: BuildingSpec): BoxSpec => {
 };
 export type DeliveryPoint = Vec2 & { stop?: number; building?: string };
 export type GroundCivilianModel = "CART" | "CRATE";
-export type CivilianModel = GroundCivilianModel | "KITE";
+export type CivilianModel = GroundCivilianModel | "KITE" | "PORTER";
 export type CartRoute = { id: string; points: DeliveryPoint[]; count: number; color: number; model?: GroundCivilianModel };
 export type DeliveryPad = Vec2 & { id: string; color: number };
 /** Corridors are traversed at altitude; takeoff and final approach are vertical. */
 export type FlightRoute = { id: string; home: string; destination: string; altitude: number; corridor: Vec2[]; color: number };
-export type WaterFeature = Vec2 & { id: string; w: number; d: number; crossings: { z: number; width: number }[] };
+export type WaterFeature = Vec2 & { id: string; w: number; d: number; crossings: { z: number; width: number }[];
+  harbor?: { surface: number; bed: number } };
+export type CargoStop = Vec2 & { station?: { id: string; yaw: number } };
+export type PorterRoute = { id: string; points: CargoStop[]; color: number };
 
 /** The bed is shallow; navigation excludes water, while impacts can cross its banks. */
 export function waterSections(water: WaterFeature) {
@@ -51,6 +55,12 @@ export function inWater(point: Vec2, water: WaterFeature) {
     waterSections(water).some(s => point.z > s.back && point.z < s.front);
 }
 export function waterSolids(water: WaterFeature): BoxSpec[] {
+  if (water.harbor) return [
+    { x: water.x, z: water.z, w: water.w, d: water.d, h: 0.1, style: "barrier", navigationOnly: true },
+    // A retaining wall, rather than a floor beneath the sea. Its west edge is the quay.
+    { x: water.x - water.w / 2, z: water.z, w: 0.6, d: water.d, h: -water.harbor.bed,
+      y: water.harbor.bed, style: "wall" },
+  ];
   const solids: BoxSpec[] = [];
   for (const { back, front } of waterSections(water)) {
     const z = (back + front) / 2, d = front - back;
@@ -78,7 +88,27 @@ export type CityDistrict = {
   water: WaterFeature[];
   streets: { axis: "x" | "z"; at: number; center: number; length: number; width: number; sidewalk: number }[];
   junctions: Vec2[];
+  port?: PortLayout;
+  porterRoutes?: PorterRoute[];
 };
+
+/** Shared by visible paving and physics. Harbor water removes the ground slab. */
+export function dryGround(extent: RangeBounds, water: WaterFeature[]) {
+  let pieces = [{ ...extent }];
+  for (const w of water.filter(w => w.harbor)) {
+    const cut = { left: w.x - w.w / 2, right: w.x + w.w / 2, back: w.z - w.d / 2, front: w.z + w.d / 2 };
+    pieces = pieces.flatMap(p => {
+      const left = Math.max(p.left, cut.left), right = Math.min(p.right, cut.right);
+      const back = Math.max(p.back, cut.back), front = Math.min(p.front, cut.front);
+      if (left >= right || back >= front) return [p];
+      return [
+        { ...p, right: left }, { ...p, left: right },
+        { left, right, back: p.back, front: back }, { left, right, back: front, front: p.front },
+      ].filter(r => r.right > r.left && r.front > r.back);
+    });
+  }
+  return pieces;
+}
 
 const buildings: BuildingSpec[] = [
   { id: "grocer", prefab: "shop", x: -27, z: -21, turn: 0, finish: "sand", accent: 0x558b74 },

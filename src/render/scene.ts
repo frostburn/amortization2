@@ -22,6 +22,7 @@ import type {
 import { CityView } from "./city";
 import { CartFleet } from "./carts";
 import { KiteFleet } from "./kites";
+import { PorterFleet, makeTote } from "./porters";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
@@ -167,6 +168,7 @@ export class RangeScene {
   private cityView?: CityView;
   private cartFleet?: CartFleet;
   private kiteFleet?: KiteFleet;
+  private porterFleet?: PorterFleet;
   private environmentLabels = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
@@ -718,7 +720,7 @@ export class RangeScene {
     camera.far = district ? cityExtent * 2 + 80 : 230;
     // The city shadow frustum covers much more ground per texel; offset the
     // receiver enough to avoid self-shadow speckling on broad building walls.
-    this.sun.shadow.normalBias = this.sim.range === "city" ? 0.1 : 0.035;
+    this.sun.shadow.normalBias = this.sim.city ? 0.1 : 0.035;
     camera.updateProjectionMatrix();
   }
 
@@ -1079,6 +1081,8 @@ export class RangeScene {
     this.cartFleet = undefined;
     this.kiteFleet?.dispose();
     this.kiteFleet = undefined;
+    this.porterFleet?.dispose();
+    this.porterFleet = undefined;
     for (const visual of this.actors.values()) this.disposeActor(visual);
     // Props retain their shared primitive geometry and materials.
     this.dynamic.traverse((object) => {
@@ -1098,10 +1102,12 @@ export class RangeScene {
       this.dynamic.add(this.cartFleet.root);
       this.kiteFleet = new KiteFleet(this.sim.city.kites);
       this.dynamic.add(this.kiteFleet.root);
+      this.porterFleet = new PorterFleet(this.sim.city.porters);
+      this.dynamic.add(this.porterFleet.root);
     }
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
-      const group = this.makeCrate(p.w, p.h, p.d);
+      const group = p.style === "tote" ? makeTote() : this.makeCrate(p.w, p.h, p.d);
       this.batchRigidPart(group);
       this.dynamic.add(group);
       this.props.set(p.id, group);
@@ -1224,6 +1230,10 @@ export class RangeScene {
           aim = { x: p.x, y: upperBody, z: p.z };
       }
     } else if (!grenade && hit && this.sim.city?.neutral(hit.collider.handle))
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    else if (!grenade && hit && this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle))
+      // Loose cargo keeps its physical hitbox when dropped. Aim at its actual
+      // surface instead of applying the empty-ground height used to clear cover.
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.weapon === "rifle")
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
@@ -1533,6 +1543,7 @@ export class RangeScene {
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
     this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
     this.kiteFleet?.update(alpha, paused ? 0 : delta);
+    this.porterFleet?.update(alpha);
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
       this.camera.position.y += (Math.random() - 0.5) * this.shake;

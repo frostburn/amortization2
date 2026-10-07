@@ -100,7 +100,8 @@ export class ParcelFlights {
   }
   private occupied(c: CivilianKite, pad: Vec3) {
     const obstacles = [...this.sim.actors.map(a => a.body), ...this.sim.props.map(p => p.body),
-      ...(this.sim.city?.carts ?? []).map(c => c.body), ...this.kites.filter(k => k !== c).map(k => k.body)];
+      ...(this.sim.city?.carts ?? []).map(c => c.body), ...(this.sim.city?.porters ?? []).map(c => c.body),
+      ...this.kites.filter(k => k !== c).map(k => k.body)];
     return obstacles.some(body => { const p = body.translation(); return p.y < 3 && distance2(p, pad) < 2.5; });
   }
   update() {
