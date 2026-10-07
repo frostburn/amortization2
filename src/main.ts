@@ -179,7 +179,7 @@ async function start() {
     scene.updateAim(ground, false);
     audio.stop();
     accumulator = 0;
-    toast(sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
+    toast(sim.range === "port" ? "Port restored." : sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
@@ -213,9 +213,11 @@ async function start() {
     scene.resetCamera();
     accumulator = 0;
     document.getElementById("menu-title")!.textContent =
-      range === "city" ? "City district" : range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
+      range === "port" ? "Marine port" : range === "city" ? "City district" : range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent =
-      range === "city"
+      range === "port"
+        ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
+        : range === "city"
         ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
         : range === "arena"
         ? "Survive incoming robot squads. Watch the marked entrances, move around cover, and interrupt enemy bursts. Survivors are repaired and rearmed between waves; disabled robots stay down. Shift+R restarts."

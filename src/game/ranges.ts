@@ -9,8 +9,9 @@ import {
 } from "./config";
 
 import { CITY_DISTRICT, buildingSolid, waterSolids, type CityDistrict } from "./city";
+import { MARINE_PORT, portSolids } from "./port";
 
-export type RangeId = "proving" | "long" | "arena" | "city";
+export type RangeId = "proving" | "long" | "arena" | "city" | "port";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -30,6 +31,12 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  port: {
+    name: "MARINE PORT", city: MARINE_PORT, bounds: MARINE_PORT.bounds,
+    barriers: portSolids(MARINE_PORT), platforms: [],
+    players: [{ x: -1.1, z: 3.1 }, { x: -1.1, z: 0.9 }, { x: 1.1, z: 0.9 }, { x: 1.1, z: 3.1 }],
+    targets: [], props: [],
+  },
   city: {
     name: "CITY DISTRICT",
     city: CITY_DISTRICT,

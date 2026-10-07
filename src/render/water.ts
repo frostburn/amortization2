@@ -10,6 +10,7 @@ export class WaterView {
     const stone = surface(0xb9b5a2), steel = surface(0x43565b, 0.4);
     const structure = new THREE.Group();
     for (const b of waterSolids(water).filter(b => !b.navigationOnly)) {
+      if (water.harbor) continue; // The port kit supplies its retaining face and fenders.
       if (b.h < 0.9) block(structure, b.w, b.h, b.d, b.x, b.h / 2, b.z, stone);
       else {
         block(structure, b.w, 0.10, b.d, b.x, 0.90, b.z, steel);
@@ -28,7 +29,7 @@ export class WaterView {
       }
     }
     batchRigid(structure); this.root.add(structure);
-    const material = surface(0x387779, 0.35, 0.3);
+    const material = surface(water.harbor ? 0x426a73 : 0x387779, 0.35, 0.3);
     // Opaque, shallow water retains depth and has no facade sorting problem.
     // Small moving normals and broad highlights avoid glitter at tactical zoom.
     material.onBeforeCompile = shader => {
@@ -50,10 +51,10 @@ export class WaterView {
     material.customProgramCacheKey = () => "shallow-canal";
     for (const section of waterSections(water)) {
       const depth = section.front - section.back;
-      const geometry = new THREE.PlaneGeometry(water.w - 0.6, depth, 16, Math.ceil(depth));
+      const geometry = new THREE.PlaneGeometry(water.w - (water.harbor ? 0 : 0.6), depth, 16, Math.min(120, Math.ceil(depth)));
       geometry.rotateX(-Math.PI / 2); geometry.userData.owned = true;
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(water.x, 0.055, (section.back + section.front) / 2);
+      mesh.position.set(water.x, water.harbor?.surface ?? 0.055, (section.back + section.front) / 2);
       mesh.receiveShadow = true; this.root.add(mesh);
     }
   }

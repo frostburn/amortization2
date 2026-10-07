@@ -40,6 +40,7 @@ export class RangeAudio {
   private rotary = new Map<number, RotaryVoice>();
   private cartMotors = new Map<number, CartMotor>();
   private kiteRotors = new Map<number, CartMotor>();
+  private porterServos = new Map<number, CartMotor & { step: number }>();
   private transients = new Set<AudioScheduledSourceNode>();
   private pending?: Promise<void>;
   private noise?: AudioBuffer;
@@ -247,6 +248,41 @@ export class RangeAudio {
     }
     this.updateCarts(sim);
     this.updateKites(sim);
+    this.updatePorters(sim);
+  }
+
+  private updatePorters(sim: Simulation) {
+    const ctx = this.context!;
+    const distance = (p: Vec3) => Math.hypot(p.x - this.listener.x, p.y - this.listener.y, p.z - this.listener.z);
+    const active = (sim.city?.porters ?? []).filter(p => p.hp > 0 && !p.impactUntil && this.civilianVolume > 0 &&
+      (Math.hypot(p.body.linvel().x, p.body.linvel().z) > 0.08 || p.state === "pickup" || p.state === "place"))
+      .sort((a, b) => distance(a.body.translation()) - distance(b.body.translation())).slice(0, 4);
+    for (const [id, voice] of this.porterServos) if (!active.some(p => p.id === id)) {
+      this.stopCart(voice); this.porterServos.delete(id);
+    }
+    for (const p of active) {
+      const position = p.body.translation(), speed = Math.hypot(p.body.linvel().x, p.body.linvel().z);
+      const step = Math.floor(p.distance / 0.55);
+      let voice = this.porterServos.get(p.id);
+      if (!voice) {
+        const { amp, pan } = this.bus(position, 0), filter = ctx.createBiquadFilter(), harmonic = ctx.createGain();
+        filter.type = "lowpass"; filter.frequency.value = 950; filter.connect(amp);
+        harmonic.gain.value = 0.12; harmonic.connect(filter);
+        const sources = [ctx.createOscillator(), ctx.createOscillator()];
+        sources[0].type = "sine"; sources[1].type = "triangle";
+        sources[0].connect(filter); sources[1].connect(harmonic); sources.forEach(s => s.start());
+        voice = { sources, gain: amp, pan, filter, step }; this.porterServos.set(p.id, voice);
+        sources[1].onended = () => { sources.forEach(s => s.disconnect()); harmonic.disconnect(); filter.disconnect(); amp.disconnect(); pan.disconnect(); };
+      }
+      const working = p.state === "pickup" || p.state === "place";
+      const pitch = 105 + speed * 58 + (working ? Math.sin(p.phase * Math.PI) * 30 : 0);
+      voice.sources[0].frequency.setTargetAtTime(pitch, ctx.currentTime, 0.08);
+      voice.sources[1].frequency.setTargetAtTime(pitch * 3.01, ctx.currentTime, 0.08);
+      voice.gain.gain.setTargetAtTime(0.019 * this.civilianVolume * Math.min(1, working ? 0.7 : speed) * this.distanceGain(position), ctx.currentTime, 0.09);
+      voice.pan.pan.setTargetAtTime(spatialPan(position, this.listener, this.listenerRight), ctx.currentTime, 0.08);
+      if (step > voice.step && speed > 0.1) this.tone(position, 78, 0.027 * this.civilianVolume * this.distanceGain(position), 0.065, 42);
+      voice.step = step;
+    }
   }
 
   private updateKites(sim: Simulation) {
@@ -402,6 +438,8 @@ export class RangeAudio {
     this.cartMotors.clear();
     for (const voice of this.kiteRotors.values()) this.stopCart(voice);
     this.kiteRotors.clear();
+    for (const voice of this.porterServos.values()) this.stopCart(voice);
+    this.porterServos.clear();
     for (const source of this.transients) source.stop();
     this.transients.clear();
   }
@@ -527,6 +565,7 @@ export class RangeAudio {
       loops: this.voices.size,
       cartMotors: this.cartMotors.size,
       kiteRotors: this.kiteRotors.size,
+      porterServos: this.porterServos.size,
       miniguns: [...this.rotary].map(([actor, voice]) => ({ actor, phase: voice.phase, spin: voice.spin, firing: !!voice.fire })),
       transients: this.transients.size,
       impacts: this.impactSerial,

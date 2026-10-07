@@ -61,6 +61,10 @@ Each wave adds robots up to three four-member squads, then continues indefinitel
 
 Choose **City District** for a 234 × 147 metre urban sandbox. Twenty six-wheel CARTs circulate between shops and homes; five heavier **CRATE** parcel cabinets serve the depot, station hall, canal library and apartments, opening one of three compartments per visit. Both chassis yield to the squad and one another. Pan east for a shallow canal with two paved crossings, stone banks, quay furniture and a pump house; ground orders use the crossings. Nearby gunfire interrupts collection and closes local shop shutters; activity resumes after quiet. Hits launch and tumble civilian hulls, including wrecks, with CRATE's greater mass resisting bullet pressure. Their quiet motor mix is independently adjustable in the pause menu. Buildings, streets, paving and canals use reusable geometry and shared collision/navigation data. The district has no mission or enemy waves yet. See [city construction and behavior](docs/city-district.md) and [the civilian cast through 2040](docs/civilian-robots.md).
 
+## Marine port
+
+Choose **Marine Port** for a 204 × 140 metre cargo district with warehouses, stacked intermodal containers, two quay gantries and a moored coastal freighter. Four **PORTER** working bipeds lift and carry physical totes between loading stands, alongside CART, CRATE and KITE traffic. Nearby gunfire makes them steady their loads and withdraw; hits release the cargo and tumble their heavy hulls. Their quiet servos and foot contacts share the **Civilian motors** mix. Clear access lanes and water-aware navigation keep movement on the quay; loose cargo knocked into the harbor sinks. Buildings, containers, loading stations and port props are reusable. See [Marine port and PORTER](docs/marine-port.md).
+
 ## Controls
 
 | Input                       | Action                                                                         |

@@ -1,10 +1,11 @@
 import * as THREE from "three";
-import { BUILDING_KIT, type BuildingSpec, type CityDistrict } from "../game/city";
+import { BUILDING_KIT, dryGround, type BuildingSpec, type CityDistrict } from "../game/city";
 import type { Simulation } from "../game/simulation";
 import { batchRigid, block, panel, surface, tube } from "./primitives";
 import { WaterView } from "./water";
 import { makeStreets } from "./streets";
 import { makeDeliveryPad } from "./kites";
+import { makePort } from "./port";
 
 type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
   bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
@@ -140,8 +141,8 @@ export class CityView {
     const white = surface(0xd3cdbc), dark = surface(0x344347, 0.4);
     const leaf = surface(0x566f53), earth = surface(0x737767);
     const extent = district.ground;
-    block(ground, extent.right - extent.left, 0.16, extent.front - extent.back,
-      (extent.left + extent.right) / 2, -0.1, (extent.back + extent.front) / 2, earth);
+    for (const piece of dryGround(extent, district.water)) block(ground, piece.right - piece.left, 0.16, piece.front - piece.back,
+      (piece.left + piece.right) / 2, -0.1, (piece.back + piece.front) / 2, earth);
     ground.add(makeStreets(district, texture));
     // Pad paint sits above paving; keep it out of the baked street surfaces.
     for (const pad of district.pads) this.root.add(makeDeliveryPad(pad));
@@ -169,6 +170,7 @@ export class CityView {
     batchRigid(ground); this.root.add(ground);
     this.water = district.water.map(spec => new WaterView(spec));
     this.water.forEach(w => this.root.add(w.root));
+    if (district.port) this.root.add(makePort(district));
     const background = new THREE.Group(), shared = new Map<string, THREE.MeshStandardMaterial>();
     this.buildings = [];
     for (const spec of district.buildings) {

@@ -24,6 +24,7 @@ import {
   type Firearm,
 } from "./config";
 import { CityLife } from "./civilians";
+import { dryGround } from "./city";
 import { NavigationGrid, segmentClear } from "./navigation";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat, type EnemyBrain } from "./arena";
@@ -75,6 +76,7 @@ export interface Prop {
   w: number;
   h: number;
   d: number;
+  style?: "tote";
   previous: Vec3;
   previousRotation: { x: number; y: number; z: number; w: number };
 }
@@ -166,7 +168,7 @@ export class Simulation {
     this.props = [];
     this.grenades = [];
     this.events = [];
-    this.selected = new Set((range === "arena" || range === "city") ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
+    this.selected = new Set((range === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
     this.trigger = false;
     this.sniping = false;
     this.weapon = range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
@@ -188,21 +190,21 @@ export class Simulation {
     this.nextId = 100;
     this.drill = { gun: false, impulse: false, grenade: false, rifle: false };
     const bounds = this.layout.bounds;
-    const floor = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(
-        (bounds.left + bounds.right) / 2, -0.5, (bounds.back + bounds.front) / 2,
-      ),
-    );
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(
-        (bounds.right - bounds.left) / 2 + 24, 0.5, (bounds.front - bounds.back) / 2 + 24,
-      ).setFriction(0.8),
-      floor,
-    );
+    const extent = { left: bounds.left - 24, right: bounds.right + 24, back: bounds.back - 24, front: bounds.front + 24 };
+    for (const piece of dryGround(extent, this.layout.city?.water ?? [])) {
+      const floor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(
+        (piece.left + piece.right) / 2, -0.5, (piece.back + piece.front) / 2));
+      this.world.createCollider(RAPIER.ColliderDesc.cuboid((piece.right - piece.left) / 2, 0.5,
+        (piece.front - piece.back) / 2).setFriction(0.8), floor);
+    }
+    for (const water of this.layout.city?.water ?? []) if (water.harbor) {
+      const bed = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(water.x, water.harbor.bed - 0.5, water.z));
+      this.world.createCollider(RAPIER.ColliderDesc.cuboid(water.w / 2, 0.5, water.d / 2).setFriction(0.8), bed);
+    }
     for (const box of [...this.layout.barriers, ...this.layout.platforms]) {
       if (box.navigationOnly) continue;
       const body = this.world.createRigidBody(
-        RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, box.h / 2, box.z),
+        RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, (box.y ?? 0) + box.h / 2, box.z),
       );
       this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2).setFriction(

@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { BLAST_RADIUS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
 import { buildingSolid, inWater, type GroundCivilianModel, type CartRoute, type CityDistrict } from "./city";
 import { ParcelFlights, type CivilianKite } from "./aircraft";
+import { CargoWorkers, type CivilianPorter } from "./porters";
 import type { Simulation } from "./simulation";
 import { segmentClear } from "./navigation";
 
@@ -45,6 +46,7 @@ function lineDistance(p: Vec2, a: Vec2, b: Vec2) {
 export class CityLife {
   carts: CivilianCart[] = [];
   flights: ParcelFlights;
+  workers: CargoWorkers;
   closedUntil = new Map<string, number>();
   constructor(private sim: Simulation, public district: CityDistrict) {
     let id = 1000;
@@ -72,10 +74,12 @@ export class CityLife {
       }
     }
     this.flights = new ParcelFlights(sim, district);
+    this.workers = new CargoWorkers(sim, district);
   }
 
   get kites() { return this.flights.kites; }
-  neutral(handle: number) { return this.flights.neutral(handle) ?? this.carts.find(c => c.collider.handle === handle); }
+  get porters() { return this.workers.porters; }
+  neutral(handle: number) { return this.flights.neutral(handle) ?? this.workers.neutral(handle) ?? this.carts.find(c => c.collider.handle === handle); }
 
   get crossing() { return Math.floor(this.sim.time / 10) % 2; }
   isClosed(id: string) { return (this.closedUntil.get(id) ?? 0) > this.sim.time; }
@@ -89,6 +93,7 @@ export class CityLife {
 
   disturb(from: Vec3, to: Vec3 = from, duration = 8) {
     this.flights.disturb(from, to, duration);
+    this.workers.disturb(from, to, duration);
     for (const c of this.carts) {
       const p = c.body.translation();
       if (c.hp <= 0 || (distance2(p, from) > 18 && lineDistance(p, from, to) > 4)) continue;
@@ -119,8 +124,9 @@ export class CityLife {
     c.body.setLinearDamping(0.35); c.body.setAngularDamping(1.8);
   }
 
-  damage(c: CivilianCart | CivilianKite, damage: number, impulse: Vec3, point: Vec3) {
+  damage(c: CivilianCart | CivilianKite | CivilianPorter, damage: number, impulse: Vec3, point: Vec3) {
     if (c.model === "KITE") { this.flights.damage(c, damage, impulse, point); this.disturb(point); return; }
+    if (c.model === "PORTER") { this.workers.damage(c, damage, impulse, point); this.disturb(point); return; }
     const chassis = CIVILIAN_CHASSIS[c.model];
     const wasAlive = c.hp > 0;
     c.hp = Math.max(0, c.hp - damage);
@@ -145,6 +151,7 @@ export class CityLife {
   blast(origin: Vec3) {
     this.disturb(origin, origin, 12);
     this.flights.blast(origin);
+    this.workers.blast(origin);
     for (const c of this.carts) {
       const p = c.body.translation(), distance = Math.hypot(p.x - origin.x, p.y - origin.y, p.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;
@@ -160,6 +167,7 @@ export class CityLife {
 
   update() {
     this.flights.update();
+    this.workers.update();
     for (const c of this.carts) {
       const chassis = CIVILIAN_CHASSIS[c.model];
       const p = c.body.translation(), velocity = c.body.linvel();
@@ -215,6 +223,7 @@ export class CityLife {
       const obstacles = [
         ...this.sim.actors.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.45, cart: false })),
         ...this.sim.props.map(a => ({ id: -a.id, p: a.body.translation(), radius: Math.max(a.w, a.d) / 2 + 0.8, cart: false })),
+        ...this.porters.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.35, cart: false })),
         ...this.carts.filter(other => other !== c).map(other => ({ id: other.id, p: other.body.translation(),
           radius: chassis.clearance + CIVILIAN_CHASSIS[other.model].clearance, cart: true })),
       ];
@@ -245,7 +254,7 @@ export class CityLife {
   }
 
   inspect() {
-    return { crossing: this.crossing, kites: this.flights.inspect(),
+    return { crossing: this.crossing, kites: this.flights.inspect(), porters: this.workers.inspect(),
       closedShops: this.district.buildings.filter(b => this.isClosed(b.id)).map(b => b.id),
       carts: this.carts.map(c => ({ id: c.id, model: c.model, route: c.route.id, state: c.state, compartment: c.compartment,
         hp: c.hp, yaw: c.yaw, deliveries: c.deliveries, distance: c.distance,

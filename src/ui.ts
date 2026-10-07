@@ -27,7 +27,7 @@ const rifleIcon =
 const minigunIcon =
   '<svg viewBox="0 0 100 36" aria-hidden="true"><path d="M9 11h35v17H9zM23 3h16v8H23zM43 9h10v22H43zM53 11h44v4H53zm0 7h44v4H53zm0 7h44v4H53zM67 8h5v25h-5zM85 8h5v25h-5z" fill="currentColor"/></svg>';
 const rangeOptions =
-  '<option value="proving">PROVING GROUND</option><option value="long">LONG RANGE</option><option value="arena">ENDLESS ARENA</option><option value="city">CITY DISTRICT</option>';
+  '<option value="proving">PROVING GROUND</option><option value="long">LONG RANGE</option><option value="arena">ENDLESS ARENA</option><option value="city">CITY DISTRICT</option><option value="port">MARINE PORT</option>';
 const loadoutOptions =
   '<option value="sniper">NEEDLE · SNIPER</option><option value="minigunner">TWIN MINIGUNS</option><option value="assault">BOLT · MACHINE GUNNER</option>';
 
@@ -117,10 +117,10 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
       state.reload > 0 ? `${(1 - state.reload / sim.reloadDuration(a, weapon)) * 100}%` : "0";
   }
   const arena = sim.arena;
-  document.getElementById("drills")!.hidden = !!arena || sim.range === "city";
+  document.getElementById("drills")!.hidden = !!arena || !!sim.city;
   document.getElementById("arena-panel")!.hidden = !arena;
   document.getElementById("arena-defeat")!.hidden = arena?.phase !== "defeat";
-  text("reset", arena ? "RESTART ARENA" : sim.range === "city" ? "RESET DISTRICT" : "RESET RANGE");
+  text("reset", arena ? "RESTART ARENA" : sim.range === "port" ? "RESET PORT" : sim.city ? "RESET DISTRICT" : "RESET RANGE");
   if (arena) {
     const pending = arena.phase === "incoming" || arena.phase === "intermission";
     text("arena-wave", `WAVE ${arena.wave + Number(pending)}`);
