@@ -74,12 +74,12 @@ export class CityWindows {
     this.breakPane(pane, point, normal); this.rebuild(group); return true;
   }
   has(handle: number) { return this.byHandle.has(handle); }
-  blast(origin: Vec3) {
+  blast(origin: Vec3, source?: RAPIER.RigidBody) {
     // Resolve exposure before changing any mesh, so authoring order cannot
     // change which panes a solid wall shields from the pressure.
     const exposed = this.panes.filter(p => !p.broken &&
       Math.hypot(p.spec.x - origin.x, p.spec.y - origin.y, p.spec.z - origin.z) < BLAST_RADIUS &&
-      !this.sim.ray(origin, p.spec, undefined, c => c.handle !== p.collider.handle));
+      !this.sim.ray(origin, p.spec, source, c => c.handle !== p.collider.handle));
     const changed = new Set<Glazing>();
     for (const p of exposed) {
       changed.add(this.byHandle.get(p.collider.handle)!);

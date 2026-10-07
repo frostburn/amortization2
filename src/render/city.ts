@@ -190,6 +190,7 @@ export class CityView {
   }
 
   disposeReflections() { this.reflection?.dispose(); this.reflection = undefined; }
+  get reflectionTexture() { return this.reflection?.texture; }
 
   update(sim: Simulation, camera: THREE.Camera, delta: number) {
     if (!sim.city) return;

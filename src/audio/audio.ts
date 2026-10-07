@@ -323,7 +323,7 @@ export class RangeAudio {
 
   private updateCarts(sim: Simulation) {
     const ctx = this.context!;
-    const moving = (sim.city?.carts ?? []).filter(c => c.hp > 0 && !c.impactUntil && this.civilianVolume > 0 && Math.hypot(c.body.linvel().x, c.body.linvel().z) > 0.08)
+    const moving = [...(sim.city?.carts ?? []), ...(sim.city?.vehicles ?? [])].filter(c => c.hp > 0 && !c.impactUntil && this.civilianVolume > 0 && Math.hypot(c.body.linvel().x, c.body.linvel().z) > 0.08)
       .sort((a, b) => {
         const pa = a.body.translation(), pb = b.body.translation();
         return Math.hypot(pa.x - this.listener.x, pa.z - this.listener.z) - Math.hypot(pb.x - this.listener.x, pb.z - this.listener.z);
@@ -346,11 +346,11 @@ export class RangeAudio {
         voice = { sources, gain: amp, pan, filter }; this.cartMotors.set(c.id, voice);
         sources[1].onended = () => { sources.forEach(s => s.disconnect()); harmonic.disconnect(); filter.disconnect(); amp.disconnect(); pan.disconnect(); };
       }
-      const pitch = CIVILIAN_CHASSIS[c.model].motorPitch;
-      const frequency = (150 + speed * 90 + (c.id % 7) * 5) * pitch;
+      const vehicle = "colliders" in c;
+      const frequency = vehicle ? 68 + speed * 26 : (150 + speed * 90 + (c.id % 7) * 5) * CIVILIAN_CHASSIS[c.model].motorPitch;
       voice.sources[0].frequency.setTargetAtTime(frequency, ctx.currentTime, 0.15);
       voice.sources[1].frequency.setTargetAtTime(frequency * 4.03, ctx.currentTime, 0.15);
-      voice.gain.gain.setTargetAtTime(0.025 * this.civilianVolume * Math.min(1, speed) * this.distanceGain(position), ctx.currentTime, 0.09);
+      voice.gain.gain.setTargetAtTime((vehicle ? 0.014 : 0.025) * this.civilianVolume * Math.min(1, speed / (vehicle ? 3 : 1)) * this.distanceGain(position), ctx.currentTime, 0.09);
       voice.pan.pan.setTargetAtTime(spatialPan(position, this.listener, this.listenerRight), ctx.currentTime, 0.08);
     }
   }
@@ -546,8 +546,9 @@ export class RangeAudio {
         this.impact(e.to, e.material === "metal");
       this.flyby(e.from, e.to);
     } else if (e.type === "explosion") {
-      this.sample("blast", e.position, 0.95, 0.97 + Math.random() * 0.06);
-      this.tone(e.position, 75, 0.25, 0.35, 34);
+      const vehicle=e.vehicle!==undefined;
+      this.sample("blast", e.position, 0.95, (vehicle?0.82:0.97) + Math.random() * 0.06);
+      this.tone(e.position, vehicle?58:75, vehicle?0.4:0.25, 0.35, vehicle?27:34);
     } else if (e.type === "bounce") this.impact(e.position, true, 0.6);
     else if (e.type === "throw") this.impact(e.position, true, 0.2);
     else if (e.type === "reload") {

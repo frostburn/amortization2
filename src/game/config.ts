@@ -73,7 +73,7 @@ export const KINETIC = {
   minigunMaxSpeed: 13,
 };
 export const STAGGER = {
-  duration: { gun: 0.18, minigun: 0.2, pistol: 0.22, rifle: 0.4, grenade: 0.65 },
+  duration: { gun: 0.18, minigun: 0.2, pistol: 0.22, rifle: 0.4, grenade: 0.65, vehicle: 0.65 },
   bracedRecovery: 2.5,
   grace: 0.12,
 };
