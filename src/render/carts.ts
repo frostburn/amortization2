@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { CivilianCart } from "../game/civilians";
-import type { CivilianModel } from "../game/city";
+import type { GroundCivilianModel } from "../game/city";
 import { batchRigid, block, surface, tube } from "./primitives";
 
 function cartBody() {
@@ -56,7 +56,7 @@ class WheelerFleet {
   private position = new THREE.Vector3();
   private rotation = new THREE.Quaternion();
   private scale = new THREE.Vector3(1, 1, 1);
-  constructor(private carts: CivilianCart[], private model: CivilianModel) {
+  constructor(private carts: CivilianCart[], private model: GroundCivilianModel) {
     const body = model === "CART" ? cartBody() : crateBody();
     batchRigid(body);
     for (const part of body.children as THREE.Mesh[]) {

@@ -4,6 +4,7 @@ import type { Simulation } from "../game/simulation";
 import { batchRigid, block, panel, surface, tube } from "./primitives";
 import { WaterView } from "./water";
 import { makeStreets } from "./streets";
+import { makeDeliveryPad } from "./kites";
 
 type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
   bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
@@ -142,6 +143,8 @@ export class CityView {
     block(ground, extent.right - extent.left, 0.16, extent.front - extent.back,
       (extent.left + extent.right) / 2, -0.1, (extent.back + extent.front) / 2, earth);
     ground.add(makeStreets(district, texture));
+    // Pad paint sits above paving; keep it out of the baked street surfaces.
+    for (const pad of district.pads) this.root.add(makeDeliveryPad(pad));
     for (const f of district.furniture) {
       if (f.fixture === "signal") {
         tube(ground, 0.035, 1.65, f.x, 0.825, f.z, dark);

@@ -16,6 +16,19 @@ function dispose(root: THREE.Object3D) {
 }
 
 describe("city surfaces", () => {
+  test("delivery paint and receivers remain exposed above paving without duplicate faces", () => {
+    const texture = new THREE.Texture(), view = new CityView(CITY_DISTRICT, texture), ray = new THREE.Raycaster();
+    view.root.updateMatrixWorld(true);
+    try {
+      for (const pad of CITY_DISTRICT.pads) for (const [dx, dz, color] of [[1.74, 0.14, pad.color], [0.1, 0.07, 0x465659], [2.03, 0.02, pad.color]]) {
+        ray.set(new THREE.Vector3(pad.x + dx, 2, pad.z + dz), new THREE.Vector3(0, -1, 0));
+        const hits = ray.intersectObject(view.root, true), first = hits[0];
+        expect(first.point.y).toBeGreaterThan(0.033);
+        expect((first.object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>).material.color.getHex()).toBe(color);
+        expect(hits.filter(h => Math.abs(h.distance - first.distance) < 1e-6)).toHaveLength(1);
+      }
+    } finally { dispose(view.root); texture.dispose(); }
+  });
   test("traffic lanes retain continuous asphalt through every junction, quay and bridge", () => {
     const texture = new THREE.Texture(), view = new CityView(CITY_DISTRICT, texture);
     view.root.updateMatrixWorld(true);

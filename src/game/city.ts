@@ -26,8 +26,12 @@ export const buildingSolid = (b: BuildingSpec): BoxSpec => {
     d: b.turn % 2 ? kit.w : kit.d, h: kit.h, style: "wall" };
 };
 export type DeliveryPoint = Vec2 & { stop?: number; building?: string };
-export type CivilianModel = "CART" | "CRATE";
-export type CartRoute = { id: string; points: DeliveryPoint[]; count: number; color: number; model?: CivilianModel };
+export type GroundCivilianModel = "CART" | "CRATE";
+export type CivilianModel = GroundCivilianModel | "KITE";
+export type CartRoute = { id: string; points: DeliveryPoint[]; count: number; color: number; model?: GroundCivilianModel };
+export type DeliveryPad = Vec2 & { id: string; color: number };
+/** Corridors are traversed at altitude; takeoff and final approach are vertical. */
+export type FlightRoute = { id: string; home: string; destination: string; altitude: number; corridor: Vec2[]; color: number };
 export type WaterFeature = Vec2 & { id: string; w: number; d: number; crossings: { z: number; width: number }[] };
 
 /** The bed is shallow; navigation excludes water, while impacts can cross its banks. */
@@ -69,6 +73,8 @@ export type CityDistrict = {
   furniture: StreetFixture[];
   plazas: Pick<BoxSpec, "x" | "z" | "w" | "d">[];
   routes: CartRoute[];
+  pads: DeliveryPad[];
+  flights: FlightRoute[];
   water: WaterFeature[];
   streets: { axis: "x" | "z"; at: number; center: number; length: number; width: number; sidewalk: number }[];
   junctions: Vec2[];
@@ -184,4 +190,20 @@ export const CITY_DISTRICT: CityDistrict = {
       style: "barrier" as const, fixture: "planter" as const })),
   ],
   routes,
+  pads: [
+    { id: "depot-a", x: -60, z: 74, color: 0xb08d52 },
+    { id: "depot-b", x: -60, z: 82, color: 0xb08d52 },
+    { id: "depot-c", x: -60, z: 66, color: 0xb08d52 },
+    { id: "station-west", x: -9, z: 76, color: 0x738e94 },
+    { id: "station-east", x: 10, z: 82, color: 0x738e94 },
+    { id: "quay", x: 92, z: 76, color: 0x588b88 },
+  ],
+  flights: [
+    { id: "station-air", home: "depot-a", destination: "station-west", altitude: 18,
+      corridor: [{ x: -60, z: 42 }, { x: -9, z: 42 }], color: 0xc3a05f },
+    { id: "quay-air", home: "depot-b", destination: "quay", altitude: 21,
+      corridor: [{ x: -60, z: -8 }, { x: 92, z: -8 }], color: 0x719b9a },
+    { id: "station-express", home: "depot-c", destination: "station-east", altitude: 24,
+      corridor: [{ x: -43, z: 56 }, { x: 10, z: 56 }], color: 0x8a9ba9 },
+  ],
 };

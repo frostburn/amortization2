@@ -805,11 +805,11 @@ export class Simulation {
         if (covering) this.coverHits++;
         else this.hits++;
       }
-    } else if (hit && this.city?.carts.some(c => c.collider.handle === hit.collider.handle)) {
-      const cart = this.city.carts.find(c => c.collider.handle === hit.collider.handle)!;
+    } else if (hit && this.city?.neutral(hit.collider.handle)) {
+      const cart = this.city.neutral(hit.collider.handle)!;
       const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
       this.city.damage(cart, spec.damage, { x: dir.x * strength,
-        y: (Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
+        y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
     } else if (hit?.collider.parent()?.isDynamic()) {
       hit.collider
         .parent()!

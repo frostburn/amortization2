@@ -39,6 +39,7 @@ export class RangeAudio {
   private voices = new Map<number, Voice>();
   private rotary = new Map<number, RotaryVoice>();
   private cartMotors = new Map<number, CartMotor>();
+  private kiteRotors = new Map<number, CartMotor>();
   private transients = new Set<AudioScheduledSourceNode>();
   private pending?: Promise<void>;
   private noise?: AudioBuffer;
@@ -245,6 +246,43 @@ export class RangeAudio {
       if (voice.fire) this.moveLayer(voice.fire, position, 0.55 * gain);
     }
     this.updateCarts(sim);
+    this.updateKites(sim);
+  }
+
+  private updateKites(sim: Simulation) {
+    const ctx = this.context!;
+    const flying = (sim.city?.kites ?? []).filter(c => c.rotors > 0.04 && this.civilianVolume > 0)
+      .sort((a, b) => {
+        const distance = (p: Vec3) => Math.hypot(p.x - this.listener.x, p.y - this.listener.y, p.z - this.listener.z);
+        return distance(a.body.translation()) - distance(b.body.translation());
+      }).slice(0, 3);
+    for (const [id, voice] of this.kiteRotors) if (!flying.some(c => c.id === id)) {
+      this.stopCart(voice); this.kiteRotors.delete(id);
+    }
+    for (const c of flying) {
+      const p = c.body.translation(), velocity = c.body.linvel();
+      let voice = this.kiteRotors.get(c.id);
+      if (!voice) {
+        const { amp, pan } = this.bus(p, 0), filter = ctx.createBiquadFilter();
+        filter.type = "lowpass"; filter.frequency.value = 1100; filter.connect(amp);
+        const sources = [ctx.createOscillator(), ctx.createOscillator(), ctx.createOscillator()];
+        // Two slightly unequal motor groups beat together, with blade-pass flutter.
+        const motors = ctx.createGain(), flutter = ctx.createGain();
+        motors.gain.value = 0.6; motors.connect(filter); flutter.gain.value = 0.14;
+        sources[0].type = "triangle"; sources[1].type = "triangle"; sources[2].type = "sine";
+        sources[0].connect(motors); sources[1].connect(motors);
+        sources[2].connect(flutter); flutter.connect(motors.gain); sources.forEach(s => s.start());
+        voice = { sources, gain: amp, pan, filter }; this.kiteRotors.set(c.id, voice);
+        sources[2].onended = () => { sources.forEach(s => s.disconnect()); motors.disconnect(); flutter.disconnect(); filter.disconnect(); amp.disconnect(); pan.disconnect(); };
+      }
+      const pitch = (145 + Math.max(0, velocity.y) * 12 + Math.hypot(velocity.x, velocity.z) * 3) * Math.max(0.2, c.rotors);
+      voice.sources[0].frequency.setTargetAtTime(pitch, ctx.currentTime, 0.12);
+      voice.sources[1].frequency.setTargetAtTime(pitch * 1.023, ctx.currentTime, 0.12);
+      voice.sources[2].frequency.setTargetAtTime(pitch / 4, ctx.currentTime, 0.12);
+      const distance = Math.hypot(p.x - this.listener.x, p.y - this.listener.y, p.z - this.listener.z);
+      voice.gain.gain.setTargetAtTime(0.026 * this.civilianVolume * c.rotors / (1 + distance / 24), ctx.currentTime, 0.09);
+      voice.pan.pan.setTargetAtTime(spatialPan(p, this.listener, this.listenerRight), ctx.currentTime, 0.08);
+    }
   }
 
   private updateCarts(sim: Simulation) {
@@ -362,6 +400,8 @@ export class RangeAudio {
     this.rotary.clear();
     for (const voice of this.cartMotors.values()) this.stopCart(voice);
     this.cartMotors.clear();
+    for (const voice of this.kiteRotors.values()) this.stopCart(voice);
+    this.kiteRotors.clear();
     for (const source of this.transients) source.stop();
     this.transients.clear();
   }
@@ -486,6 +526,7 @@ export class RangeAudio {
       buffers: [...this.buffers.keys()],
       loops: this.voices.size,
       cartMotors: this.cartMotors.size,
+      kiteRotors: this.kiteRotors.size,
       miniguns: [...this.rotary].map(([actor, voice]) => ({ actor, phase: voice.phase, spin: voice.spin, firing: !!voice.fire })),
       transients: this.transients.size,
       impacts: this.impactSerial,
