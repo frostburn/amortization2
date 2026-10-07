@@ -60,6 +60,18 @@ describe("PORTER and the marine port", () => {
     ticks(sim, 45); expect(p.transfers).toBeGreaterThan(0); expect(p.hp).toBe(PORTER.hp);
   });
 
+  test("a waiting worker pushed off its station finishes its pause and returns to work", () => {
+    const p = sim.city!.porters[0]; p.wait = 1.6;
+    p.body.applyImpulse({ x: 180, y: 0, z: 0 }, true);
+    ticks(sim, 0.35);
+    expect(distance2(p.body.translation(), p.route.points[0])).toBeGreaterThan(0.2);
+    expect(p.wait).toBeGreaterThan(0); expect(p.state).toBe("waiting");
+    ticks(sim, 2);
+    expect(p.wait).toBe(0); expect(p.hp).toBe(PORTER.hp);
+    ticks(sim, 4);
+    expect(p.grip).toBeDefined(); expect(p.distance).toBeGreaterThan(0.8);
+  });
+
   test("a bullet hit drops the physical tote and releases the heavy neutral hull without score credit", () => {
     ticks(sim, 5); const p = sim.city!.porters[0], a = sim.squad[0], at = p.body.translation();
     expect(p.grip).toBeDefined();

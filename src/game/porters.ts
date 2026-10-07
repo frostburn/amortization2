@@ -143,6 +143,9 @@ export class CargoWorkers {
       if (!p.impactUntil && this.district.water.some(w => inWater(at, w)))
         this.damage(p, 0, { x: 0, y: 0, z: 0 }, at);
       if (p.impactUntil && !this.recover(p)) continue;
+      // A physical shove can move a waiting worker off its station. Its pause
+      // must still expire so the drive can return it to the loading stand.
+      p.wait = Math.max(0, p.wait - STEP);
       const alerted = p.alertUntil > this.sim.time;
       if (alerted && p.grip) p.grip.setAnchor1({ x: 0, y: TOTE.carryHeight, z: TOTE.reach });
       let target = p.route.points[p.next], distance = distance2(at, target);
@@ -160,7 +163,6 @@ export class CargoWorkers {
           p.phase = 0;
         }
       } else if (distance < 0.12 && !alerted) {
-        p.wait = Math.max(0, p.wait - STEP);
         const desired = target.station?.yaw ?? p.yaw;
         const turn = Math.atan2(Math.sin(desired - p.yaw), Math.cos(desired - p.yaw));
         if (!p.wait && Math.abs(turn) < 0.04) {
