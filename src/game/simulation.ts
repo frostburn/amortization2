@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
   BLAST_RADIUS,
+  AUTOMATIC_AIM,
   FIREARMS,
   FRIENDLY_FIRE,
   FORMATION_SPACING,
@@ -119,6 +120,7 @@ export class Simulation {
   world!: RAPIER.World;
   actors: Actor[] = [];
   props: Prop[] = [];
+  private lowCover = new Set<number>();
   grenades: Grenade[] = [];
   events: GameEvent[] = [];
   selected = new Set([1]);
@@ -167,6 +169,7 @@ export class Simulation {
     this.world.timestep = STEP;
     this.actors = [];
     this.props = [];
+    this.lowCover.clear();
     this.grenades = [];
     this.events = [];
     this.selected = new Set((range === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
@@ -207,12 +210,14 @@ export class Simulation {
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, (box.y ?? 0) + box.h / 2, box.z),
       );
-      this.world.createCollider(
+      const collider = this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2).setFriction(
           0.8,
         ),
         body,
       );
+      if ((box.y ?? 0) + box.h < AUTOMATIC_AIM.height)
+        this.lowCover.add(collider.handle);
     }
     this.layout.players.forEach((p, i) =>
       this.addActor(i + 1, "player", p.x, p.z),
@@ -644,6 +649,17 @@ export class Simulation {
 
   actorAim(a: Actor): Vec3 {
     return a.cover?.aim ?? a.ai?.aim ?? this.aim;
+  }
+
+  /** Raise a player's low aim only when static low cover actually obstructs
+   * the intended point and the assisted line clears it. */
+  clearsLowCover(a: Actor, aim: Vec3, raised: Vec3) {
+    const from = this.muzzle(a, aim), direct = this.fireRay(a, from, aim);
+    if (!direct || !this.lowCover.has(direct.collider.handle) ||
+      direct.timeOfImpact >= Math.hypot(aim.x - from.x, aim.y - from.y, aim.z - from.z) - 0.05) return false;
+    const upper = this.muzzle(a, raised), hit = this.fireRay(a, upper, raised);
+    return !hit || hit.timeOfImpact >= Math.hypot(raised.x - upper.x, raised.y - upper.y, raised.z - upper.z) - 0.05 ||
+      this.actors.some(target => !target.dead && target.collider.handle === hit.collider.handle);
   }
   muzzle(a: Actor, toward: Vec3 = this.actorAim(a), weapon: Firearm = a.weapon): Vec3 {
     const p = a.body.translation();

@@ -1249,6 +1249,18 @@ export class RangeScene {
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && (braced || this.sim.weapon === "rifle"))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    // Bracing expresses a firing intent: a clear low point remains reachable,
+    // but low cover may call for the usual chest-height line. Explicit panes,
+    // cargo and civilian surfaces stay pickable at their actual height.
+    if (!grenade && automatic && braced && !actor?.dead && !(hit &&
+      (this.sim.city?.neutral(hit.collider.handle) || this.sim.city?.windows.has(hit.collider.handle) ||
+      this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle)))) {
+      const p = actor?.body.translation();
+      const raised = p ? { x: p.x, y: p.y + AUTOMATIC_AIM.bodyOffset, z: p.z }
+        : { x: aim.x, y: AUTOMATIC_AIM.height, z: aim.z };
+      if (aim.y < raised.y && this.sim.active.some(a => a.braced &&
+        this.sim.followsOrder(a, this.sim.weapon) && this.sim.clearsLowCover(a, aim, raised))) aim = raised;
+    }
     return { aim, ground, actor: actor?.id };
   }
   project(position: Vec3) {
