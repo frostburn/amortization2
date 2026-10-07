@@ -17,8 +17,7 @@
   display: none !important;
 }
 .aux-labels-off .aux-label,
-.aux-labels-off .range-note,
-.aux-labels-off #drills .detail {
+.aux-labels-off .range-note {
   display: none !important;
 }
 .aux-labels-off .grenade {
@@ -390,9 +389,11 @@ button:disabled {
 .unit-name {
   position: absolute;
   bottom: 10px;
-  left: 8px;
+  left: 4px;
+  right: 4px;
+  text-align: center;
   font:
-    8px ui-monospace,
+    10px ui-monospace,
     monospace;
   letter-spacing: 1px;
 }
@@ -573,6 +574,13 @@ kbd {
   transform: scaleX(0.72);
   color: #c6d4c9;
 }
+.unit.minigunner-unit svg {
+  width: 32px;
+  height: 30px;
+  right: 5px;
+  top: 3px;
+}
+.unit.minigunner-unit .unit-role { bottom: 23px; }
 .unit-role {
   position: absolute;
   left: 8px;
@@ -807,7 +815,7 @@ a:hover {
     width: 20px;
   }
   .unit-name {
-    font-size: 7px;
+    font-size: 9px;
     letter-spacing: 0.5px;
   }
   .squad {
@@ -935,7 +943,7 @@ a:hover {
   }
   .unit-name {
     bottom: 7px;
-    font-size: 6px;
+    font-size: 9px;
   }
   .unit-role {
     display: none;
