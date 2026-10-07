@@ -21,6 +21,7 @@ import type {
 } from "../game/simulation";
 import { CityView } from "./city";
 import { CartFleet } from "./carts";
+import { KiteFleet } from "./kites";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
@@ -165,6 +166,7 @@ export class RangeScene {
   private environment = new THREE.Group();
   private cityView?: CityView;
   private cartFleet?: CartFleet;
+  private kiteFleet?: KiteFleet;
   private environmentLabels = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
@@ -1075,6 +1077,8 @@ export class RangeScene {
   resetDynamic() {
     this.cartFleet?.dispose();
     this.cartFleet = undefined;
+    this.kiteFleet?.dispose();
+    this.kiteFleet = undefined;
     for (const visual of this.actors.values()) this.disposeActor(visual);
     // Props retain their shared primitive geometry and materials.
     this.dynamic.traverse((object) => {
@@ -1092,6 +1096,8 @@ export class RangeScene {
     if (this.sim.city) {
       this.cartFleet = new CartFleet(this.sim.city.carts);
       this.dynamic.add(this.cartFleet.root);
+      this.kiteFleet = new KiteFleet(this.sim.city.kites);
+      this.dynamic.add(this.kiteFleet.root);
     }
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
@@ -1134,9 +1140,12 @@ export class RangeScene {
     this.updateCamera();
   }
   private updateCamera() {
+    // Orthographic zoom can bring the camera below aircraft, clipping them and
+    // starting pick rays behind them. Back up along the same viewing direction.
+    const flightCeiling = Math.max(0, ...(this.sim.city?.district.flights ?? []).map(f => f.altitude));
     this.camera.position
       .copy(this.cameraOffset)
-      .multiplyScalar(1 / this.zoom)
+      .multiplyScalar(Math.max(1 / this.zoom, (flightCeiling + 6) / this.cameraOffset.y))
       .add(this.cameraTarget);
     this.camera.lookAt(this.cameraTarget);
     this.camera.updateMatrixWorld();
@@ -1214,7 +1223,7 @@ export class RangeScene {
         if (aim.y < upperBody)
           aim = { x: p.x, y: upperBody, z: p.z };
       }
-    } else if (!grenade && hit && this.sim.city?.carts.some(c => c.collider.handle === hit.collider.handle))
+    } else if (!grenade && hit && this.sim.city?.neutral(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.weapon === "rifle")
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
@@ -1523,6 +1532,7 @@ export class RangeScene {
     this.updateCamera();
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
     this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
+    this.kiteFleet?.update(alpha, paused ? 0 : delta);
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
       this.camera.position.y += (Math.random() - 0.5) * this.shake;

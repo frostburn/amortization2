@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { BLAST_RADIUS, STEP, clamp, distance2, type Vec2, type Vec3 } from "./config";
-import { buildingSolid, inWater, type CivilianModel, type CartRoute, type CityDistrict } from "./city";
+import { buildingSolid, inWater, type GroundCivilianModel, type CartRoute, type CityDistrict } from "./city";
+import { ParcelFlights, type CivilianKite } from "./aircraft";
 import type { Simulation } from "./simulation";
 import { segmentClear } from "./navigation";
 
@@ -12,7 +13,7 @@ export const CIVILIAN_CHASSIS = { CART, CRATE };
 export type CartState = "travel" | "delivery" | "yield" | "alert" | "tumbling" | "stranded" | "disabled";
 export type CivilianCart = {
   id: number;
-  model: CivilianModel;
+  model: GroundCivilianModel;
   route: CartRoute;
   next: number;
   direction: number;
@@ -43,6 +44,7 @@ function lineDistance(p: Vec2, a: Vec2, b: Vec2) {
 /** Local civilian activity. No weapons, squad membership, enemy scoring or arena AI. */
 export class CityLife {
   carts: CivilianCart[] = [];
+  flights: ParcelFlights;
   closedUntil = new Map<string, number>();
   constructor(private sim: Simulation, public district: CityDistrict) {
     let id = 1000;
@@ -69,7 +71,11 @@ export class CityLife {
           distance: 0, deliveries: 0, compartment: i % 3 });
       }
     }
+    this.flights = new ParcelFlights(sim, district);
   }
+
+  get kites() { return this.flights.kites; }
+  neutral(handle: number) { return this.flights.neutral(handle) ?? this.carts.find(c => c.collider.handle === handle); }
 
   get crossing() { return Math.floor(this.sim.time / 10) % 2; }
   isClosed(id: string) { return (this.closedUntil.get(id) ?? 0) > this.sim.time; }
@@ -82,6 +88,7 @@ export class CityLife {
   }
 
   disturb(from: Vec3, to: Vec3 = from, duration = 8) {
+    this.flights.disturb(from, to, duration);
     for (const c of this.carts) {
       const p = c.body.translation();
       if (c.hp <= 0 || (distance2(p, from) > 18 && lineDistance(p, from, to) > 4)) continue;
@@ -112,7 +119,8 @@ export class CityLife {
     c.body.setLinearDamping(0.35); c.body.setAngularDamping(1.8);
   }
 
-  damage(c: CivilianCart, damage: number, impulse: Vec3, point: Vec3) {
+  damage(c: CivilianCart | CivilianKite, damage: number, impulse: Vec3, point: Vec3) {
+    if (c.model === "KITE") { this.flights.damage(c, damage, impulse, point); this.disturb(point); return; }
     const chassis = CIVILIAN_CHASSIS[c.model];
     const wasAlive = c.hp > 0;
     c.hp = Math.max(0, c.hp - damage);
@@ -136,6 +144,7 @@ export class CityLife {
 
   blast(origin: Vec3) {
     this.disturb(origin, origin, 12);
+    this.flights.blast(origin);
     for (const c of this.carts) {
       const p = c.body.translation(), distance = Math.hypot(p.x - origin.x, p.y - origin.y, p.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;
@@ -150,6 +159,7 @@ export class CityLife {
   }
 
   update() {
+    this.flights.update();
     for (const c of this.carts) {
       const chassis = CIVILIAN_CHASSIS[c.model];
       const p = c.body.translation(), velocity = c.body.linvel();
@@ -235,7 +245,7 @@ export class CityLife {
   }
 
   inspect() {
-    return { crossing: this.crossing,
+    return { crossing: this.crossing, kites: this.flights.inspect(),
       closedShops: this.district.buildings.filter(b => this.isClosed(b.id)).map(b => b.id),
       carts: this.carts.map(c => ({ id: c.id, model: c.model, route: c.route.id, state: c.state, compartment: c.compartment,
         hp: c.hp, yaw: c.yaw, deliveries: c.deliveries, distance: c.distance,
