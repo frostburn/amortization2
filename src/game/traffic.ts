@@ -271,9 +271,12 @@ export class StreetTraffic {
       const turn=clamp(angle,-STEP*1.3,STEP*1.3)*Math.min(1,speed);
       c.yaw+=turn;c.steering=clamp(Math.atan(turn/STEP*spec.wheelbase/Math.max(1,speed)),-0.7,0.7);
       c.body.setRotation({x:0,y:Math.sin(c.yaw/2),z:0,w:Math.cos(c.yaw/2)},true);
-      const dx=Math.sin(c.yaw)*desired-v.x,dz=Math.cos(c.yaw)*desired-v.z,d=Math.hypot(dx,dz)||1;
-      const change=Math.min(d,STEP*(c.braking?7:2.4));
-      c.body.applyImpulse({x:dx/d*change*spec.mass,y:0,z:dz/d*change*spec.mass},true);
+      const fx=Math.sin(c.yaw),fz=Math.cos(c.yaw);
+      // Tyres resist sideways slip independently of engine acceleration/braking.
+      // Impacted vehicles skip this controller until they have settled upright.
+      const drive=clamp(desired-(v.x*fx+v.z*fz),-STEP*7,STEP*2.4);
+      const grip=clamp(-(v.x*fz-v.z*fx),-STEP*10,STEP*10);
+      c.body.applyImpulse({x:(fx*drive+fz*grip)*spec.mass,y:0,z:(fz*drive-fx*grip)*spec.mass},true);
     }
   }
   inspect(){return this.cars.map(c=>({id:c.id,model:c.model,state:c.state,hp:c.hp,distance:c.distance,laps:c.laps,

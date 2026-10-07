@@ -46,6 +46,37 @@ describe("self-driving street traffic",()=>{
     }
     expect(sim.city!.vehicles).toHaveLength(12);expect(sim.events.filter(e=>e.type==="wave")).toHaveLength(0);
   });
+  test.each([
+    ["city","CAB"],["city","VAN"],["port","CAB"],["port","VAN"],
+  ] as const)("%s %s follows a bend without sliding sideways",(range,model)=>{
+    if(range!=="city")sim.reset(range);
+    const traffic=sim.city!.traffic,c=traffic.cars.find(c=>c.model===model)!,spec=VEHICLES[model];
+    // Isolate a real lane bend from queueing, starting at full cruise speed.
+    traffic.cars.forEach((v,i)=>position(v,400+i*10,400,0));
+    const progress=range==="city"?c.path.offsets[9]-8:c.path.total-8;
+    const start=pointOnTrafficPath(c.path,progress),ahead=pointOnTrafficPath(c.path,progress+0.1).point;
+    const yaw=Math.atan2(ahead.x-start.point.x,ahead.z-start.point.z);
+    position(c,start.point.x,start.point.z,yaw);c.progress=progress;c.segment=start.segment;
+    c.body.setLinvel({x:Math.sin(yaw)*spec.speed,y:0,z:Math.cos(yaw)*spec.speed},true);sim.world.step();
+    let slip=0,turned=0;
+    for(let i=0;i<12/STEP;i++) {
+      sim.time+=STEP;traffic.update();sim.world.step();
+      const v=c.body.linvel(),p=c.body.translation();
+      slip=Math.max(slip,Math.abs(v.x*Math.cos(c.yaw)-v.z*Math.sin(c.yaw)));
+      turned=Math.max(turned,Math.abs(Math.atan2(Math.sin(c.yaw-yaw),Math.cos(c.yaw-yaw))));
+      expect(road(range==="city"?CITY_DISTRICT:MARINE_PORT,p.x,p.z)).toBe(true);
+    }
+    expect(turned).toBeGreaterThan(1.4);expect(c.distance).toBeGreaterThan(20);
+    expect(slip).toBeLessThan(0.1);
+  });
+  test("tyre grip does not erase sideways motion from an impact",()=>{
+    const traffic=sim.city!.traffic,c=traffic.cars.find(c=>c.model==="CAB")!,spec=VEHICLES.CAB;
+    position(c,0,-20,0);c.body.setTranslation({x:0,y:spec.height/2+0.5,z:-20},true);sim.world.step();
+    traffic.damage(c,10,{x:spec.mass*2,y:spec.mass*3,z:0},c.body.translation());
+    for(let i=0;i<6;i++){sim.time+=STEP;traffic.update();sim.world.step();}
+    expect(c.state).toBe("settling");expect(c.body.linvel().x).toBeGreaterThan(1.9);
+    expect(c.body.translation().x).toBeGreaterThan(0.15);expect(c.body.linvel().y).toBeGreaterThan(1.5);
+  });
   test("an approaching car brakes for a robot and continues when the road clears",()=>{
     const c=sim.city!.vehicles.find(c=>c.path.id==="block-1-1-in")!;
     position(c,-30,45.24,-Math.PI/2);
