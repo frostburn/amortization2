@@ -4,6 +4,7 @@ import { CITY_DISTRICT, type CityDistrict } from "../src/game/city";
 import { MARINE_PORT } from "../src/game/port";
 import { VEHICLES, pointOnTrafficPath, trafficPaths, type CivilianVehicle } from "../src/game/traffic";
 import { STEP, distance2 } from "../src/game/config";
+import RAPIER from "@dimforge/rapier3d-compat";
 
 const ticks=(sim:Simulation,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)sim.step();};
 const road=(d:CityDistrict,x:number,z:number)=>d.streets.some(s=>s.axis==="x"
@@ -107,5 +108,53 @@ describe("self-driving street traffic",()=>{
     expect(sim.primary.path.some(p=>Math.abs(p.x)>2)).toBe(true);
     ticks(sim,15);expect(distance2(sim.primary.body.translation(),{x:0,z:25})).toBeLessThan(1);
     expect(sim.hits).toBe(0);
+  });
+  test.each(["CAB","VAN"] as const)("sufficient rifle fire detonates a %s once, damages nearby robots and leaves a physical wreck",model=>{
+    const c=sim.city!.vehicles.find(c=>c.model===model)!;position(c,0,-20,0);
+    const ally=sim.squad[0],shooter=sim.squad[3],cart=sim.city!.carts[0];
+    shooter.body.setTranslation({x:-10,y:0.98,z:-20},true);
+    ally.body.setTranslation({x:0,y:0.98,z:-16.4},true);
+    cart.body.setTranslation({x:0,y:0.31,z:-25},true);
+    const enemy=sim.addEnemy("assault",{x:5,z:-20});
+    sim.select(4);sim.chooseWeapon("rifle");sim.setBrace(true);shooter.braceTime=1;
+    sim.world.step();sim.aim={x:0,y:1.1,z:-20};
+    for(let i=0;i<3&&c.hp;i++){shooter.shotWait=0;sim.shoot(shooter);}
+    expect(c.hp).toBe(0);ticks(sim,0.02);
+    const blasts=()=>sim.events.filter(e=>e.type==="explosion"&&e.vehicle===c.id);
+    expect(blasts()).toHaveLength(1);expect(blasts()[0]).toMatchObject({team:"neutral",affected:0});
+    expect(ally.hp).toBeLessThan(ally.maxHp);expect(enemy.hp).toBeLessThan(enemy.maxHp);
+    expect(cart.hp).toBe(0);expect(cart.body.linvel().z).toBeLessThan(-0.1);
+    expect(shooter.hp).toBe(shooter.maxHp);expect(sim.hits).toBe(0);expect(sim.grenadeHits).toBe(0);
+    expect(c.body.mass()).toBeCloseTo(VEHICLES[model].mass);expect(c.body.linvel().y).toBeGreaterThan(1);
+    expect(c.colliders.every(h=>h.isValid())).toBe(true);
+    sim.city!.damage(c,100,{x:0,y:0,z:0},c.body.translation());ticks(sim,0.1);expect(blasts()).toHaveLength(1);
+  });
+  test("a grenade initiates a bounded chain reaction, and reset restores unexploded vehicles",()=>{
+    const [a,b]=sim.city!.vehicles.filter(c=>c.model==="CAB");position(a,0,-20,0);position(b,4.8,-20,0);
+    a.hp=35;b.hp=40;sim.primary.body.setTranslation({x:-10,y:0.98,z:-20},true);
+    sim.world.step();expect(sim.throwGrenade({x:-2,z:-20})).toBe(true);
+    const grenade=sim.grenades[0];grenade.body.setTranslation({x:-2,y:0.3,z:-20},true);sim.world.step();sim.explode(grenade);
+    expect(a.hp).toBe(0);expect(b.hp).toBe(40);ticks(sim,0.02);
+    expect(b.hp).toBe(0);expect(sim.events.filter(e=>e.type==="explosion"&&e.vehicle!==undefined)).toHaveLength(2);
+    expect(a.explodedAt).toBe(b.explodedAt);expect(sim.grenadeHits).toBe(0);
+    ticks(sim,0.2);expect(sim.events.filter(e=>e.type==="explosion"&&e.vehicle!==undefined)).toHaveLength(2);
+    sim.reset();expect(sim.city!.vehicles.every(c=>c.hp===VEHICLES[c.model].hp&&c.explodedAt===undefined)).toBe(true);
+    ticks(sim,0.1);expect(sim.events.some(e=>e.type==="explosion")).toBe(false);
+  });
+  test("vehicle pressure ignores its source hull but still respects solid cover",()=>{
+    const c=sim.city!.vehicles.find(c=>c.model==="CAB")!;position(c,0,-20,0);
+    const shielded=sim.squad[0],exposed=sim.squad[1];
+    shielded.body.setTranslation({x:4,y:0.98,z:-20},true);exposed.body.setTranslation({x:0,y:0.98,z:-16.5},true);
+    const wall=sim.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(2,1.5,-20));
+    sim.world.createCollider(RAPIER.ColliderDesc.cuboid(0.4,1.5,3),wall);sim.world.step();
+    sim.city!.damage(c,1000,{x:0,y:0,z:0},c.body.translation());ticks(sim,0.02);
+    expect(shielded.hp).toBe(shielded.maxHp);expect(exposed.hp).toBeLessThan(exposed.maxHp);
+    expect(sim.grenadeHits).toBe(0);
+  });
+  test("VAN collision geometry follows the narrowed nose instead of a full-width box",()=>{
+    const c=sim.city!.vehicles.find(c=>c.model==="VAN")!;position(c,0,-20,0);sim.world.step();
+    const from={x:-3,y:0.5,z:-17.4};
+    expect(sim.ray(from,{...from,x:-0.5})).toBeNull();
+    expect(sim.city!.neutral(sim.ray(from,{...from,x:0})!.collider.handle)).toBe(c);
   });
 });

@@ -546,8 +546,9 @@ export class RangeAudio {
         this.impact(e.to, e.material === "metal");
       this.flyby(e.from, e.to);
     } else if (e.type === "explosion") {
-      this.sample("blast", e.position, 0.95, 0.97 + Math.random() * 0.06);
-      this.tone(e.position, 75, 0.25, 0.35, 34);
+      const vehicle=e.vehicle!==undefined;
+      this.sample("blast", e.position, 0.95, (vehicle?0.82:0.97) + Math.random() * 0.06);
+      this.tone(e.position, vehicle?58:75, vehicle?0.4:0.25, 0.35, vehicle?27:34);
     } else if (e.type === "bounce") this.impact(e.position, true, 0.6);
     else if (e.type === "throw") this.impact(e.position, true, 0.2);
     else if (e.type === "reload") {

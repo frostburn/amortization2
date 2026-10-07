@@ -34,6 +34,15 @@ const MINT = 0x9be6cd,
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 10);
 const unitSphere = new THREE.IcosahedronGeometry(1, 1);
+function smokeTexture() {
+  const size=32,data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++) {
+    const i=(y*size+x)*4,r=Math.hypot((x+0.5)/size*2-1,(y+0.5)/size*2-1);
+    data[i]=data[i+1]=data[i+2]=255;data[i+3]=Math.round(255*Math.max(0,1-r)**2);
+  }
+  const texture=new THREE.DataTexture(data,size,size);texture.needsUpdate=true;
+  texture.magFilter=texture.minFilter=THREE.LinearFilter;return texture;
+}
 const material = (color: number, metalness = 0, roughness = 0.8) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness });
 const metal = material(0x38464a, 0.55, 0.6);
@@ -180,11 +189,14 @@ export class RangeScene {
   private grenadeHazards = new Map<number, THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>>();
   private entryMarkers = new Map<number, THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>>();
   private particles: Particle[] = [];
+  private wreckSmoke = new Map<number, number>();
   private particleMesh = new THREE.InstancedMesh(
     unitSphere,
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
     400,
   );
+  private smokeMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(2,2),
+    new THREE.MeshBasicMaterial({map:smokeTexture(),color:0xffffff,transparent:true,opacity:0.35,depthWrite:false}),400);
   private glassMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 3),
     new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }), 400);
   private trails: Trail[] = [];
@@ -345,12 +357,16 @@ export class RangeScene {
       this.environmentLabels,
       this.dynamic,
       this.particleMesh,
+      this.smokeMesh,
       this.glassMesh,
       this.bulletMarks,
       this.lightFlash,
     );
     this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.smokeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.smokeMesh.frustumCulled=false;
     this.particleMesh.count = 0;
+    this.smokeMesh.count = 0;
     this.glassMesh.count = 0;
     this.bulletMarks.count = 0;
     this.aimRing.rotation.x = this.blastPreview.rotation.x = -Math.PI / 2;
@@ -1138,8 +1154,10 @@ export class RangeScene {
     }
     this.blastRings = [];
     this.particles = [];
+    this.wreckSmoke.clear();
     this.glassMesh.count = 0;
     this.particleMesh.count = 0;
+    this.smokeMesh.count = 0;
     this.markIndex = 0;
     this.bulletMarks.count = 0;
     this.flashes.clear();
@@ -1510,8 +1528,11 @@ export class RangeScene {
         this.bulletMarks.instanceMatrix.needsUpdate = true;
       }
     } else if (e.type === "explosion") {
-      this.emit(e.position, 30, 0xffb661, 11, false, 0.1);
-      this.emit(e.position, 35, 0x8e8a79, 4.2, true, 0.6);
+      const vehicle=e.vehicle!==undefined;
+      this.emit(e.position, vehicle?35:30, vehicle?0xff923d:0xffb661, vehicle?5.5:11, false, vehicle?0.52:0.1,false,vehicle?1.8:1);
+      if(vehicle)this.emit(e.position,18,0xffde81,2.8,false,0.32,false,2.4);
+      this.emit(e.position, vehicle?50:35, vehicle?0x565b56:0x8e8a79, 4.2, true, vehicle?0.85:0.6);
+      if(vehicle)this.wreckSmoke.set(e.vehicle!,this.sim.time);
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(0.96, 1, 64),
         new THREE.MeshBasicMaterial({
@@ -1544,12 +1565,13 @@ export class RangeScene {
     smoke: boolean,
     size: number,
     shard = false,
+    duration = 1,
   ) {
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= 400) this.particles.shift();
       const angle = Math.random() * Math.PI * 2,
         velocity = speed * (0.3 + Math.random() * 0.7),
-        life = smoke ? 0.65 + Math.random() * 0.8 : shard ? 0.8 + Math.random() * 0.4 : 0.13 + Math.random() * 0.32;
+        life = (smoke ? 0.65 + Math.random() * 0.8 : shard ? 0.8 + Math.random() * 0.4 : 0.13 + Math.random() * 0.32)*duration;
       this.particles.push({
         p: new THREE.Vector3(
           position.x,
@@ -1579,6 +1601,15 @@ export class RangeScene {
     this.kiteFleet?.update(alpha, paused ? 0 : delta);
     this.porterFleet?.update(alpha);
     this.trafficFleet?.update(alpha, this.sim.time);
+    if(!paused)for(const [id,next] of this.wreckSmoke) {
+      const c=this.sim.city?.vehicles.find(c=>c.id===id);
+      if(!c||c.explodedAt===undefined||this.sim.time-c.explodedAt>8){this.wreckSmoke.delete(id);continue;}
+      if(this.sim.time>=next) {
+        const p=c.body.translation();
+        this.emit({x:p.x,y:p.y+0.45,z:p.z},2,0x515853,0.8,true,0.5);
+        this.wreckSmoke.set(id,this.sim.time+0.18);
+      }
+    }
     if (this.shake > 0) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake;
       this.camera.position.y += (Math.random() - 0.5) * this.shake;
@@ -1759,7 +1790,7 @@ export class RangeScene {
       return false;
     });
     this.particles = this.particles.filter((p) => p.life > 0);
-    this.particleMesh.count = this.glassMesh.count = 0;
+    this.particleMesh.count = this.glassMesh.count = this.smokeMesh.count = 0;
     this.particles.forEach(p => {
       p.life -= delta;
       p.p.addScaledVector(p.v, delta);
@@ -1773,15 +1804,16 @@ export class RangeScene {
       }
       this.dummy.position.copy(p.p);
       this.dummy.quaternion.identity();
+      if(p.smoke)this.dummy.quaternion.copy((this.sim.sniping?this.scope.camera:this.camera).quaternion);
       if (p.shard) this.dummy.rotation.set(p.life * 12, p.life * 7, p.life * 15);
       this.dummy.scale.setScalar(
         Math.max(
           0.001,
-          p.size * (p.smoke ? 1.5 - p.life / p.max : p.life / p.max),
+          p.size * (p.smoke ? (1.5-p.life/p.max)*Math.max(0,p.life/p.max)**0.25 : p.life/p.max),
         ),
       );
       this.dummy.updateMatrix();
-      const mesh = p.shard ? this.glassMesh : this.particleMesh, i = mesh.count++;
+      const mesh = p.shard ? this.glassMesh : p.smoke ? this.smokeMesh : this.particleMesh, i = mesh.count++;
       mesh.setMatrixAt(i, this.dummy.matrix);
       mesh.setColorAt(
         i,
@@ -1795,6 +1827,8 @@ export class RangeScene {
       this.particleMesh.instanceColor.needsUpdate = true;
     this.glassMesh.instanceMatrix.needsUpdate = true;
     if (this.glassMesh.instanceColor) this.glassMesh.instanceColor.needsUpdate = true;
+    this.smokeMesh.instanceMatrix.needsUpdate=true;
+    if(this.smokeMesh.instanceColor)this.smokeMesh.instanceColor.needsUpdate=true;
     for (const b of this.blastRings) {
       b.age += delta;
       b.mesh.scale.setScalar(0.2 + b.age * 15);

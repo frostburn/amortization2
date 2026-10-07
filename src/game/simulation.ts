@@ -70,7 +70,7 @@ export interface Actor {
   recoil: number;
   previous: Vec3;
   previousRotation: { x: number; y: number; z: number; w: number };
-  killedBy?: Weapon;
+  killedBy?: Weapon | "vehicle";
 }
 export interface Prop {
   id: number;
@@ -104,7 +104,7 @@ export type GameEvent =
       material: "metal" | "concrete" | "glass";
       normal: Vec3;
     }
-  | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" }
+  | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" | "neutral"; vehicle?: number }
   | { type: "glass"; position: Vec3; normal: Vec3 }
   | {
       type: "throw" | "bounce" | "reload" | "empty" | "down";
@@ -880,7 +880,7 @@ export class Simulation {
     amount: number,
     impulse: Vec3,
     point: Vec3,
-    source?: Weapon,
+    source?: Weapon | "vehicle",
   ) {
     const bullet = source === "gun" || source === "minigun" || source === "pistol";
     const multiplier = a.braced ? (bullet ? KINETIC.bracedBullet : 0.28) : 1;
@@ -1022,7 +1022,7 @@ export class Simulation {
     return true;
   }
 
-  blastExposure(origin: Vec3, actor: Actor): number {
+  blastExposure(origin: Vec3, actor: Actor, source?: RAPIER.RigidBody): number {
     const p = actor.body.translation();
     let visible = 0;
     for (const y of [0.25, 0.75, 1.35]) {
@@ -1031,7 +1031,7 @@ export class Simulation {
         origin,
         sample,
         actor.body,
-        (c) => !this.grenades.some((g) => g.body.handle === c.parent()?.handle),
+        (c) => (!source || c.parent()?.handle !== source.handle) && !this.grenades.some((g) => g.body.handle === c.parent()?.handle),
       );
       if (!hit) visible++;
     }
@@ -1043,15 +1043,28 @@ export class Simulation {
     origin.y = Math.max(0.18, origin.y);
     this.world.removeRigidBody(grenade.body);
     this.grenades = this.grenades.filter((g) => g !== grenade);
+    this.applyBlast(origin, grenade.team);
+  }
+
+  explodeVehicle(body: RAPIER.RigidBody, id: number) {
+    const origin = vcopy(body.translation());
+    origin.y = Math.max(0.18, origin.y);
+    body.applyImpulse({ x: 0, y: body.mass() * 1.8, z: 0 }, true);
+    body.applyTorqueImpulse({ x: body.mass() * 0.18, y: 0, z: body.mass() * 0.12 }, true);
+    this.applyBlast(origin, "neutral", body, id);
+  }
+
+  /** Source hull emits pressure but remains physical cover for subsequent blasts. */
+  private applyBlast(origin: Vec3, team: "player" | "enemy" | "neutral", source?: RAPIER.RigidBody, vehicle?: number) {
     let affected = 0;
     for (const a of this.actors) {
-      if (!FRIENDLY_FIRE.grenade && this.team(a) === grenade.team) continue;
+      if (!FRIENDLY_FIRE.grenade && this.team(a) === team) continue;
       const p = a.body.translation();
       const dx = p.x - origin.x,
         dz = p.z - origin.z,
         distance = Math.hypot(dx, p.y - origin.y, dz);
       if (distance >= BLAST_RADIUS) continue;
-      const exposure = this.blastExposure(origin, a);
+      const exposure = this.blastExposure(origin, a, source);
       if (!exposure) continue;
       const falloff = 1 - distance / BLAST_RADIUS;
       const strength = 550 * falloff * exposure;
@@ -1065,11 +1078,11 @@ export class Simulation {
           z: (dz / Math.max(0.4, distance)) * strength,
         },
         p,
-        "grenade",
+        vehicle === undefined ? "grenade" : "vehicle",
       );
-      if (wasAlive && (grenade.team === "player" ? a.kind !== "player" : a.kind === "player")) {
+      if (wasAlive && team !== "neutral" && (team === "player" ? a.kind !== "player" : a.kind === "player")) {
         affected++;
-        if (grenade.team === "player") this.grenadeHits++;
+        if (team === "player") this.grenadeHits++;
       }
     }
     for (const p of this.props) {
@@ -1079,7 +1092,7 @@ export class Simulation {
         position.y - origin.y,
         position.z - origin.z,
       );
-      if (distance >= BLAST_RADIUS || this.ray(origin, position, p.body))
+      if (distance >= BLAST_RADIUS || this.ray(origin, position, p.body, c => !source || c.parent()?.handle !== source.handle))
         continue;
       const strength = 280 * (1 - distance / BLAST_RADIUS);
       p.body.applyImpulse(
@@ -1095,9 +1108,9 @@ export class Simulation {
         true,
       );
     }
-    this.city?.blast(origin);
-    this.city?.windows.blast(origin);
-    this.events.push({ type: "explosion", position: origin, affected, team: grenade.team });
+    this.city?.blast(origin, source);
+    this.city?.windows.blast(origin, source);
+    this.events.push({ type: "explosion", position: origin, affected, team, ...(vehicle === undefined ? {} : { vehicle }) });
   }
 
   isDisrupted(a: Actor) {

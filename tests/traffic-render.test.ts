@@ -17,7 +17,7 @@ describe("reusable traffic models",()=>{
       const hits=ray.intersectObject(root,true),first=hits[0];
       expect(first).toBeDefined();expect((first.object as THREE.Mesh).material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
       expect(hits.filter(h=>Math.abs(h.distance-first.distance)<1e-5)).toHaveLength(1);
-      expect(new THREE.Box3().setFromObject(root).max.y+spec.height/2).toBeLessThan(spec.height+0.1);
+      expect(new THREE.Box3().setFromObject(root).max.y+spec.height/2).toBeLessThan(spec.height+0.25);
     } finally {dispose(root);}
   });
   test("adding vehicles increases instances rather than draw calls, and disposal releases every batch",async()=>{

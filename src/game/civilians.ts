@@ -157,15 +157,15 @@ export class CityLife {
     }
   }
 
-  blast(origin: Vec3) {
+  blast(origin: Vec3, source?: RAPIER.RigidBody) {
     this.disturb(origin, origin, 12);
-    this.flights.blast(origin);
-    this.workers.blast(origin);
-    this.traffic.blast(origin);
+    this.flights.blast(origin, source);
+    this.workers.blast(origin, source);
+    this.traffic.blast(origin, source);
     for (const c of this.carts) {
       const p = c.body.translation(), distance = Math.hypot(p.x - origin.x, p.y - origin.y, p.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;
-      const samples = [-0.18, 0.18].filter(dy => !this.sim.ray(origin, { x: p.x, y: p.y + dy, z: p.z }, c.body));
+      const samples = [-0.18, 0.18].filter(dy => !this.sim.ray(origin, { x: p.x, y: p.y + dy, z: p.z }, c.body, h => !source || h.parent()?.handle !== source.handle));
       if (!samples.length) continue;
       const falloff = (1 - distance / BLAST_RADIUS) * samples.length / 2, strength = 500 * falloff;
       const dx = (p.x - origin.x) / Math.max(0.4, distance), dz = (p.z - origin.z) / Math.max(0.4, distance);

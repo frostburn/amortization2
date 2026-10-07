@@ -17,6 +17,7 @@ export type CivilianVehicle = {
   state: "cruise" | "yield" | "signal" | "alert" | "settling" | "stranded" | "disabled";
   alertUntil: number; impactUntil: number; settled: number; braking: boolean;
   nextSense: number; clearance: number;
+  explodedAt?: number;
 };
 
 /** Conservative footprint follows the body's current pose, including a tipped wreck. */
@@ -104,6 +105,7 @@ export class StreetTraffic {
   private handles=new Map<number,CivilianVehicle>();
   private junctions:Vec2[];
   private reservations=new Map<number,number>();
+  private detonations=new Set<CivilianVehicle>();
   constructor(private sim:Simulation,private district:CityDistrict) {
     this.junctions=trafficJunctions(district);
     const paths=trafficPaths(district), colors=[0xc8c6b8,0x687f87,0x98695d,0x89937d,0xb7a980,0x52636e];
@@ -115,11 +117,19 @@ export class StreetTraffic {
       const body=sim.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(start.point.x,spec.height/2+0.01,start.point.z)
         .lockRotations().setLinearDamping(0.15).setAngularDamping(3).setCcdEnabled(true));
       body.setRotation({x:0,y:Math.sin(yaw/2),z:0,w:Math.cos(yaw/2)},true);
-      const lower=sim.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width/2,0.48,spec.length/2)
-        .setTranslation(0,0.48-spec.height/2,0).setMass(spec.mass*0.75).setFriction(0.05)
+      const hull=(rows:{z:number;width:number;bottom:number;top:number;roof?:number}[])=>RAPIER.ColliderDesc.convexHull(new Float32Array(rows.flatMap(s=>[
+        -s.width,s.bottom-spec.height/2,s.z,s.width,s.bottom-spec.height/2,s.z,
+        -(s.roof??s.width),s.top-spec.height/2,s.z,s.roof??s.width,s.top-spec.height/2,s.z,
+      ])))!;
+      const lowerShape=model==="CAB"?RAPIER.ColliderDesc.cuboid(spec.width/2,0.48,spec.length/2).setTranslation(0,0.48-spec.height/2,0)
+        :hull([{z:-2.75,width:0.99,bottom:0,top:0.96},{z:0.4,width:0.92,bottom:0,top:0.96},{z:2.75,width:0.22,bottom:0,top:0.72}]);
+      const upperShape=model==="CAB"?RAPIER.ColliderDesc.cuboid(spec.width*0.44,(spec.height-0.9)/2,1.25).setTranslation(0,(spec.height+0.9)/2-spec.height/2,-0.25)
+        :hull([{z:-2.69,width:0.87,roof:0.81,bottom:0.9,top:1.98},{z:-2.4,width:0.99,roof:0.87,bottom:0.9,top:2.15},
+          {z:-0.3,width:0.99,roof:0.85,bottom:0.9,top:2.15},{z:0.38,width:0.61,roof:0.51,bottom:0.96,top:2.04},
+          {z:1.34,width:0.52,roof:0.44,bottom:0.96,top:1.78},{z:2.16,width:0.37,roof:0.34,bottom:0.96,top:1.04}]);
+      const lower=sim.world.createCollider(lowerShape.setMass(spec.mass*0.75).setFriction(0.05)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min),body);
-      const cabin=sim.world.createCollider(RAPIER.ColliderDesc.cuboid(spec.width*0.44,(spec.height-0.9)/2,model==="CAB"?1.25:2.15)
-        .setTranslation(0,(spec.height+0.9)/2-spec.height/2,model==="CAB"?-0.25:-0.35).setMass(spec.mass*0.25).setFriction(0.05),body);
+      const cabin=sim.world.createCollider(upperShape.setMass(spec.mass*0.25).setFriction(0.05),body);
       const c:CivilianVehicle={id:4000+this.cars.length,model,color:colors[(j+n)%colors.length],path:p,segment:start.segment,progress,
         body,colliders:[lower,cabin],previous:{...body.translation()},previousRotation:{...body.rotation()},yaw,steering:0,
         hp:spec.hp,distance:0,laps:0,state:"cruise",alertUntil:0,impactUntil:0,settled:0,braking:false,nextSense:0,clearance:100};
@@ -148,12 +158,16 @@ export class StreetTraffic {
       if(spin)c.body.setAngvel(bounded,true);else c.body.setLinvel(bounded,true);
     }
     c.state=c.hp?"settling":"disabled";
-    if(alive&&!c.hp)this.sim.events.push({type:"down",position:{...c.body.translation()}});
+    if(alive&&!c.hp) {
+      this.detonations.add(c);
+      this.sim.events.push({type:"down",position:{...c.body.translation()}});
+    }
   }
-  blast(origin:Vec3) {
+  blast(origin:Vec3,source?:RAPIER.RigidBody) {
     for(const c of this.cars) {
+      if(c.body===source)continue;
       const p=c.body.translation(),d=Math.hypot(p.x-origin.x,p.y-origin.y,p.z-origin.z);
-      if(d>=BLAST_RADIUS || this.sim.ray(origin,p,c.body))continue;
+      if(d>=BLAST_RADIUS || this.sim.ray(origin,p,c.body,h=>!source||h.parent()?.handle!==source.handle))continue;
       const f=1-d/BLAST_RADIUS,strength=500*f;
       this.damage(c,160*Math.sqrt(f),{x:(p.x-origin.x)/Math.max(d,0.4)*strength,y:strength*0.4,
         z:(p.z-origin.z)/Math.max(d,0.4)*strength},p);
@@ -186,6 +200,12 @@ export class StreetTraffic {
   }
   update() {
     const now=this.sim.time;
+    // Newly destroyed neighbours join the same bounded Set iteration. No
+    // recursive damage/blast calls, and each vehicle crosses zero health once.
+    for(const c of this.detonations) {
+      this.detonations.delete(c);c.explodedAt=now;
+      this.sim.explodeVehicle(c.body,c.id);
+    }
     for(const [j,id] of this.reservations) {
       const c=this.cars.find(c=>c.id===id)!;
       // Retain the reservation throughout the 14 m approach zone. Releasing
@@ -257,6 +277,7 @@ export class StreetTraffic {
     }
   }
   inspect(){return this.cars.map(c=>({id:c.id,model:c.model,state:c.state,hp:c.hp,distance:c.distance,laps:c.laps,
+    explodedAt:c.explodedAt,
     route:c.path.id,steering:c.steering,braking:c.braking,alertUntil:c.alertUntil,
     position:{...c.body.translation()},rotation:{...c.body.rotation()},velocity:{...c.body.linvel()}}));}
 }

@@ -103,11 +103,11 @@ export class CargoWorkers {
     p.state = p.hp ? "tumbling" : "disabled";
     if (alive && !p.hp) this.sim.events.push({ type: "down", position: { ...p.body.translation() } });
   }
-  blast(origin: Vec3) {
+  blast(origin: Vec3, source?: RAPIER.RigidBody) {
     for (const p of this.porters) {
       const at = p.body.translation(), distance = Math.hypot(at.x - origin.x, at.y - origin.y, at.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;
-      const exposed = [-0.25, 0.25].filter(dy => !this.sim.ray(origin, { ...at, y: at.y + dy }, p.body)).length;
+      const exposed = [-0.25, 0.25].filter(dy => !this.sim.ray(origin, { ...at, y: at.y + dy }, p.body, h => !source || h.parent()?.handle !== source.handle)).length;
       if (!exposed) continue;
       const falloff = (1 - distance / BLAST_RADIUS) * exposed / 2, strength = 720 * falloff;
       const dx = (at.x - origin.x) / Math.max(0.4, distance), dz = (at.z - origin.z) / Math.max(0.4, distance);

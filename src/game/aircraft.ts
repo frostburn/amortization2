@@ -89,10 +89,10 @@ export class ParcelFlights {
     }
     if (alive && !c.hp) this.sim.events.push({ type: "down", position: { ...c.body.translation() } });
   }
-  blast(origin: Vec3) {
+  blast(origin: Vec3, source?: RAPIER.RigidBody) {
     for (const c of this.kites) {
       const p = c.body.translation(), d = Math.hypot(p.x - origin.x, p.y - origin.y, p.z - origin.z);
-      if (d >= BLAST_RADIUS || this.sim.ray(origin, p, c.body)) continue;
+      if (d >= BLAST_RADIUS || this.sim.ray(origin, p, c.body, h => !source || h.parent()?.handle !== source.handle)) continue;
       const f = 1 - d / BLAST_RADIUS, strength = 500 * f;
       this.damage(c, 160 * Math.sqrt(f), { x: (p.x - origin.x) / Math.max(d, 0.4) * strength,
         y: strength * 0.7, z: (p.z - origin.z) / Math.max(d, 0.4) * strength }, p);
