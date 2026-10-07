@@ -284,13 +284,7 @@ export class RangeScene {
   private destinationAge = 99;
   private lightFlash = new THREE.PointLight(0xffd699, 0, 8, 2);
   reducedMotion = false;
-  get auxLabels() {
-    return this.environmentLabels.visible;
-  }
-  set auxLabels(enabled: boolean) {
-    this.environmentLabels.visible = enabled;
-    for (const marker of this.destinationMarkers) marker.number.visible = enabled;
-  }
+  auxLabels = true;
   private shake = 0;
   private resizeObserver: ResizeObserver;
 
