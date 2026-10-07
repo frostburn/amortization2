@@ -109,6 +109,19 @@ describe("PORTER and the marine port", () => {
     expect(tipped.state).toBe("stranded"); expect(tipped.hp).toBe(PORTER.hp - 1);
   });
 
+  test("a dropped tote can be launched again by an exposed grenade blast", () => {
+    ticks(sim, 4); const p = sim.city!.porters[0]; sim.city!.workers.release(p);
+    p.cargo.body.setTranslation({ x: 8, y: TOTE.h / 2 + 0.01, z: 5 }, true);
+    p.cargo.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    sim.select(1); expect(sim.throwGrenade({ x: 6.5, z: 5 })).toBe(true);
+    const grenade = sim.grenades[0]; grenade.body.setTranslation({ x: 6.5, y: 0.2, z: 5 }, true);
+    sim.world.step(); sim.explode(grenade);
+    expect(p.grip).toBeUndefined(); expect(p.cargo.body.linvel().x).toBeGreaterThan(10);
+    expect(p.cargo.body.linvel().y).toBeGreaterThan(3);
+    ticks(sim, 0.2); expect(p.cargo.body.translation().x).toBeGreaterThan(9);
+    expect(sim.grenadeHits).toBe(0);
+  });
+
   test("water orders resolve to dry ground; the harbor has a submerged bed rather than an invisible quay floor", () => {
     sim.select(1); sim.move({ x: 70, z: 10 });
     for (const point of sim.squad[0].path) expect(MARINE_PORT.water.some(w => inWater(point, w))).toBe(false);

@@ -1231,6 +1231,10 @@ export class RangeScene {
       }
     } else if (!grenade && hit && this.sim.city?.neutral(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    else if (!grenade && hit && this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle))
+      // Loose cargo keeps its physical hitbox when dropped. Aim at its actual
+      // surface instead of applying the empty-ground height used to clear cover.
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.weapon === "rifle")
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     return { aim, ground, actor: actor?.id };

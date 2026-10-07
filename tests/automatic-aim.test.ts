@@ -74,6 +74,27 @@ describe("automatic upper-body aim", () => {
     expect(sim.hits).toBe(0);
   });
 
+  test.each([1, 4])("operator %s can aim at and knock around a dropped PORTER tote", (id) => {
+    sim.reset("port", "minigunner"); sim.select(id);
+    const cargo = sim.city!.porters[0].cargo;
+    cargo.body.setTranslation({ x: 6, y: 0.4, z: 4 }, true);
+    if (id === 4) cargo.body.setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 }, true);
+    sim.primary.body.setTranslation({ x: 2, y: 0.96, z: 4 }, true);
+    for (let i = 0; i < 30; i++) sim.step();
+    const before = { ...cargo.body.translation() }, selected = pick(before);
+    expect(selected.actor).toBeUndefined(); expect(selected.aim.y).toBeLessThan(0.8);
+    sim.aim = selected.aim;
+    expect(sim.fireRay(sim.primary, sim.muzzle(sim.primary), sim.aim)?.collider.parent()?.handle).toBe(cargo.body.handle);
+    sim.primary.spin = 1; sim.setBrace(true); sim.shoot(sim.primary);
+    expect(cargo.body.linvel().x).toBeGreaterThan(0.8);
+    expect(sim.shots).toBe(1); expect(sim.hits).toBe(0);
+    for (let i = 0; i < 15; i++) sim.step();
+    expect(cargo.body.translation().x - before.x).toBeGreaterThan(0.02);
+    // Movement and grenade placement still resolve the same cursor to the floor.
+    expect(pick({ ...cargo.body.translation() }, true).aim.y).toBeGreaterThan(1);
+    expect(pick({ ...cargo.body.translation() }, true).ground.y).toBe(0);
+  });
+
   test("elevated silhouettes keep their height while movement and grenades use the ground", () => {
     sim.reset("long", "sniper");
     sim.select(1);

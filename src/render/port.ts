@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { CityDistrict } from "../game/city";
-import { CONTAINER, type ContainerSpec } from "../game/port";
+import { CONTAINER, type ContainerSpec, type CraneSpec } from "../game/port";
 import { batchRigid, block, surface, tube } from "./primitives";
 
 /** Standard intermodal dimensions, corrugated sides and paired locking doors. */
@@ -37,6 +37,71 @@ function beam(root: THREE.Group, from: THREE.Vector3, to: THREE.Vector3, radius:
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
 }
 
+/** Radar scanners, a radome, aerials and shielded lamps break up the mast silhouette. */
+function makeNavigationMast() {
+  const root = new THREE.Group(), paint = surface(0xc6c7b9), steel = surface(0x516a70, 0.45), black = surface(0x303e42);
+  const lamp = surface(0xe0d3a7);
+  tube(root, 0.09, 5.2, 0, 2.6, 0, paint);
+  for (const side of [-1, 1]) {
+    beam(root, new THREE.Vector3(side * 0.65, 0, -0.25), new THREE.Vector3(0, 1.65, 0), 0.045, steel);
+    tube(root, 0.018, 3.6, side * 0.14, 1.8, -0.18, steel, 6);
+  }
+  for (let y = 0.25; y < 3.6; y += 0.3) block(root, 0.28, 0.025, 0.035, 0, y, -0.18, steel);
+  for (const [y, length, angle] of [[1.8, 1.6, -0.35], [3.75, 2.8, 0.25]]) {
+    block(root, 0.65, 0.09, 0.55, 0, y, 0, steel);
+    tube(root, 0.17, 0.3, 0, y + 0.18, 0, black);
+    const scanner = block(root, length, 0.2, 0.27, 0, y + 0.41, 0, paint);
+    scanner.rotation.y = angle;
+    block(root, 0.26, 0.12, 0.29, 0, y + 0.45, 0, steel);
+  }
+  block(root, 0.9, 0.08, 0.16, 0.4, 2.7, 0, steel);
+  tube(root, 0.12, 0.16, 0.8, 2.8, 0, black);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 6), paint);
+  dome.position.set(0.8, 3.04, 0); dome.castShadow = true; root.add(dome);
+  block(root, 0.9, 0.08, 0.25, -0.35, 1.1, -0.15, steel);
+  for (const [x, height] of [[-0.7, 1.35], [-0.38, 1.8]]) {
+    tube(root, 0.055, 0.18, x, 1.2, -0.15, black);
+    tube(root, 0.018, height, x, 1.28 + height / 2, -0.15, paint, 6);
+  }
+  for (const y of [4.55, 5.05]) {
+    block(root, 0.09, 0.07, 0.34, 0, y - 0.14, 0.14, steel);
+    tube(root, 0.095, 0.26, 0, y, 0.25, black);
+    tube(root, 0.098, 0.12, 0, y, 0.25, lamp);
+  }
+  batchRigid(root); return root;
+}
+
+/** Bounded Warren trusses: both chords, connected diagonals and closed ends. */
+export function makeCrane(c: CraneSpec, steel = surface(0x516a70, 0.45), safety = surface(0xc6af67), black = surface(0x303e42)) {
+  const root = new THREE.Group();
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = c.x + sx * c.span / 2, z = c.z + sz * 4;
+    block(root, 1.1, c.height, 1.1, x, c.height / 2, z, steel);
+    block(root, 1.4, 0.7, 2.1, x, 0.35, z, black);
+    for (let y = 0.18; y < 2.2; y += 0.45) block(root, 1.13, 0.2, 1.13, x, y, z, safety);
+  }
+  const left = c.x - c.span / 2 - 2, right = c.x + c.span / 2 + 24;
+  const lower = c.height - 1.7, bays = Math.ceil((right - left) / 4), bay = (right - left) / bays;
+  for (const sz of [-1, 1]) {
+    const z = c.z + sz * 4;
+    block(root, right - left, 1, 0.75, (left + right) / 2, c.height, z, steel);
+    block(root, right - left, 0.24, 0.28, (left + right) / 2, lower, z, steel);
+    for (let i = 0; i < bays; i++) beam(root,
+      new THREE.Vector3(left + i * bay, i % 2 ? c.height : lower, z),
+      new THREE.Vector3(left + (i + 1) * bay, i % 2 ? lower : c.height, z), 0.11, steel);
+    for (const x of [left, right]) block(root, 0.22, c.height - lower, 0.28, x, (c.height + lower) / 2, z, steel);
+  }
+  for (const x of [c.x - c.span / 2, c.x + c.span / 2, right])
+    block(root, 0.4, 0.5, 8.5, x, c.height, c.z, steel);
+  block(root, 3.2, 0.6, 9, c.x + 17, c.height + 0.55, c.z, black);
+  block(root, 1.8, 1.7, 2.2, c.x + 17, c.height - 1.35, c.z + 5.1, steel);
+  block(root, 1.4, 0.8, 0.06, c.x + 17, c.height - 1.2, c.z + 6.23, black);
+  for (const sz of [-1, 1]) beam(root,
+    new THREE.Vector3(c.x + 17, c.height, c.z + sz * 2.6), new THREE.Vector3(c.x + 17, 8, c.z + sz * 2.6), 0.035, black);
+  block(root, 3.5, 0.4, 6, c.x + 17, 7.8, c.z, safety);
+  batchRigid(root); return root;
+}
+
 function makeShip(spec: NonNullable<CityDistrict["port"]>["ship"], shared: Map<string, THREE.MeshStandardMaterial>) {
   const root = new THREE.Group(), hull = surface(0x435e68, 0.45), deck = surface(0x9c9e90);
   const red = surface(0x785148, 0.15), cream = surface(0xc6c7b9), glass = surface(0x344d58, 0.45, 0.3);
@@ -65,8 +130,11 @@ function makeShip(spec: NonNullable<CityDistrict["port"]>["ship"], shared: Map<s
   for (const x of [-3, 0, 3]) block(root, 2.1, 0.7, 0.06, x, 5.05, -26.96, glass);
   for (const side of [-1, 1]) for (const z of [-31, -28.8]) block(root, 0.06, 0.7, 1.55, side * 4.78, 5.05, z, glass);
   block(root, 2.2, 2.5, 2.4, 2.6, 6.2, -34, hull);
-  tube(root, 0.065, 5.2, -1.8, 8.4, -31, cream);
-  block(root, 3, 0.11, 0.12, -1.8, 10.3, -31, cream);
+  const mast = makeNavigationMast(); mast.position.set(-1.8, 5.8, -31); root.add(mast);
+  for (const side of [-1, 1]) {
+    block(root, 0.28, 0.3, 0.3, side * 4.65, 5.52, -27.25, hull);
+    block(root, 0.16, 0.13, 0.055, side * 4.65, 5.54, -27.075, surface(side < 0 ? 0xac6656 : 0x79a18b));
+  }
   block(root, 12.5, 0.24, 30, 0, 2.03, 3, hull);
   for (const x of [-3.2, 3.2]) for (const z of [-6, 8]) {
     const container = makeContainer({ x: 0, z: 0, length: "40ft", turn: 1, levels: 1, color: x < 0 ? 0x8b6652 : 0x859080 }, shared);
@@ -86,26 +154,7 @@ export function makePort(district: CityDistrict) {
   const shared = new Map<string, THREE.MeshStandardMaterial>();
   const steel = surface(0x516a70, 0.45), safety = surface(0xc6af67), black = surface(0x303e42), concrete = surface(0xaaa99b);
   for (const spec of port.containers) root.add(makeContainer(spec, shared));
-  for (const c of port.cranes) {
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      const x = c.x + sx * c.span / 2, z = c.z + sz * 4;
-      block(kit, 1.1, c.height, 1.1, x, c.height / 2, z, steel);
-      block(kit, 1.4, 0.7, 2.1, x, 0.35, z, black);
-      for (let y = 0.18; y < 2.2; y += 0.45) block(kit, 1.13, 0.2, 1.13, x, y, z, safety);
-    }
-    for (const sz of [-1, 1]) {
-      block(kit, c.span + 26, 1, 0.75, c.x + 11, c.height, c.z + sz * 4, steel);
-      for (let x = c.x - c.span / 2; x < c.x + c.span / 2 + 25; x += 4)
-        beam(kit, new THREE.Vector3(x, c.height - 1.7, c.z + sz * 4), new THREE.Vector3(x + 4, c.height, c.z + sz * 4), 0.11, steel);
-    }
-    block(kit, 3.2, 0.6, 9, c.x + 17, c.height + 0.55, c.z, black);
-    block(kit, 1.8, 1.7, 2.2, c.x + 17, c.height - 1.35, c.z + 5.1, steel);
-    block(kit, 1.4, 0.8, 0.06, c.x + 17, c.height - 1.2, c.z + 6.23, black);
-    for (const sz of [-1, 1]) {
-      beam(kit, new THREE.Vector3(c.x + 17, c.height, c.z + sz * 2.6), new THREE.Vector3(c.x + 17, 8, c.z + sz * 2.6), 0.035, black);
-    }
-    block(kit, 3.5, 0.4, 6, c.x + 17, 7.8, c.z, safety);
-  }
+  for (const c of port.cranes) kit.add(makeCrane(c, steel, safety, black));
   for (let z = -66; z <= 66; z += 12) {
     tube(kit, 0.23, 0.5, 44.2, 0.25, z, steel);
     const cap = tube(kit, 0.13, 0.85, 44.2, 0.4, z, steel); cap.rotation.z = Math.PI / 2;
