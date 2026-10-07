@@ -14,7 +14,7 @@ Nearby fire cancels the handling phase, steadies an attached load for 0.7 second
 
 Joint-motor tones and restrained foot contacts use the existing **Civilian motors** slider, underneath combat sounds. At most four servo voices run; pause, floor changes and reset stop them. No additional licensed audio samples are required.
 
-Dropped totes keep their physical collision hulls. Hovering one aims at its actual surface, including when it rests on its side, so machine guns, miniguns and pistols can push it around; grenades use the normal loose-prop blast physics. Empty-ground aiming still clears low cover. Quay gantries use connected upper/lower truss chords, alternating braces, end posts and cross members. The freighter's navigation mast carries paired radar scanners, a radome, aerials, a service ladder and shielded lights.
+Dropped totes keep their physical collision hulls. Hovering one aims at its actual surface, including when it rests on its side, so machine guns, miniguns and pistols can push it around; grenades use the normal loose-prop blast physics. A sniper hit on a held tote breaks the grip before applying the bullet impulse, knocking the box free without damaging its carrier or earning hostile score credit. Automatic fire hitting the box leaves the grip intact. Empty-ground aiming still clears low cover. Quay gantries use connected upper/lower truss chords, alternating braces, end posts and cross members. The freighter's navigation mast carries paired radar scanners, a radome, aerials, a service ladder and shielded lights.
 
 ## Reuse and navigation
 

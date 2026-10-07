@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Simulation } from "../src/game/simulation";
-import { STEP, distance2 } from "../src/game/config";
+import { RIFLE, STEP, distance2 } from "../src/game/config";
 import { inWater } from "../src/game/city";
 import { MARINE_PORT } from "../src/game/port";
 import { PORTER, TOTE } from "../src/game/porters";
@@ -82,6 +82,25 @@ describe("PORTER and the marine port", () => {
     const load = { ...p.cargo.body.translation() }; ticks(sim, 0.7);
     expect(p.cargo.body.translation().y).toBeLessThan(load.y - 0.3);
     expect(Math.abs(p.body.rotation().x) + Math.abs(p.body.rotation().z)).toBeGreaterThan(0.05);
+  });
+
+  test.each(["gun", "rifle"] as const)("%s hits the held tote rather than its carrier", (weapon) => {
+    ticks(sim, 5); const p = sim.city!.porters[0], load = { ...p.cargo.body.translation() };
+    expect(p.grip).toBeDefined();
+    sim.select(weapon === "rifle" ? 4 : 1); const a = sim.primary;
+    a.body.setTranslation({ x: load.x + 8, y: 0.98, z: load.z + 8 }, true);
+    sim.setBrace(true); a.braceTime = RIFLE.settle; sim.world.step();
+    sim.aim = { ...p.cargo.body.translation() };
+    expect(sim.fireRay(a, sim.muzzle(a), sim.aim)?.collider.parent()?.handle).toBe(p.cargo.body.handle);
+    sim.shoot(a);
+    expect(p.hp).toBe(PORTER.hp); expect(sim.shots).toBe(1); expect(sim.hits).toBe(0);
+    expect(sim.coverHits).toBe(0); expect(sim.events.some(e => e.type === "down")).toBe(false);
+    if (weapon === "gun") { expect(p.grip).toBeDefined(); return; }
+    expect(p.grip).toBeUndefined(); expect(p.cargo.body.linvel().z).toBeLessThan(-0.6);
+    ticks(sim, 0.7);
+    expect(p.grip).toBeUndefined(); expect(p.hp).toBe(PORTER.hp);
+    expect(p.cargo.body.translation().y).toBeLessThan(load.y - 0.3);
+    expect(distance2(p.cargo.body.translation(), load)).toBeGreaterThan(0.2);
   });
 
   test("grenades launch PORTER, respect container cover and leave a released load physical", () => {

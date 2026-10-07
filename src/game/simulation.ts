@@ -813,6 +813,11 @@ export class Simulation {
       this.city.damage(cart, spec.damage, { x: dir.x * strength,
         y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
     } else if (hit?.collider.parent()?.isDynamic()) {
+      // Break the grip before the shot impulse can transfer into PORTER's hull.
+      if (rifle) {
+        const porter = this.city?.porters.find(p => p.grip && p.cargo.body.handle === hit.collider.parent()!.handle);
+        if (porter) this.city!.workers.release(porter);
+      }
       hit.collider
         .parent()!
         .applyImpulseAtPoint(
