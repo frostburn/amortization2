@@ -49,10 +49,11 @@ describe("building facades", () => {
       const openings = prefab === "shop" ? [[5.8, 2.3], [0.25, 1.4]]
         : prefab === "depot" ? [[7.4, 2.12], [4.1, 1.4]]
         : [[prefab === "pump" ? 3.65 : 7.4, 2.12], [0.25, 1.4]];
-      for (const [x, y] of openings) {
+      for (const [i, [x, y]] of openings.entries()) {
         const panes = sample(x, y);
         expect(panes).toHaveLength(1);
-        expect((panes[0].object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>).material.color.getHex()).toBe(0x354c52);
+        expect((panes[0].object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>).material.color.getHex())
+          .toBe(i === 0 && prefab !== "depot" ? 0x24343b : 0x656d6b);
         expect(panes[0].point.z).toBeCloseTo(front + 0.04, 4);
       }
       const wall = sample(prefab === "pump" ? 5.15 : 9, 2.12);

@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
   BLAST_RADIUS,
+  AUTOMATIC_AIM,
   FIREARMS,
   FRIENDLY_FIRE,
   FORMATION_SPACING,
@@ -99,10 +100,11 @@ export type GameEvent =
       to: Vec3;
       hit: boolean;
       impact: boolean;
-      material: "metal" | "concrete";
+      material: "metal" | "concrete" | "glass";
       normal: Vec3;
     }
   | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" }
+  | { type: "glass"; position: Vec3; normal: Vec3 }
   | {
       type: "throw" | "bounce" | "reload" | "empty" | "down";
       position: Vec3;
@@ -118,6 +120,7 @@ export class Simulation {
   world!: RAPIER.World;
   actors: Actor[] = [];
   props: Prop[] = [];
+  private lowCover = new Set<number>();
   grenades: Grenade[] = [];
   events: GameEvent[] = [];
   selected = new Set([1]);
@@ -166,6 +169,7 @@ export class Simulation {
     this.world.timestep = STEP;
     this.actors = [];
     this.props = [];
+    this.lowCover.clear();
     this.grenades = [];
     this.events = [];
     this.selected = new Set((range === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
@@ -202,16 +206,18 @@ export class Simulation {
       this.world.createCollider(RAPIER.ColliderDesc.cuboid(water.w / 2, 0.5, water.d / 2).setFriction(0.8), bed);
     }
     for (const box of [...this.layout.barriers, ...this.layout.platforms]) {
-      if (box.navigationOnly) continue;
+      if (box.navigationOnly || box.building) continue;
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, (box.y ?? 0) + box.h / 2, box.z),
       );
-      this.world.createCollider(
+      const collider = this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2).setFriction(
           0.8,
         ),
         body,
       );
+      if ((box.y ?? 0) + box.h < AUTOMATIC_AIM.height)
+        this.lowCover.add(collider.handle);
     }
     this.layout.players.forEach((p, i) =>
       this.addActor(i + 1, "player", p.x, p.z),
@@ -644,6 +650,17 @@ export class Simulation {
   actorAim(a: Actor): Vec3 {
     return a.cover?.aim ?? a.ai?.aim ?? this.aim;
   }
+
+  /** Raise a player's low aim only when static low cover actually obstructs
+   * the intended point and the assisted line clears it. */
+  clearsLowCover(a: Actor, aim: Vec3, raised: Vec3) {
+    const from = this.muzzle(a, aim), direct = this.fireRay(a, from, aim);
+    if (!direct || !this.lowCover.has(direct.collider.handle) ||
+      direct.timeOfImpact >= Math.hypot(aim.x - from.x, aim.y - from.y, aim.z - from.z) - 0.05) return false;
+    const upper = this.muzzle(a, raised), hit = this.fireRay(a, upper, raised);
+    return !hit || hit.timeOfImpact >= Math.hypot(raised.x - upper.x, raised.y - upper.y, raised.z - upper.z) - 0.05 ||
+      this.actors.some(target => !target.dead && target.collider.handle === hit.collider.handle);
+  }
   muzzle(a: Actor, toward: Vec3 = this.actorAim(a), weapon: Firearm = a.weapon): Vec3 {
     const p = a.body.translation();
     const dx = toward.x - p.x,
@@ -722,7 +739,7 @@ export class Simulation {
 
   rifleSpread(a: Actor) {
     return a.braced
-      ? 0.0006 + (1 - clamp(a.braceTime / RIFLE.settle, 0, 1)) * 0.024
+      ? (1 - clamp(a.braceTime / RIFLE.settle, 0, 1)) * 0.024
       : 0.04 + a.recoil * 0.055 + (1 - a.stability) * 0.02;
   }
 
@@ -763,7 +780,7 @@ export class Simulation {
     };
     const length = Math.hypot(delta.x, delta.y, delta.z) || 1;
     const speed = Math.hypot(a.body.linvel().x, a.body.linvel().z);
-    const spread = (a.braced ? 0.003 : 0.005 + a.recoil * 0.005 + (a.path.length ? 0.006 : 0))
+    const spread = a.braced ? 0 : (0.005 + a.recoil * 0.005 + (a.path.length ? 0.006 : 0))
       + Math.min(0.006, speed * 0.001)
       + (a.kind === "enemy" ? 0.012 : pistol ? 0.004 : weapon === "minigun" && !a.braced ? 0.006 : 0);
     const dir = rifle
@@ -791,7 +808,8 @@ export class Simulation {
     const target =
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
     const hitOpponent = !!target && !target.dead && this.team(target) !== this.team(a);
-    if (target && !target.dead) {
+    const glass = !!hit && !!this.city?.windows.hit(hit.collider.handle, to, hit.normal);
+    if (!glass && target && !target.dead) {
       this.damage(
         target,
         spec.damage,
@@ -807,12 +825,12 @@ export class Simulation {
         if (covering) this.coverHits++;
         else this.hits++;
       }
-    } else if (hit && this.city?.neutral(hit.collider.handle)) {
+    } else if (!glass && hit && this.city?.neutral(hit.collider.handle)) {
       const cart = this.city.neutral(hit.collider.handle)!;
       const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
       this.city.damage(cart, spec.damage, { x: dir.x * strength,
         y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
-    } else if (hit?.collider.parent()?.isDynamic()) {
+    } else if (!glass && hit?.collider.parent()?.isDynamic()) {
       // Break the grip before the shot impulse can transfer into PORTER's hull.
       if (rifle) {
         const porter = this.city?.porters.find(p => p.grip && p.cargo.body.handle === hit.collider.parent()!.handle);
@@ -850,7 +868,7 @@ export class Simulation {
       hit: hitOpponent,
       impact: !!hit,
       material:
-        target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
+        glass ? "glass" : target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
       normal: hit ? vcopy(hit.normal) : { x: 0, y: 1, z: 0 },
     });
   }
@@ -1076,6 +1094,7 @@ export class Simulation {
       );
     }
     this.city?.blast(origin);
+    this.city?.windows.blast(origin);
     this.events.push({ type: "explosion", position: origin, affected, team: grenade.team });
   }
 

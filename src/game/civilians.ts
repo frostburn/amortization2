@@ -5,6 +5,7 @@ import { ParcelFlights, type CivilianKite } from "./aircraft";
 import { CargoWorkers, type CivilianPorter } from "./porters";
 import type { Simulation } from "./simulation";
 import { segmentClear } from "./navigation";
+import { CityWindows } from "./windows";
 
 export const CART = { width: 0.82, length: 0.94, height: 0.62, mass: 35, hp: 36, speed: 1.6,
   retreatSpeed: 1.6, turnSpeed: 2.6, clearance: 0.65, maxImpactSpeed: 14, maxSpin: 8, motorPitch: 1 };
@@ -47,8 +48,10 @@ export class CityLife {
   carts: CivilianCart[] = [];
   flights: ParcelFlights;
   workers: CargoWorkers;
+  windows: CityWindows;
   closedUntil = new Map<string, number>();
   constructor(private sim: Simulation, public district: CityDistrict) {
+    this.windows = new CityWindows(sim, district);
     let id = 1000;
     for (const route of district.routes) {
       const model = route.model ?? "CART", chassis = CIVILIAN_CHASSIS[model];
@@ -254,7 +257,7 @@ export class CityLife {
   }
 
   inspect() {
-    return { crossing: this.crossing, kites: this.flights.inspect(), porters: this.workers.inspect(),
+    return { crossing: this.crossing, windows: this.windows.inspect(), kites: this.flights.inspect(), porters: this.workers.inspect(),
       closedShops: this.district.buildings.filter(b => this.isClosed(b.id)).map(b => b.id),
       carts: this.carts.map(c => ({ id: c.id, model: c.model, route: c.route.id, state: c.state, compartment: c.compartment,
         hp: c.hp, yaw: c.yaw, deliveries: c.deliveries, distance: c.distance,

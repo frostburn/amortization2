@@ -2,6 +2,8 @@ import * as THREE from "three";
 import type { CityDistrict } from "../game/city";
 import { CONTAINER, type ContainerSpec, type CraneSpec } from "../game/port";
 import { batchRigid, block, surface, tube } from "./primitives";
+import { wheelhouseFacades } from "../game/facades";
+import { makeFacade } from "./windows";
 
 /** Standard intermodal dimensions, corrugated sides and paired locking doors. */
 export function makeContainer(spec: ContainerSpec, shared?: Map<string, THREE.MeshStandardMaterial>) {
@@ -104,7 +106,7 @@ export function makeCrane(c: CraneSpec, steel = surface(0x516a70, 0.45), safety 
 
 function makeShip(spec: NonNullable<CityDistrict["port"]>["ship"], shared: Map<string, THREE.MeshStandardMaterial>) {
   const root = new THREE.Group(), hull = surface(0x435e68, 0.45), deck = surface(0x9c9e90);
-  const red = surface(0x785148, 0.15), cream = surface(0xc6c7b9), glass = surface(0x344d58, 0.45, 0.3);
+  const red = surface(0x785148, 0.15), cream = surface(0xc6c7b9);
   const outline = [[-0.38, -0.5], [0.38, -0.5], [0.5, -0.4], [0.5, 0.33], [0.35, 0.46],
     [0, 0.5], [-0.35, 0.46], [-0.5, 0.33], [-0.5, -0.4]];
   const ring = (y: number, scale: number) => outline.map(([x, z]) => new THREE.Vector3(x * spec.width * scale, y, z * spec.length));
@@ -126,9 +128,11 @@ function makeShip(spec: NonNullable<CityDistrict["port"]>["ship"], shared: Map<s
   geometry.rotateZ(Math.PI); geometry.computeVertexNormals();
   const floor = new THREE.Mesh(geometry, deck); floor.position.y = 1.9; floor.receiveShadow = true; root.add(floor);
   block(root, 11.5, 1.8, 14, 0, 2.8, -29, cream);
-  block(root, 9.5, 2.2, 8, 0, 4.8, -31, cream);
-  for (const x of [-3, 0, 3]) block(root, 2.1, 0.7, 0.06, x, 5.05, -26.96, glass);
-  for (const side of [-1, 1]) for (const z of [-31, -28.8]) block(root, 0.06, 0.7, 1.55, side * 4.78, 5.05, z, glass);
+  for (const f of wheelhouseFacades()) {
+    const face = makeFacade(f, cream, hull, hull);
+    face.position.set(f.x, 3.7, f.z); face.rotation.y = f.turn * Math.PI / 2; root.add(face);
+  }
+  block(root, 9.75, 0.2, 8.25, 0, 6, -31, cream);
   block(root, 2.2, 2.5, 2.4, 2.6, 6.2, -34, hull);
   const mast = makeNavigationMast(); mast.position.set(-1.8, 5.8, -31); root.add(mast);
   for (const side of [-1, 1]) {

@@ -62,6 +62,21 @@ describe("centred sniper sight", () => {
     expect(sim.actors.find(a => a.id === 11)!.killedBy).toBe("rifle");
   });
 
+  test("a settled shot converges on the reticle after turning away from the robot's heading", () => {
+    for (let i = 0; i < Math.ceil((RIFLE.settle + 0.1) / STEP); i++) sim.step();
+    sight.look(100, -65, sim, 700);
+    const aim = new Vector3().copy(sim.aim), centred = aim.clone().project(sight.camera);
+    expect(Math.abs(centred.x) + Math.abs(centred.y)).toBeLessThan(1e-6);
+    sim.primary.yaw = -Math.PI / 2;
+    sim.shoot(sim.primary);
+    const shot = sim.events.find(e => e.type === "shot" && e.actor === sim.primary.id)!;
+    if (shot.type !== "shot") throw Error("missing shot");
+    const from = new Vector3().copy(shot.from), direction = new Vector3().copy(shot.to).sub(from).normalize();
+    const expected = aim.clone().sub(from).normalize();
+    expect(direction.distanceTo(expected)).toBeLessThan(1e-6);
+    expect(sim.rifleSpread(sim.primary)).toBeGreaterThan(0); // The fired shot restarts settling.
+  });
+
   test("a teammate crossing the fixed optic intercepts its aim ray and actual rifle shot", () => {
     const ally = sim.squad[0], target = sim.actors.find(a => a.id === 11)!;
     ally.body.setTranslation({ x: 4, y: 0.98, z: 0 }, true);

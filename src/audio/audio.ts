@@ -484,6 +484,19 @@ export class RangeAudio {
     if (metal)
       this.tone(position, 390 + Math.random() * 120, 0.035 * strength, 0.16);
   }
+  private nextGlass = 0;
+  private glass(position: Vec3) {
+    if (!this.context || !this.noise || this.context.currentTime < this.nextGlass) return;
+    const ctx = this.context, now = ctx.currentTime, gain = this.distanceGain(position);
+    this.nextGlass = now + 0.065;
+    const { amp, pan } = this.bus(position, 0.15 * gain), source = ctx.createBufferSource(), filter = ctx.createBiquadFilter();
+    source.buffer = this.noise; filter.type = "highpass"; filter.frequency.value = 3700;
+    amp.gain.setValueAtTime(0.15 * gain, now); amp.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    source.connect(filter); filter.connect(amp); source.start(now, 0, 0.26);
+    this.transients.add(source);
+    source.onended = () => { this.transients.delete(source); source.disconnect(); filter.disconnect(); amp.disconnect(); pan.disconnect(); };
+    for (const frequency of [2370, 3310, 4670]) this.tone(position, frequency, 0.009 * gain, 0.12, frequency * 0.97);
+  }
   private tone(
     position: Vec3,
     frequency: number,
@@ -514,7 +527,8 @@ export class RangeAudio {
   }
   event(e: GameEvent) {
     if (!this.ready) return;
-    if (e.type === "shot") {
+    if (e.type === "glass") this.glass(e.position);
+    else if (e.type === "shot") {
       if (e.weapon === "rifle") {
         const mix = rifleMix(e.from, this.listener, this.listenerRight);
         this.lastRifle = mix;
@@ -528,7 +542,7 @@ export class RangeAudio {
         this.sample("pistol", e.from, 0.5 * this.distanceGain(e.from));
         this.pistolShots++;
       }
-      if (e.impact)
+      if (e.impact && e.material !== "glass")
         this.impact(e.to, e.material === "metal");
       this.flyby(e.from, e.to);
     } else if (e.type === "explosion") {

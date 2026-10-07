@@ -25,7 +25,6 @@ export function portSolids(district: CityDistrict): BoxSpec[] {
     { x: port.ship.x, z: port.ship.z + 36, w: 9, d: 10, h: 5.5, y: -3.6, style: "wall" },
     { x: port.ship.x, z: port.ship.z - 39, w: 12, d: 8, h: 5.5, y: -3.6, style: "wall" },
     { x: port.ship.x, z: port.ship.z - 29, w: 11.5, d: 14, h: 1.8, y: 1.9, style: "wall" },
-    { x: port.ship.x, z: port.ship.z - 31, w: 9.5, d: 8, h: 2.2, y: 3.7, style: "wall" },
     ...port.cranes.flatMap(c => [-1, 1].flatMap(sx => [-1, 1].map(sz => ({
       x: c.x + sx * c.span / 2, z: c.z + sz * 4, w: 1.1, d: 1.1, h: c.height, style: "wall" as const,
     })))),

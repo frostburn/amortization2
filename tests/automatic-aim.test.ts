@@ -28,16 +28,18 @@ describe("automatic upper-body aim", () => {
     return scene.pick(screen.x, screen.y, groundOnly)!;
   }
 
-  test.each([1, 4])("operator %s clears a low barrier while aiming at empty ground beyond a target", (id) => {
+  test.each([[1, false], [4, false], [1, true], [4, true]] as const)("operator %s clears a low barrier from ground intent (braced: %s)", (id, braced) => {
     sim.select(id);
     sim.primary.body.setTranslation({ x: -19, y: 0.96, z: 16 }, true);
     const enemy = sim.addEnemy("assault", { x: -19, z: 5 });
     for (let i = 0; i < 20; i++) sim.step();
+    sim.setBrace(braced);
     const cursor = { x: -19, y: 0, z: -5 };
     const selected = pick(cursor);
     expect(selected.actor).toBeUndefined();
     expect(selected.ground.x).toBeCloseTo(cursor.x);
     expect(selected.ground.z).toBeCloseTo(cursor.z);
+    expect(selected.aim.y).toBeCloseTo(1.65);
     sim.aim = selected.aim;
     expect(sim.fireRay(sim.primary, sim.muzzle(sim.primary), sim.aim)?.collider.handle).toBe(enemy.collider.handle);
     expect(sim.aimTrace(sim.primary).to.z).toBeGreaterThan(4.5);
@@ -47,11 +49,12 @@ describe("automatic upper-body aim", () => {
     expect(sim.hits).toBe(1);
   });
 
-  test.each([1, 4])("operator %s keeps a leg hover above low cover", (id) => {
+  test.each([[1, false], [4, false], [1, true], [4, true]] as const)("operator %s keeps a leg hover above low cover (braced: %s)", (id, braced) => {
     sim.select(id);
     sim.primary.body.setTranslation({ x: -19, y: 0.96, z: 16 }, true);
     const enemy = sim.addEnemy("assault", { x: -19, z: 5 });
     for (let i = 0; i < 20; i++) sim.step();
+    sim.setBrace(braced);
     const p = enemy.body.translation();
     const selected = pick({ ...p, y: p.y - 0.4 });
     expect(selected.actor).toBe(enemy.id);
@@ -62,16 +65,78 @@ describe("automatic upper-body aim", () => {
     expect(sim.hits).toBe(1);
   });
 
-  test("tall crates still block the default line and the actual shot", () => {
+  test.each([false, true])("tall crates block aim and actual shots (braced: %s)", braced => {
     sim.select(1);
     sim.primary.body.setTranslation({ x: -19, y: 0.96, z: -4 }, true);
     const enemy = sim.addEnemy("assault", { x: -19, z: -17 });
     for (let i = 0; i < 20; i++) sim.step();
+    sim.setBrace(braced);
     sim.aim = pick({ x: -19, y: 0, z: -23 }).aim;
     expect(sim.aimTrace(sim.primary).to.z).toBeGreaterThan(-12);
     sim.shoot(sim.primary);
     expect(enemy.hp).toBe(enemy.maxHp);
     expect(sim.hits).toBe(0);
+  });
+
+  test.each([1, 4])("braced operator %s does not lift aim if the default line cannot clear nearby cover", id => {
+    sim.reset("long", "minigunner"); sim.select(id);
+    sim.primary.body.setTranslation({ x: 74.5, y: 0.96, z: -5 }, true);
+    for (let i = 0; i < 20; i++) sim.step();
+    sim.setBrace(true);
+    const cursor = { x: 50, y: 0, z: -5 };
+    const raised = { ...cursor, y: 1.65 };
+    const upper = sim.fireRay(sim.primary, sim.muzzle(sim.primary, raised), raised)!;
+    expect(upper.collider.translation().x).toBeCloseTo(72);
+    expect(pick(cursor).aim.y).toBeCloseTo(0, 4);
+  });
+
+  test("the selected squad shares the assisted firing height when one member needs clearance", () => {
+    sim.primary.body.setTranslation({ x: -19, y: 0.96, z: 16 }, true);
+    for (let i = 0; i < 20; i++) sim.step();
+    sim.select(5); sim.setBrace(true);
+    expect(pick({ x: -19, y: 0, z: -5 }).aim.y).toBeCloseTo(1.65);
+  });
+
+  test.each([1, 4])("braced operator %s aims and fires at the ground without the cover-clearance lift", id => {
+    sim.select(id);
+    sim.primary.body.setTranslation({ x: 2, y: 0.96, z: 20 }, true);
+    for (let i = 0; i < 20; i++) sim.step();
+    const cursor = { x: 5, y: 0, z: 24 };
+    expect(pick(cursor).aim.y).toBeGreaterThan(1);
+    sim.setBrace(true); sim.primary.spin = 1;
+    sim.aim = pick(cursor).aim;
+    expect(sim.aim.y).toBeCloseTo(0, 4);
+    expect(sim.aim.x).toBeCloseTo(cursor.x, 4); expect(sim.aim.z).toBeCloseTo(cursor.z, 4);
+    const expected = sim.aimTrace(sim.primary).to;
+    sim.shoot(sim.primary);
+    const shot = sim.events.find(e => e.type === "shot")!;
+    if (shot.type !== "shot") throw Error("missing shot");
+    expect(shot.to.y).toBeCloseTo(0, 4);
+    expect(shot.to.x).toBeCloseTo(expected.x, 4); expect(shot.to.z).toBeCloseTo(expected.z, 4);
+    // Bracing does not change ground-only placement or unbraced clearance assistance.
+    expect(pick(cursor, true).aim.y).toBeGreaterThan(1);
+    sim.setBrace(false); expect(pick(cursor).aim.y).toBeGreaterThan(1);
+  });
+
+  test("bracing preserves the hovered leg height instead of raising it to the chest", () => {
+    sim.select(1);
+    const enemy = sim.addEnemy("assault", { x: 2, z: 20 });
+    for (let i = 0; i < 20; i++) sim.step();
+    const point = { ...enemy.body.translation(), y: enemy.body.translation().y - 0.4 };
+    const unbraced = pick(point);
+    sim.setBrace(true);
+    const braced = pick(point);
+    expect(braced.actor).toBe(enemy.id);
+    expect(braced.aim.y).toBeLessThan(unbraced.aim.y - 0.5);
+  });
+
+  test("NEEDLE's braced pistol also follows the ground surface", () => {
+    sim.reset("arena", "sniper"); sim.select(4); sim.chooseWeapon("pistol");
+    for (let i = 0; i < 20; i++) sim.step();
+    const cursor = { x: 5, y: 0, z: 24 };
+    expect(pick(cursor).aim.y).toBeGreaterThan(1);
+    sim.setBrace(true);
+    expect(pick(cursor).aim.y).toBeCloseTo(0, 4);
   });
 
   test.each([1, 4])("operator %s can aim at and knock around a dropped PORTER tote", (id) => {
@@ -93,6 +158,23 @@ describe("automatic upper-body aim", () => {
     // Movement and grenade placement still resolve the same cursor to the floor.
     expect(pick({ ...cargo.body.translation() }, true).aim.y).toBeGreaterThan(1);
     expect(pick({ ...cargo.body.translation() }, true).ground.y).toBe(0);
+  });
+
+  test.each([1, 4])("braced operator %s converges on a hovered pane after an aim change", id => {
+    sim.reset("city", "minigunner"); sim.select(id);
+    const pane = sim.city!.windows.panes.find(p => p.spec.id === "grocer/0/1/0")!;
+    sim.primary.body.setTranslation({ x: pane.spec.x, y: 0.98, z: pane.spec.z + 8 }, true);
+    sim.world.step(); sim.setBrace(true); sim.primary.yaw = Math.PI / 2; sim.primary.spin = 1;
+    sim.aim = pick(pane.spec).aim;
+    expect(sim.aim.y).toBeLessThan(1.5);
+    const expected = sim.aimTrace(sim.primary).to;
+    sim.shoot(sim.primary);
+    const shot = sim.events.find(e => e.type === "shot")!;
+    if (shot.type !== "shot") throw Error("missing shot");
+    // Rapier's mesh intersections use float32; compare well below a millimetre.
+    expect(shot.to.x).toBeCloseTo(expected.x, 4); expect(shot.to.y).toBeCloseTo(expected.y, 4);
+    expect(shot.to.z).toBeCloseTo(expected.z, 4);
+    expect(sim.city!.windows.broken.has(pane.spec.id)).toBe(true);
   });
 
   test("elevated silhouettes keep their height while movement and grenades use the ground", () => {

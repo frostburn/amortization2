@@ -37,7 +37,8 @@ async function start() {
   let middleDrag: { x: number; y: number } | null = null;
   let sniperPointer: { x: number; y: number } | null = null;
   let capturePending = false,
-    sightCaptured = false;
+    sightCaptured = false,
+    skipCaptureWarp = false;
   let selectionDrag: {
     x: number;
     y: number;
@@ -385,6 +386,7 @@ async function start() {
       return;
     }
     capturePending = true;
+    skipCaptureWarp = true;
     try {
       // Space/click provides user activation. Legacy browsers return void;
       // modern browsers also reject a promise when capture is unavailable.
@@ -439,6 +441,9 @@ async function start() {
     if (paused) return;
     if (sim.sniping) {
       if (document.pointerLockElement === canvas) {
+        // Capturing may warp the cursor into the canvas. That first relative
+        // event must not change the reticle's world target.
+        if (skipCaptureWarp) { skipCaptureWarp = false; return; }
         scene.scope.look(e.movementX, e.movementY, sim, canvas.clientHeight);
       } else {
         updatePointer(e);

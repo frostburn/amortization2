@@ -6,35 +6,11 @@ import { WaterView } from "./water";
 import { makeStreets } from "./streets";
 import { makeDeliveryPad } from "./kites";
 import { makePort } from "./port";
+import { WINDOW_BORDER, MULLION, buildingFacades, buildingPanes, roofPanels, shipPanes } from "../game/facades";
+import { makeFacade, WindowView } from "./windows";
 
 type BuildingView = { spec: BuildingSpec; root: THREE.Group; materials: THREE.MeshStandardMaterial[];
-  bounds: THREE.Box3; shutter?: THREE.Mesh; opacity: number; closed: number };
-
-type Opening = { x: number; y: number; w: number; h: number };
-/** Exterior wall faces around actual openings, with recessed panes and frame rings. */
-function facade(w: number, h: number, openings: Opening[], wall: THREE.Material, frame: THREE.Material, glass: THREE.Material) {
-  const root = new THREE.Group();
-  const levels = [...new Set([0, h, ...openings.flatMap(o => [o.y - o.h / 2, o.y + o.h / 2])])].sort((a, b) => a - b);
-  for (let i = 1; i < levels.length; i++) {
-    const bottom = levels[i - 1], top = levels[i];
-    const gaps = openings.filter(o => o.y - o.h / 2 <= bottom && o.y + o.h / 2 >= top).sort((a, b) => a.x - b.x);
-    let left = -w / 2;
-    for (const gap of [...gaps, { x: w / 2, w: 0 }]) {
-      const right = gap.x - gap.w / 2;
-      if (right > left) panel(root, right - left, top - bottom, (left + right) / 2, (top + bottom) / 2, 0, wall);
-      left = Math.max(left, gap.x + gap.w / 2);
-    }
-  }
-  for (const o of openings) {
-    const border = 0.14;
-    for (const side of [-1, 1]) {
-      block(root, o.w, border, 0.12, o.x, o.y + side * (o.h - border) / 2, 0.06, frame);
-      block(root, border, o.h - border * 2, 0.12, o.x + side * (o.w - border) / 2, o.y, 0.06, frame);
-    }
-    panel(root, o.w - border * 2, o.h - border * 2, o.x, o.y, 0.04, glass);
-  }
-  return root;
-}
+  bounds: THREE.Box3; shutter?: THREE.Mesh; glazing: WindowView; opacity: number; closed: number };
 
 // A small reusable kit: repeated window bays, storefront, service roof and shutter.
 export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.MeshStandardMaterial>, coverage = true): BuildingView {
@@ -49,34 +25,18 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
   const kit = BUILDING_KIT[spec.prefab], root = new THREE.Group();
   const wall = paint(({ brick: 0x9a7667, sand: 0xb8ad92, slate: 0x7d8a88 })[spec.finish]);
   wall.shadowSide = THREE.DoubleSide;
-  const frame = paint(0x49585b, 0.4), glass = paint(0x354c52, 0.5, 0.35);
+  const frame = paint(0x49585b, 0.4);
   const trim = paint(0xd0c9b2), accent = paint(spec.accent), roof = paint(0x656d6b);
-  const materials = [wall, frame, glass, trim, accent, roof];
+  const materials = [wall, frame, trim, accent, roof];
   const { w, h, d } = kit, front = d / 2;
-  const windows: Opening[] = [];
-  const sideWindows: Opening[] = [];
-  for (let f = 0; f < kit.floors; f++) {
-    for (const x of [-7.5, -3.75, 0, 3.75, 7.5].filter(x => Math.abs(x) + 1.18 < w / 2))
-      windows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
-    for (const x of [-d / 4, d / 4]) sideWindows.push({ x, y: 2 + f * 3.35, w: 2.35, h: 2.1 });
+  for (const f of buildingFacades(spec)) {
+    const face = makeFacade(f, wall, frame, roof);
+    face.position.set(f.x, 0, f.z); face.rotation.y = f.turn * Math.PI / 2; root.add(face);
   }
   const shop = spec.prefab === "shop";
-  const frontWindows = windows.filter(o => o.y !== 2 || (!shop && o.x !== 0));
-  frontWindows.push({ x: 0, y: 1.5, w: 2.5, h: 3 });
-  if (shop) for (const x of [-5.5, 5.5]) frontWindows.push({ x, y: 1.625, w: 6.7, h: 2.85 });
-  if (spec.prefab === "depot") {
-    frontWindows.length = 0;
-    for (const x of [-5.5, 5.5]) frontWindows.push({ x, y: 2.1, w: 6.2, h: 4.2 });
-  }
-  for (const side of [-1, 1]) {
-    const face = facade(w, h, side === 1 ? frontWindows : windows, wall, frame, glass);
-    face.position.z = side * front; face.rotation.y = side === 1 ? 0 : Math.PI; root.add(face);
-    const end = facade(d, h, sideWindows, wall, frame, glass);
-    end.position.x = side * w / 2; end.rotation.y = side * Math.PI / 2; root.add(end);
-  }
   block(root, w, 0.12, d, 0, 0.06, 0, wall);
-  block(root, w + 0.25, 0.32, d + 0.25, 0, h + 0.16, 0, trim);
-  block(root, w - 0.7, 0.18, d - 0.7, 0, h + 0.37, 0, roof);
+  for (const p of roofPanels(spec, w + 0.25, d + 0.25)) block(root, p.w, 0.32, p.d, p.x, h + 0.16, p.z, trim);
+  for (const p of roofPanels(spec, w - 0.7, d - 0.7)) block(root, p.w, 0.18, p.d, p.x, h + 0.37, p.z, roof);
   for (const x of [-w / 2 + 0.4, w / 2 - 0.4]) {
     block(root, 0.32, h, 0.12, x, h / 2, front + 0.09, trim);
     block(root, 0.32, h, 0.12, x, h / 2, -front - 0.09, trim);
@@ -95,8 +55,8 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
     for (const x of [-5.5, 5.5]) for (let y = 0.6; y < 4.2; y += 0.6)
       block(root, 5.9, 0.055, 0.03, x, y, front + 0.065, frame);
     for (const z of [-5.5, 0, 5.5]) {
-      const rooflight = block(root, w - 1, 0.14, 2, 0, h + 0.65, z, glass);
-      rooflight.rotation.x = 0.22;
+      for (const side of [-1, 1]) block(root, w - 1, 0.12, WINDOW_BORDER, 0, h + 0.46, z + side * (1.8 - WINDOW_BORDER) / 2, frame);
+      for (let i = 0; i <= 5; i++) block(root, MULLION, 0.12, 1.8, -(w - 1) / 2 + i * (w - 1) / 5, h + 0.46, z, frame);
     }
   } else if (spec.prefab === "civic") {
     block(root, 11.5, 0.3, 2.2, 0, 3.55, front + 0.75, accent);
@@ -117,6 +77,8 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
     for (let i = -3; i <= 3; i++) block(root, 1.8, 0.08, 0.07, x, h + 1.49, serviceZ + i * 0.16, trim);
   }
   batchRigid(root);
+  const glazing = new WindowView(buildingPanes(spec), coverage);
+  root.add(glazing.mesh); materials.push(glazing.material);
   let shutter: THREE.Mesh | undefined;
   if (spec.prefab === "shop" && !spec.backdrop) {
     // Separate articulated part; never bake it into the static facade.
@@ -124,7 +86,7 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
     shutter.visible = false;
   }
   root.position.set(spec.x, 0, spec.z); root.rotation.y = spec.turn * Math.PI / 2;
-  return { spec, root, materials, shutter, opacity: 1, closed: 0,
+  return { spec, root, materials, shutter, glazing, opacity: 1, closed: 0,
     bounds: new THREE.Box3().setFromObject(root) };
 }
 
@@ -133,6 +95,8 @@ export class CityView {
   private buildings: BuildingView[];
   private signals: { mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>; axis: number }[] = [];
   private water: WaterView[];
+  private glazing: WindowView[] = [];
+  private reflection?: THREE.WebGLRenderTarget;
   private ray = new THREE.Ray();
   private intersection = new THREE.Vector3();
   constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true) {
@@ -175,15 +139,62 @@ export class CityView {
     this.buildings = [];
     for (const spec of district.buildings) {
       const building = makeBuilding(spec, spec.backdrop ? shared : undefined, coverage);
-      if (spec.backdrop) background.add(building.root);
+      this.glazing.push(building.glazing);
+      if (spec.backdrop) {
+        building.root.remove(building.glazing.mesh);
+        const panes = new THREE.Group(); panes.add(building.glazing.mesh);
+        panes.position.copy(building.root.position); panes.rotation.copy(building.root.rotation);
+        this.root.add(panes); background.add(building.root);
+      }
       else { this.buildings.push(building); this.root.add(building.root); }
     }
     batchRigid(background); this.root.add(background);
+    if (district.port) {
+      const shipGlass = new WindowView(shipPanes(district), coverage);
+      this.glazing.push(shipGlass); this.root.add(shipGlass.mesh);
+    }
   }
+
+  /** Capture static scenery once per district; camera motion changes reflection
+   * direction without six extra scene renders on every combat frame. */
+  captureReflections(renderer: THREE.WebGLRenderer, source: THREE.Scene) {
+    if (this.reflection) return;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xb7c4ca);
+    scene.fog = new THREE.Fog(0xb7c4ca, 180, 320);
+    const scenery = this.root.clone(true);
+    scenery.traverse(o => { if (o.userData.glazing) o.visible = false; });
+    scene.add(scenery);
+    for (const light of source.children) if (light instanceof THREE.Light) {
+      const copy = light.clone(); copy.castShadow = false; scene.add(copy);
+      if (copy instanceof THREE.DirectionalLight) scene.add(copy.target);
+    }
+    const cube = new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType });
+    const camera = new THREE.CubeCamera(0.1, 400, cube);
+    camera.position.set(0, 6, 4); scene.add(camera);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const shadows = renderer.shadowMap.enabled;
+    try {
+      renderer.shadowMap.enabled = false;
+      camera.update(renderer, scene);
+      this.reflection = pmrem.fromCubemap(cube.texture);
+      for (const view of this.glazing) {
+        view.material.envMap = this.reflection.texture; view.material.needsUpdate = true;
+      }
+    } finally {
+      renderer.shadowMap.enabled = shadows;
+      cube.dispose(); pmrem.dispose();
+      // Clones share the live geometry/materials; only release their instance buffers.
+      scenery.traverse(o => { if (o instanceof THREE.InstancedMesh) o.dispose(); });
+    }
+  }
+
+  disposeReflections() { this.reflection?.dispose(); this.reflection = undefined; }
 
   update(sim: Simulation, camera: THREE.Camera, delta: number) {
     if (!sim.city) return;
     this.water.forEach(w => w.update(sim.time));
+    this.glazing.forEach(g => g.update(sim.city!.windows.broken));
     for (const signal of this.signals) signal.mesh.material.color.setHex(signal.axis === sim.city.crossing ? 0x87d5b5 : 0xb78159);
     for (const b of this.buildings) {
       const obscures = !sim.sniping && !b.spec.backdrop && sim.active.some(a => {
