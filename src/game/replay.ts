@@ -22,7 +22,7 @@ export function replaySnapshot(sim: Simulation) {
     tick: tick(sim), mission: sim.mission?.inspect() ?? null, arena: sim.arena?.inspect() ?? null,
     selected: [...sim.selected], aim: { ...sim.aim }, trigger: sim.trigger, sniping: sim.sniping,
     shots: sim.shots, hits: sim.hits, throws: sim.throws,
-    actors: sim.actors.map(a => ({ id: a.id, kind: a.kind, model: a.model, hp: a.hp,
+    actors: sim.actors.map(a => ({ id: a.id, kind: a.kind, model: a.flight ? "WATCH" : a.model, hp: a.hp,
       position: position(a.body.translation()), yaw: rounded(a.yaw), weapon: a.weapon,
       ammo: sim.ammunition(a).ammo, reload: rounded(sim.ammunition(a).reload),
       braced: a.braced, firing: a.firing, stagger: rounded(a.stagger),

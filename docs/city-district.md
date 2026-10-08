@@ -1,6 +1,6 @@
 # City district
 
-A city should feel large through connected streets, repeated architecture, movement and responses. Playable missions can occupy a small district in real-world dimensions. The district is now 234 × 147 metres (about 3.44 hectares), almost three times the original area. The central shops connect to a western parcel neighbourhood, a southern station forecourt and an eastern canal court. Roads continue beyond the playable area into adjacent skyline blocks. It is an activity sandbox, without a campaign objective or enemy wave controller.
+A city should feel large through connected streets, repeated architecture, movement and responses. Playable missions can occupy a small district in real-world dimensions. The district is now 234 × 147 metres (about 3.44 hectares), almost three times the original area. The central shops connect to a western parcel neighbourhood, a southern station forecourt and an eastern canal court. Roads continue beyond the playable area into adjacent skyline blocks. It is an activity sandbox, without a campaign objective or scheduled enemy-wave controller. Player damage to civilians can call a local [WATCH security response](security-response.md).
 
 ## Play
 

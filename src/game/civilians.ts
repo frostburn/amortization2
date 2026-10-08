@@ -132,7 +132,10 @@ export class CityLife {
     c.body.setLinearDamping(0.35); c.body.setAngularDamping(1.8);
   }
 
-  damage(c: CivilianCart | CivilianKite | CivilianPorter | CivilianVehicle, damage: number, impulse: Vec3, point: Vec3) {
+  damage(c: CivilianCart | CivilianKite | CivilianPorter | CivilianVehicle, damage: number, impulse: Vec3, point: Vec3,
+    responsible?: "player" | "enemy") {
+    if (responsible === "player" && damage > 0 && c.hp > 0)
+      this.sim.security?.report(point, c.id, damage >= c.hp);
     if ("path" in c) { this.traffic.damage(c, damage, impulse, point); this.disturb(point); return; }
     if (c.model === "KITE") { this.flights.damage(c, damage, impulse, point); this.disturb(point); return; }
     if (c.model === "PORTER") { this.workers.damage(c, damage, impulse, point); this.disturb(point); return; }
@@ -157,7 +160,9 @@ export class CityLife {
     }
   }
 
-  blast(origin: Vec3, source?: RAPIER.RigidBody) {
+  blast(origin: Vec3, source?: RAPIER.RigidBody, responsible?: "player" | "enemy" | "neutral") {
+    const victims = responsible === "player" ? [...this.carts, ...this.kites, ...this.porters, ...this.vehicles]
+      .filter(c => c.hp > 0).map(c => ({ civilian: c, hp: c.hp })) : [];
     this.disturb(origin, origin, 12);
     this.flights.blast(origin, source);
     this.workers.blast(origin, source);
@@ -173,6 +178,8 @@ export class CityLife {
         x: dx * strength, y: strength * 0.7, z: dz * strength,
       }, { x: p.x - dx * 0.3, y: p.y - 0.15, z: p.z - dz * 0.3 });
     }
+    for (const { civilian, hp } of victims) if (civilian.hp < hp)
+      this.sim.security?.report(civilian.body.translation(), civilian.id, civilian.hp === 0);
   }
 
   update() {
@@ -232,7 +239,8 @@ export class CityLife {
         return crossingX ? this.crossing !== 0 : crossingZ ? this.crossing !== 1 : false;
       });
       const obstacles = [
-        ...this.sim.actors.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.45, cart: false })),
+        ...this.sim.actors.filter(a => !a.flight || Math.abs(a.body.translation().y - p.y) < 1.5)
+          .map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.45, cart: false })),
         ...this.sim.props.map(a => ({ id: -a.id, p: a.body.translation(), radius: Math.max(a.w, a.d) / 2 + 0.8, cart: false })),
         ...this.porters.map(a => ({ id: -a.id, p: a.body.translation(), radius: 1.35, cart: false })),
         ...this.vehicles.map(a => ({ id: -a.id, p: a.body.translation(), radius: VEHICLES[a.model].length / 2 + 0.7, cart: false })),
