@@ -1,6 +1,6 @@
 # Amortization II — Futures Contract
 
-A desktop browser real-time tactics prototype about controlling a squad of machines. **Proving Ground** tests machine-gun fire, physical displacement, and thrown grenades. **Long Range** is a horizontal 30 / 60 / 90 metre lane for the fragile NEEDLE sniper model. **Endless Arena** pits the squad against incoming AI robot squads, with repairs between waves and a quick restart after defeat.
+A desktop browser real-time tactics game about controlling a squad of machines. The first playable contract, **Receiving**, is a low-stakes, pistols-only job at a cooperative's pickup yard: clear four guards, release the cargo and return to the service van. Morrow and Sable introduce the operation using the returning cast's portraits. The existing ranges, endless arena and city/port sandboxes remain under **Practice / debug**.
 
 The overhead view is true isometric: 45° yaw, 35.3° elevation, and world axes projected at 120°. Wider maps and a lower default zoom give the squad more room to manoeuvre. Automatic fire centres on **herding**: track an opponent to push it out of cover, change firing angle to redirect it, and regroup during a reload. Hits briefly stagger robots, interrupting walking and firing while physical knockback continues. Orders resume after recovery, and robots can return fire between staggers. **Bracing recovers 2.5× faster.** Torso jolts, bright ground rings and squad-card status show the reaction. See [camera and kinetic combat tuning](docs/combat-feel.md).
 
@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL Vite prints, then select **Enter range** to start and enable sound. Keyboard and mouse are recommended. The renderer requires WebGL 2 and WebAssembly.
+Open the URL Vite prints, then select **Deploy squad** to start the contract and enable sound, or choose a practice floor. Keyboard and mouse are recommended. The renderer requires WebGL 2 and WebAssembly.
 
 ```sh
 npm test            # headless tests against the actual physics simulation
@@ -22,6 +22,10 @@ npm run preview    # serve the production build locally
 ```
 
 The `dist/` directory is self-contained and uses relative asset URLs. Serve it over HTTP(S); opening `index.html` as a local file will not work. To share a development server on a trusted network, use `npm run dev -- --host 0.0.0.0`.
+
+## Receiving
+
+Four basic chassis carry pistols; heavy equipment is unavailable for this job. Clear the four guards, keep a robot on the yellow dispatch pad for two seconds to release the cargo, then bring every surviving squad member back to the van. PORTER work resumes after release. There are no reinforcements, timed failure or objective refits. Losing the squad triggers recovery; completing the return opens Morrow's debrief. **Replay contract** deploys a fresh squad; **Shift+R** restores the briefing. Debug squad preferences stay available in the ranges. See [the first mission](docs/first-mission.md).
 
 ## Proving Ground
 
@@ -55,7 +59,7 @@ Choose **Endless Arena** in the entry menu or header. The whole squad starts sel
 
 Enemy squads enter, acquire targets and move around blocked sight lines. **Waves 1–2 never brace**, making them easier to stagger and herd. Wave 3 introduces braced firing positions and fragile enemy snipers with the same rifle/pistol loadout as NEEDLE. Robots can return fire while sliding between staggers. Automatic aim clears low cover by default; tall cover needs a flank. From wave 4, assault robots lob grenades at clustered targets; orange ground rings and an incoming warning identify live enemy grenades. Cover blocks shots and blast pressure, and live explosives must resolve before the wave ends.
 
-Each wave adds robots up to three four-member squads, then continues indefinitely. Entrances rotate and avoid nearby survivors when the warning is planned; occupied entrance slots shift before spawning. Enemy attacks become more frequent in later waves. The HUD shows wave, remaining hostiles, total disabled hostiles and surviving squad members. Enemy shots do not count toward the player's accuracy. There are no missions, unlocks or ammunition economy.
+Each wave adds robots up to three four-member squads, then continues indefinitely. Entrances rotate and avoid nearby survivors when the warning is planned; occupied entrance slots shift before spawning. Enemy attacks become more frequent in later waves. The HUD shows wave, remaining hostiles, total disabled hostiles and surviving squad members. Enemy shots do not count toward the player's accuracy. The arena remains an independent combat sandbox with no mission objective or ammunition economy.
 
 ## City district
 
@@ -96,7 +100,7 @@ The game pauses on focus loss. Sound, motion, labels, aiming and squad preferenc
 
 The city has three KITE parcel quadrotors alongside CART and CRATE. Their four-motor flutter is synthesized locally, pans with the camera and fades with distance and rotor shutdown. All three models share the independent **Civilian motors** slider; gunfire retains its own mix. KITE flies marked depot-to-pad delivery routes, waits above occupied pads and aborts collection during nearby combat. Damaged aircraft lose lift and leave physical wrecks. See [City district](docs/city-district.md) and [Civilian roster](docs/civilian-robots.md) for the reusable route and model design.
 
-The supplied soft M4A1 shot (`854226`) stands in for NEEDLE’s pistol, played once per shot with its tail intact. It never starts a machine-gun loop. The other supplied qubodup recordings drive the machine-gun attack, looping sustain, release, grenade blast, and rifle reload. Rifle shots blend the sharp post recording near the camera with the field recording at distance; panning follows the active camera, and overhead zoom moves the listening position. First-person sniping hears the close recording from the robot's eye position. The simulation cadence matches the ten-shot machine-gun loop. Enemy machine-gun bursts use the same spatial loops, normalized with friendly voices and attenuated by camera distance. The minigun motor uses olliehahn12's CC0 saw recording: its actual acceleration and coast-down are shortened and lowered in pitch around a steady loop. Repeated M240 reports, dry transients and a low-frequency shot body supply the firing layer. Spin-up, firing start/loop/tail and spin-down follow the real motor and trigger state; cancelled wind-up has no gunfire. Metal bullet impacts use three edited contact recordings, and near-camera bullet passes use the supplied flyby. Impact/flyby voices are rate limited. Web Audio also adds concrete impacts and a short low-frequency blast layer, with voice normalization, master volume, and compression. No external synthesizer or service is required to run the game.
+The supplied soft M4A1 shot (`854226`) stands in for the contract pistols and NEEDLE’s sidearm, played once per shot with its tail intact. It never starts a machine-gun loop. The other supplied qubodup recordings drive the machine-gun attack, looping sustain, release, grenade blast, and rifle reload. Rifle shots blend the sharp post recording near the camera with the field recording at distance; panning follows the active camera, and overhead zoom moves the listening position. First-person sniping hears the close recording from the robot's eye position. The simulation cadence matches the ten-shot machine-gun loop. Enemy machine-gun bursts use the same spatial loops, normalized with friendly voices and attenuated by camera distance. The minigun motor uses olliehahn12's CC0 saw recording: its actual acceleration and coast-down are shortened and lowered in pitch around a steady loop. Repeated M240 reports, dry transients and a low-frequency shot body supply the firing layer. Spin-up, firing start/loop/tail and spin-down follow the real motor and trigger state; cancelled wind-up has no gunfire. Metal bullet impacts use three edited contact recordings, and near-camera bullet passes use the supplied flyby. Impact/flyby voices are rate limited. Web Audio also adds concrete impacts and a short low-frequency blast layer, with voice normalization, master volume, and compression. No external synthesizer or service is required to run the game.
 
 See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original files and their included license manifest are preserved in `sounds/`.
 
@@ -105,6 +109,7 @@ See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original fi
 TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and Web Audio. No backend is required.
 
 - [Range design and implementation](docs/proving-ground.md)
+- [Receiving — first playable contract](docs/first-mission.md)
 - [Isometric camera and kinetic combat](docs/combat-feel.md)
 - [Sniper model, scope, and long range](docs/sniper-range.md)
 - [Arena waves and enemy combat](docs/arena.md)

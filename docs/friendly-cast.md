@@ -162,6 +162,7 @@ machines. Most missions need one briefing owner and one principal live contact.
 When Rook interrupts Sable's report, something has reached the support vehicle.
 
 All names, roles and dialogue are selectable UI text rather than baked into
-portraits. Individual assets are prepared for future comms and scene use; the
-current prototype has no campaign dialogue player. See [story artwork](story-art.md)
+portraits. The [Receiving contract](first-mission.md) uses Morrow and Sable in
+its briefing, radio messages and debrief; the remaining portraits are ready for
+later operations and scenes. See [story artwork](story-art.md)
 for image provenance, prompts, file specifications and integration guidance.

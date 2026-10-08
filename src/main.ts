@@ -1,5 +1,6 @@
 import "./style.css";
 import { mountUI, updateUI } from "./ui";
+import { showComms } from "./mission-ui";
 import {
   STEP,
   clamp,
@@ -12,7 +13,7 @@ import {
 import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
 
-const { canvas, dialog } = mountUI();
+const { canvas, dialog, resultDialog } = mountUI();
 const audio = new RangeAudio();
 
 async function start() {
@@ -25,13 +26,14 @@ async function start() {
     const saved = JSON.parse(localStorage.getItem("amortization2.settings.v1") ?? "{}");
     if (["sniper", "minigunner", "assault"].includes(saved.fourthModel)) fourthModel = saved.fourthModel;
   } catch { /* Optional local preferences. */ }
-  const sim = await Simulation.create("proving", fourthModel);
+  const sim = await Simulation.create("receiving", fourthModel);
   const scene = await RangeScene.create(canvas, sim);
   let paused = true,
     entered = false,
     last = performance.now(),
     accumulator = 0,
-    uiTime = 0;
+    uiTime = 0,
+    nextPausedRender = 0;
   let pointer = { x: 0, y: 0, inside: false },
     ground: Vec3 = { x: -14, y: 0, z: -7 };
   let middleDrag: { x: number; y: number } | null = null;
@@ -50,6 +52,7 @@ async function start() {
   const selectionBox = document.getElementById("selection-box")!;
   const keys = new Set<string>();
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let commsTimer: ReturnType<typeof setTimeout> | undefined;
   const toast = (message: string, essential = false) => {
     const element = document.getElementById("toast")!;
     element.classList.toggle("aux-label", !essential);
@@ -139,7 +142,29 @@ async function start() {
     });
   }
 
-  function pause(title = "Range paused") {
+  function configureMenu() {
+    document.getElementById("menu-title")!.textContent = sim.mission ? "Receiving"
+      : sim.range === "port" ? "Marine port" : sim.range === "city" ? "City district"
+      : sim.arena ? "Endless arena" : sim.range === "long" ? "Long range" : "Proving ground";
+    document.getElementById("menu-intro")!.textContent = sim.mission ? sim.mission.definition.summary
+      : sim.range === "port" ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
+      : sim.range === "city" ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
+      : sim.arena ? "Survive incoming robot squads. Survivors repair and rearm between waves. Shift+R restarts."
+      : sim.range === "long" ? "Sight a target with NEEDLE and press Space for braced first-person sniping. Elevated platforms need elevated aim."
+      : "Test sustained fire, move heavy targets, and throw grenades over cover.";
+    document.getElementById("resume")!.innerHTML = sim.mission
+      ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
+      : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
+    canvas.setAttribute("aria-label", sim.mission
+      ? "Receiving mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. Hold Space to brace. Clear the guards, reach dispatch, then return to the van."
+      : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
+  }
+  function dismissComms() {
+    clearTimeout(commsTimer);
+    document.getElementById("mission-comms")!.hidden = true;
+  }
+  document.getElementById("dismiss-comms")!.addEventListener("click", dismissComms);
+  function pause(title?: string) {
     paused = true;
     exitSniping();
     sim.release();
@@ -147,9 +172,8 @@ async function start() {
     keys.clear();
     cancelDrags();
     accumulator = 0;
-    document.getElementById("menu-title")!.textContent = title;
-    document.getElementById("resume")!.innerHTML =
-      "RESUME RANGE <span>↗</span>";
+    configureMenu();
+    document.getElementById("menu-title")!.textContent = title ?? (sim.mission ? "Contract paused" : "Range paused");
     if (!dialog.open) dialog.showModal();
   }
   async function resume() {
@@ -163,6 +187,7 @@ async function start() {
     }
     button.disabled = false;
     dialog.close();
+    sim.mission?.deploy();
     entered = true;
     paused = false;
     last = performance.now();
@@ -170,6 +195,9 @@ async function start() {
     canvas.focus();
   }
   function reset() {
+    nextPausedRender = 0;
+    resultDialog.close();
+    dismissComms();
     exitSniping();
     cancelDrags();
     keys.clear();
@@ -180,10 +208,15 @@ async function start() {
     scene.updateAim(ground, false);
     audio.stop();
     accumulator = 0;
-    toast(sim.range === "port" ? "Port restored." : sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
+    if (sim.mission) {
+      paused = true;
+      configureMenu();
+      if (!dialog.open) dialog.showModal();
+    } else toast(sim.range === "port" ? "Port restored." : sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
+    if (sim.mission && weapon !== "pistol") return;
     if (!sim.chooseWeapon(weapon)) {
       toast(
         weapon === "rifle"
@@ -203,6 +236,9 @@ async function start() {
     canvas.focus();
   }
   function switchRange(range: RangeId) {
+    nextPausedRender = 0;
+    resultDialog.close();
+    dismissComms();
     exitSniping();
     cancelDrags();
     keys.clear();
@@ -213,18 +249,11 @@ async function start() {
     scene.resetDynamic();
     scene.resetCamera();
     accumulator = 0;
-    document.getElementById("menu-title")!.textContent =
-      range === "port" ? "Marine port" : range === "city" ? "City district" : range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
-    document.getElementById("menu-intro")!.textContent =
-      range === "port"
-        ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
-        : range === "city"
-        ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
-        : range === "arena"
-        ? "Survive incoming robot squads. Watch the marked entrances, move around cover, and interrupt enemy bursts. Survivors are repaired and rearmed between waves; disabled robots stay down. Shift+R restarts."
-        : range === "long"
-        ? "NEEDLE trades armour for a powerful rifle. Sight a target and press Space to enter braced first-person sniping. Aim above the raised platforms before firing."
-        : "Test sustained fire, move heavy targets, and throw grenades over cover.";
+    configureMenu();
+    if (sim.mission) {
+      paused = true;
+      if (!dialog.open) dialog.showModal();
+    }
     updateUI(sim, audio);
     if (!paused) canvas.focus();
   }
@@ -236,6 +265,7 @@ async function start() {
       );
   for (const id of ["loadout-select", "menu-loadout"])
     document.getElementById(id)!.addEventListener("change", (e) => {
+      if (sim.mission) return;
       const model = (e.target as HTMLSelectElement).value as RobotModel;
       if (!["sniper", "minigunner", "assault"].includes(model) || model === sim.fourthModel) return;
       exitSniping();
@@ -282,9 +312,18 @@ async function start() {
   });
   document
     .getElementById("help")!
-    .addEventListener("click", () => pause("Controls & settings"));
+    .addEventListener("click", () => {
+      pause("Controls & settings");
+      (document.getElementById("menu-settings") as HTMLDetailsElement).open = true;
+    });
   document.getElementById("reset")!.addEventListener("click", reset);
   document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
+  document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
+  document.getElementById("mission-debug")!.addEventListener("click", () => {
+    switchRange("proving");
+    pause("Proving ground");
+  });
+  resultDialog.addEventListener("cancel", event => event.preventDefault());
   document.getElementById("sound")!.addEventListener("click", async () => {
     try {
       await audio.unlock();
@@ -697,6 +736,7 @@ async function start() {
     "Welcome to Amortization II. window.amortization2: inspect(), project({x,y,z}), reset(), exportReport().",
   );
   document.getElementById("loading")!.classList.add("hidden");
+  configureMenu();
   updateUI(sim, audio);
   dialog.showModal();
   function frame(now: number) {
@@ -749,6 +789,11 @@ async function start() {
       scene.event(event);
       audio.event(event);
       if (event.type === "drill" || event.type === "wave") toast(event.message);
+      if (event.type === "comms") {
+        showComms(event.speaker, event.message);
+        clearTimeout(commsTimer);
+        commsTimer = setTimeout(dismissComms, 9000);
+      }
       if (event.type === "throw" && sim.actors.find((a) => a.id === event.actor)?.kind === "enemy")
         toast("Incoming grenade. Move or take cover.", true);
       if (event.type === "explosion" && !sim.city)
@@ -760,12 +805,29 @@ async function start() {
         );
     }
     audio.update(sim, paused);
-    scene.render(
-      paused ? 1 : accumulator / STEP,
-      paused ? 0 : delta,
-      sim.time,
-      paused,
-    );
+    if (sim.mission?.finished && !resultDialog.open) {
+      paused = true;
+      sim.release();
+      audio.stop();
+      keys.clear();
+      cancelDrags();
+      dismissComms();
+      updateUI(sim, audio);
+      if (dialog.open) dialog.close();
+      resultDialog.showModal();
+      nextPausedRender = 0;
+    }
+    // Briefings and settings freeze the world. Refresh for resize/settings
+    // feedback without continuously drawing the entire district behind a modal.
+    if (!paused || now >= nextPausedRender) {
+      scene.render(
+        paused ? 1 : accumulator / STEP,
+        paused ? 0 : delta,
+        sim.time,
+        paused,
+      );
+      nextPausedRender = now + 250;
+    }
     uiTime += delta;
     if (uiTime > 0.08) {
       updateUI(sim, audio);

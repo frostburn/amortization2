@@ -11,8 +11,9 @@ The six generated source images were 1254 × 1254; production images total
 Names, roles and dialogue belong in selectable UI text. Each portrait has a
 consistent head-and-shoulders crop, dark charcoal-olive background, warm upper-left
 light and restrained cool fill. The assets support small comms portraits and
-larger scene panels. They are prepared assets for the planned campaign; the
-current prototype's interface does not display campaign dialogue.
+larger scene panels. The [Receiving contract](first-mission.md) displays Morrow
+and Sable in its briefing, radio messages and debrief. The other four assets
+remain ready for later campaign scenes.
 
 ## Asset index
 
@@ -21,8 +22,8 @@ human IDs, display names, responsibilities and presentation emphasis. Its
 `portrait` filenames are relative to the manifest's directory. Resolve that
 base with the deployment's relative URL; the application also supports hosting
 under a path prefix. Load portraits when their speaker is needed rather than
-adding all six to game startup. A future dialogue UI should supply text for names
-and expose the relevant speaker identity to assistive technology.
+adding all six to game startup. The first mission supplies names as text and
+identifies its speakers through image alternatives and live radio status.
 
 | Portrait | Reference identity | Role |
 | --- | --- | --- |

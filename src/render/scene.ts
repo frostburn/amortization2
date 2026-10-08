@@ -20,6 +20,7 @@ import type {
   Simulation,
 } from "../game/simulation";
 import { CityView } from "./city";
+import { MissionView } from "./mission";
 import { CartFleet } from "./carts";
 import { KiteFleet } from "./kites";
 import { PorterFleet, makeTote } from "./porters";
@@ -177,6 +178,7 @@ export class RangeScene {
   private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
   private cityView?: CityView;
+  private missionView?: MissionView;
   private cartFleet?: CartFleet;
   private kiteFleet?: KiteFleet;
   private porterFleet?: PorterFleet;
@@ -441,6 +443,10 @@ export class RangeScene {
       floorMat.dispose();
       this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
+      if (this.sim.mission) {
+        this.missionView = new MissionView();
+        this.environment.add(this.missionView.root);
+      }
       return;
     }
     const wallTex = tex.clone();
@@ -779,6 +785,7 @@ export class RangeScene {
       }
     this.environment.clear();
     this.cityView = undefined;
+    this.missionView = undefined;
     this.environmentLabels.clear();
     this.entryMarkers.clear();
     this.buildEnvironment(this.texture);
@@ -988,6 +995,12 @@ export class RangeScene {
           }
           primaryGun.add(bipod);
           this.batchRigidPart(bipod);
+        } else {
+          box(primaryGun, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
+          box(primaryGun, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
+        }
+        this.batchRigidPart(primaryGun);
+        if (a.weapons.includes("pistol")) {
           pistol = new THREE.Group();
           torso.add(pistol);
           box(pistol, 0.16, 0.15, 0.35, 0.28, 0.3, 0.46, dark);
@@ -995,11 +1008,7 @@ export class RangeScene {
           const tip = cylinder(pistol, 0.027, 0.12, 0.28, 0.3, 0.6, silver);
           tip.rotation.x = Math.PI / 2;
           this.batchRigidPart(pistol);
-        } else {
-          box(primaryGun, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
-          box(primaryGun, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
         }
-        this.batchRigidPart(primaryGun);
         cylinder(torso, 0.013, 0.44, -0.25, 0.87, -0.2, dark);
       }
     } else {
@@ -1597,6 +1606,7 @@ export class RangeScene {
     this.renderer.info.reset();
     this.updateCamera();
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
+    this.missionView?.update(this.sim, this.reducedMotion);
     this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
     this.kiteFleet?.update(alpha, paused ? 0 : delta);
     this.porterFleet?.update(alpha);

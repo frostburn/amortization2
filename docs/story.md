@@ -97,6 +97,12 @@ count. Each can support several small districts and combat-focused operations.
 
 ### 1. Receiving
 
+The [first playable contract](first-mission.md) starts with a smaller dispute:
+release a cooperative's door motors and kettle elements from a pickup yard.
+Four hired pistol guards enforce a storage hold. Morrow accepts a limited
+assignment, Sable knows the dispatcher, and reopening access gets idle PORTERs
+moving again. The wider seizures below develop after this modest intervention.
+
 A freight cooperative at the marine port hires the crew to recover impounded
 containers. Gannet's security then begins removing its loading equipment as well.
 The crew protects workers, recovers the cargo and gets the depot moving.
