@@ -2,9 +2,15 @@ import { PISTOL, STEP, distance2 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
+import type { SingleLoadBridge } from "./bridges";
 
 export type Contact = "morrow" | "vale";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "complete" | "failed";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "complete" | "failed";
+export type MissionDefinition = {
+  id: string; number: string; title: string; location: string; summary: string;
+  briefing: readonly { speaker: Contact; message: string }[];
+  objectives: readonly string[]; releaseSeconds: number; returnSeconds: number;
+};
 export const RECEIVING_CONTRACT = {
   id: "receiving",
   number: "01",
@@ -25,18 +31,58 @@ const GUARD_PROFILE: EnemyProfile = {
   attackInterval: 0.85, reactionTime: 0.45, pistolRange: PISTOL.range, leash: 14,
 };
 
-/** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
-export class Mission {
-  readonly definition = RECEIVING_CONTRACT;
+/** Shared contract lifecycle; authored encounters own their tactics and stages. */
+export abstract class Mission {
+  abstract readonly definition: MissionDefinition;
+  abstract readonly firstPhase: MissionPhase;
+  bridge?: SingleLoadBridge;
+  alarmAt?: number;
+  failureReason?: string;
   phase: MissionPhase = "briefing";
   releaseProgress = 0;
   returnProgress = 0;
   enemyShots = 0;
   deployedAt = 0;
   finishedAt?: number;
+  constructor(protected sim: Simulation) {}
+  abstract get enemies(): Simulation["actors"];
+  abstract get objective(): number;
+  abstract get marker(): { x: number; z: number; radius: number; kind: "dispatch" | "return" } | null;
+  abstract updateCombat(): void;
+  abstract updateObjectives(): void;
+  abstract inspect(): { id: string; phase: MissionPhase; objective: number; enemies: number; guards: number;
+    releaseProgress: number; returnProgress: number; cargoReleased: boolean; marker: Mission["marker"];
+    enemyShots: number; deployedAt: number; finishedAt?: number; survivors: number; [key: string]: unknown };
+  get finished() { return this.phase === "complete" || this.phase === "failed"; }
+  get stopped() { return this.phase === "briefing" || this.finished; }
+  get cargoReleased() { return this.releaseProgress >= 1; }
+  deploy() {
+    if (this.phase !== "briefing") return;
+    this.phase = this.firstPhase;
+    this.deployedAt = this.sim.time;
+  }
+  protected finish(phase: "complete" | "failed") {
+    this.phase = phase;
+    this.finishedAt = this.sim.time;
+    this.sim.release();
+    for (const a of this.sim.actors) {
+      a.firing = false;
+      a.cover = undefined;
+      if (a.ai) a.ai.fire = false;
+      a.path = [];
+      a.moveTarget = undefined;
+    }
+  }
+}
+
+/** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
+export class ReceivingMission extends Mission {
+  readonly definition = RECEIVING_CONTRACT;
+  readonly firstPhase = "yard";
   private alertedPairs = new Set<number>();
 
-  constructor(private sim: Simulation) {
+  constructor(sim: Simulation) {
+    super(sim);
     for (const [i, position] of RECEIVING_GUARDS.entries()) {
       const guard = sim.addEnemy("assault", position);
       guard.weapons = ["pistol"];
@@ -56,20 +102,12 @@ export class Mission {
   }
 
   get enemies() { return this.sim.actors.filter(a => a.kind === "enemy" && !a.flight && !a.dead); }
-  get finished() { return this.phase === "complete" || this.phase === "failed"; }
-  get stopped() { return this.phase === "briefing" || this.finished; }
-  get cargoReleased() { return this.releaseProgress >= 1; }
   get objective() {
     return this.cargoReleased ? 2 : !this.enemies.length ? 1 : 0;
   }
   get marker() {
     return this.phase === "dispatch" ? { ...RECEIVING_SITES.dispatch, kind: "dispatch" as const }
       : this.phase === "return" ? { ...RECEIVING_SITES.return, kind: "return" as const } : null;
-  }
-  deploy() {
-    if (this.phase !== "briefing") return;
-    this.phase = "yard";
-    this.deployedAt = this.sim.time;
   }
   updateCombat() {
     const living = this.sim.squad.filter(a => !a.dead);
@@ -112,17 +150,6 @@ export class Mission {
       const together = living.every(a => inside(a, RECEIVING_SITES.return));
       this.returnProgress = together ? Math.min(1, this.returnProgress + STEP / this.definition.returnSeconds) : 0;
       if (this.returnProgress >= 1) this.finish("complete");
-    }
-  }
-  private finish(phase: "complete" | "failed") {
-    this.phase = phase;
-    this.finishedAt = this.sim.time;
-    this.sim.release();
-    for (const a of this.sim.actors) {
-      a.firing = false;
-      if (a.ai) a.ai.fire = false;
-      a.path = [];
-      a.moveTarget = undefined;
     }
   }
   inspect() {

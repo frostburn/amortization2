@@ -6,11 +6,12 @@ export type ReplayAction =
   | { type: "select"; id: number; additive: boolean }
   | { type: "group"; ids: number[] }
   | { type: "move"; point: Vec2; queued: boolean }
+  | { type: "cover"; point: Vec2 }
   | { type: "weapon"; weapon: Weapon }
   | { type: "brace"; enabled: boolean }
   | { type: "scope"; enabled: boolean }
   | { type: "grenade"; point: Vec2; actor: number }
-  | { type: "reload" | "release" | "deploy" }
+  | { type: "reload" | "release" | "deploy" | "ceasefire" }
   | { type: "control"; aim: Vec3; trigger: boolean };
 type Timed<T> = { tick: number; wallMs: number; data: T };
 export type ReplayView = { camera: object; scope: object; paused: boolean; width: number; height: number };
@@ -154,6 +155,8 @@ export function applyReplayAction(sim: Simulation, input: ReplayAction) {
     case "select": sim.select(input.id, input.additive); break;
     case "group": sim.selectGroup(input.ids); break;
     case "move": sim.move(input.point, input.queued); break;
+    case "cover": sim.coverSector(input.point); break;
+    case "ceasefire": sim.ceasefire(); break;
     case "weapon": sim.chooseWeapon(input.weapon); break;
     case "brace": sim.setBrace(input.enabled); break;
     case "scope": if (sim.sniping !== input.enabled) sim.toggleSniping(); break;
@@ -176,11 +179,12 @@ function validAction(value: unknown): value is ReplayAction {
     case "select": return id(a.id) && typeof a.additive === "boolean";
     case "group": return Array.isArray(a.ids) && a.ids.length <= 4 && a.ids.every(n => id(n) && n !== 5);
     case "move": return point(a.point, ["x", "z"]) && typeof a.queued === "boolean";
+    case "cover": return point(a.point, ["x", "z"]);
     case "weapon": return ["gun", "pistol", "minigun", "rifle", "grenade"].includes(a.weapon as string);
     case "brace": case "scope": return typeof a.enabled === "boolean";
     case "grenade": return id(a.actor) && a.actor !== 5 && point(a.point, ["x", "z"]);
     case "control": return point(a.aim, ["x", "y", "z"]) && typeof a.trigger === "boolean";
-    case "reload": case "release": case "deploy": return true;
+    case "reload": case "release": case "deploy": case "ceasefire": return true;
     default: return false;
   }
 }

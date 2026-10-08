@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { RECEIVING_SITES } from "../game/receiving";
+import { CROSSING_BRIDGE, CROSSING_SITES } from "../game/crossing";
+import { SingleLoadBridgeView } from "./bridges";
 import type { Simulation } from "../game/simulation";
 import { VEHICLES } from "../game/traffic";
 import { batchRigid, block, surface, tube } from "./primitives";
 import { vehicleBody } from "./traffic";
 
 /** Physical landmarks and one active ground objective; dialogue belongs in UI. */
-export class MissionView {
+class ReceivingView {
   root = new THREE.Group();
   private light = new THREE.MeshBasicMaterial({ color: 0xdbac5b });
   private dispatch: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
@@ -65,4 +67,57 @@ export class MissionView {
     for (const ring of [this.dispatch, this.returning])
       ring.material.opacity = reducedMotion ? 0.8 : 0.65 + Math.sin(sim.time * 4) * 0.15;
   }
+}
+
+class CrossingView {
+  root = new THREE.Group();
+  private bridge = new SingleLoadBridgeView(CROSSING_BRIDGE);
+  private beacon = new THREE.MeshBasicMaterial({ color: 0x655d4d });
+  private exit: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  constructor() {
+    this.root.add(this.bridge.root);
+    const kit = new THREE.Group(), dark = surface(0x33464b, 0.4), paint = surface(0xc0a568);
+    const alarm = CROSSING_SITES.alarm;
+    tube(kit, 0.065, 2, alarm.x, 1, alarm.z, dark);
+    block(kit, 0.35, 0.28, 0.24, alarm.x, 1.7, alarm.z, dark);
+    block(kit, 0.28, 0.1, 0.25, alarm.x, 1.95, alarm.z, this.beacon);
+    const van = vehicleBody("VAN");
+    van.paint.color.setHex(0x728c82);
+    van.root.position.set(CROSSING_SITES.van.x, VEHICLES.VAN.height / 2 + 0.035, CROSSING_SITES.van.z);
+    this.root.add(van.root);
+    const site = CROSSING_SITES.exit;
+    for (const sign of [-1, 1]) {
+      block(kit, site.radius * 2, 0.004, 0.09, site.x, 0.041, site.z + sign * site.radius, paint);
+      block(kit, 0.09, 0.004, site.radius * 2, site.x + sign * site.radius, 0.041, site.z, paint);
+    }
+    for (const side of [-1, 1]) for (const end of [-1, 1]) {
+      const tire = tube(kit, 0.36, 0.23, CROSSING_SITES.van.x + side * 0.98, 0.36,
+        CROSSING_SITES.van.z + end * VEHICLES.VAN.wheelbase / 2, dark, 16);
+      tire.rotation.z = Math.PI / 2;
+    }
+    batchRigid(kit); this.root.add(kit);
+    this.exit = new THREE.Mesh(new THREE.RingGeometry(site.radius - 0.08, site.radius, 64),
+      new THREE.MeshBasicMaterial({ color: 0xa3e6d0, transparent: true, opacity: 0.8, depthWrite: false }));
+    this.exit.rotation.x = -Math.PI / 2;
+    this.exit.position.set(site.x, 0.06, site.z);
+    this.root.add(this.exit);
+  }
+  update(sim: Simulation, reducedMotion: boolean) {
+    const mission = sim.mission;
+    if (!mission?.bridge) return;
+    this.bridge.update(mission.bridge);
+    this.beacon.color.setHex(mission.alarmAt === undefined ? 0x655d4d : reducedMotion || Math.sin(sim.time * 10) > 0 ? 0xff7259 : 0x712d26);
+    this.exit.visible = mission.phase === "withdraw";
+  }
+}
+
+/** Contract-specific landmarks built from shared district and vehicle kits. */
+export class MissionView {
+  private view: ReceivingView | CrossingView;
+  readonly root: THREE.Group;
+  constructor(sim: Simulation) {
+    this.view = sim.mission?.bridge ? new CrossingView() : new ReceivingView();
+    this.root = this.view.root;
+  }
+  update(sim: Simulation, reducedMotion: boolean) { this.view.update(sim, reducedMotion); }
 }

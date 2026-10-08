@@ -72,6 +72,15 @@ async function start() {
   } | null = null;
   let moveDrag: { queued: boolean; lastGoal: Vec2; lastTime: number } | null =
     null;
+  let covering = false;
+  const coverButton = document.getElementById("cover-order") as HTMLButtonElement;
+  function armCover(enabled: boolean) {
+    covering = enabled;
+    coverButton.setAttribute("aria-pressed", String(enabled));
+    coverButton.classList.toggle("selected", enabled);
+    canvas.classList.toggle("ordering-cover", enabled);
+    scene.previewCover(null);
+  }
   const selectionBox = document.getElementById("selection-box")!;
   const keys = new Set<string>();
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -166,7 +175,7 @@ async function start() {
   }
 
   function configureMenu() {
-    document.getElementById("menu-title")!.textContent = sim.mission ? "Receiving"
+    document.getElementById("menu-title")!.textContent = sim.mission ? sim.mission.definition.title
       : sim.range === "port" ? "Marine port" : sim.range === "city" ? "City district"
       : sim.arena ? "Endless arena" : sim.range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent = sim.mission ? sim.mission.definition.summary
@@ -179,7 +188,7 @@ async function start() {
       ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
       : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
     canvas.setAttribute("aria-label", sim.mission
-      ? "Receiving mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. Hold Space to brace. Clear the guards, reach dispatch, then return to the van."
+      ? `${sim.mission.definition.title} mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
       : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
   }
   function dismissComms() {
@@ -349,6 +358,7 @@ async function start() {
   document.getElementById("reset")!.addEventListener("click", reset);
   document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
   document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
+  document.getElementById("mission-next")!.addEventListener("click", () => switchRange("crossing"));
   document.getElementById("mission-debug")!.addEventListener("click", () => {
     switchRange("proving");
     pause("Proving ground");
@@ -380,6 +390,14 @@ async function start() {
   document.getElementById("all")!.addEventListener("click", () => {
     if (viewer?.active) return;
     sim.select(5);
+    canvas.focus();
+  });
+  coverButton.addEventListener("click", () => {
+    if (viewer?.active || paused) return;
+    const armed = !covering;
+    cancelDrags();
+    sim.release();
+    armCover(armed);
     canvas.focus();
   });
   for (const button of document.querySelectorAll<HTMLButtonElement>(
@@ -426,6 +444,7 @@ async function start() {
     return result;
   };
   function cancelDrags() {
+    armCover(false);
     selectionDrag = null;
     moveDrag = null;
     scene.cancelMovePreview();
@@ -564,7 +583,8 @@ async function start() {
       selectionBox.style.width = `${Math.abs(pointer.x - selectionDrag.x)}px`;
       selectionBox.style.height = `${Math.abs(pointer.y - selectionDrag.y)}px`;
     }
-    aimAtPointer(!!moveDrag || !!selectionDrag);
+    aimAtPointer(!!moveDrag || !!selectionDrag || covering);
+    if (covering) scene.previewCover(pointer.inside ? ground : null);
     if (moveDrag?.queued) updateMove();
   });
   canvas.addEventListener("mousedown", (e) => {
@@ -582,8 +602,15 @@ async function start() {
       return;
     }
     updatePointer(e);
-    const picked = aimAtPointer(e.button === 2 || e.shiftKey);
+    const picked = aimAtPointer(e.button === 2 || e.shiftKey || covering);
+    if (covering && e.button === 0 && !e.shiftKey) {
+      sim.coverSector(ground);
+      armCover(false);
+      updateUI(sim, audio);
+      return;
+    }
     if (e.button === 2) {
+      armCover(false);
       selectionDrag = null;
       selectionBox.hidden = true;
       moveDrag = {
@@ -689,7 +716,8 @@ async function start() {
     if (isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Escape" && !dialog.open) {
       e.preventDefault();
-      if (sim.sniping) exitSniping();
+      if (covering) armCover(false);
+      else if (sim.sniping) exitSniping();
       else pause();
       return;
     }
@@ -706,6 +734,8 @@ async function start() {
         "KeyE",
         "KeyR",
         "KeyF",
+        "KeyC",
+        "KeyX",
         "Digit1",
         "Digit2",
         "Digit3",
@@ -718,6 +748,13 @@ async function start() {
     if (e.repeat) return;
     if (/^Digit[1-5]$/.test(e.code))
       sim.select(Number(e.code.at(-1)), e.shiftKey);
+    else if (e.code === "KeyC") {
+      const armed = !covering;
+      cancelDrags();
+      exitSniping();
+      sim.release();
+      armCover(armed);
+    } else if (e.code === "KeyX") { armCover(false); sim.ceasefire(); }
     else if (e.code === "KeyG") chooseWeapon("grenade");
     else if (e.code === "KeyQ") chooseWeapon(sim.nextCloseWeapon);
     else if (e.code === "KeyE") chooseWeapon("rifle");
@@ -852,7 +889,8 @@ async function start() {
         if (keys.has("KeyW")) scene.pan(0, -panSpeed);
         if (keys.has("KeyS")) scene.pan(0, panSpeed);
         if (pointer.inside && (sim.weapon !== "rifle" || moveDrag))
-          aimAtPointer(!!moveDrag);
+          aimAtPointer(!!moveDrag || covering);
+        if (covering) scene.previewCover(pointer.inside ? ground : null);
         updateMove();
       } else {
         if (
@@ -885,7 +923,7 @@ async function start() {
         steps++;
       }
       if (steps === 6) accumulator = Math.min(accumulator, STEP);
-      scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag);
+      scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag && !covering);
     } else scene.updateAim(ground, false);
     audio.setListener(scene.listenerPosition, scene.listenerRight);
     replay?.frame(sim, { camera: scene.inspectCamera(), scope: scene.scope.inspect(), paused,

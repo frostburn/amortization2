@@ -1080,3 +1080,25 @@ a:hover {
 }
 .replay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0; }
 .replay-recording-status { color: var(--muted, #9aabad); font-size: 11px; }
+
+.cover-order {
+  width: 60px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+.cover-order svg { width: 24px; height: 24px; }
+.cover-order small { font-size: 9px; }
+.cover-order.selected { color: #dbac5b; border-color: #dbac5b; background: #dbac5b12; }
+#range.ordering-cover { cursor: crosshair; }
+#mission-name { font: inherit; }
+@media (max-width: 1100px) { .cover-order { width: 42px; } }

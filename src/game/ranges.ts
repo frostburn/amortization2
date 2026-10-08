@@ -11,8 +11,9 @@ import {
 import { CITY_DISTRICT, buildingSolid, waterSolids, type CityDistrict } from "./city";
 import { MARINE_PORT, portSolids } from "./port";
 import { RECEIVING_FIXTURES, RECEIVING_YARD } from "./receiving";
+import { CROSSING_DISTRICT, CROSSING_FIXTURES } from "./crossing";
 
-export type RangeId = "receiving" | "proving" | "long" | "arena" | "city" | "port";
+export type RangeId = "receiving" | "crossing" | "proving" | "long" | "arena" | "city" | "port";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -22,6 +23,7 @@ export const ARENA_ENTRIES = [
 export type TargetKind = (typeof TARGET_SPAWNS)[number]["kind"] | "precision";
 type RangeDefinition = {
   name: string;
+  contract?: boolean;
   city?: CityDistrict;
   bounds: RangeBounds;
   barriers: BoxSpec[];
@@ -32,8 +34,14 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  crossing: {
+    name: "02 · CROSSING", contract: true, city: CROSSING_DISTRICT, bounds: CROSSING_DISTRICT.bounds,
+    barriers: CROSSING_FIXTURES, platforms: [],
+    players: [{ x: -24.1, z: 1.1 }, { x: -24.1, z: -1.1 }, { x: -21.9, z: -1.1 }, { x: -21.9, z: 1.1 }],
+    targets: [], props: [],
+  },
   receiving: {
-    name: "01 · RECEIVING", city: RECEIVING_YARD, bounds: RECEIVING_YARD.bounds,
+    name: "01 · RECEIVING", contract: true, city: RECEIVING_YARD, bounds: RECEIVING_YARD.bounds,
     barriers: [...portSolids(RECEIVING_YARD), ...RECEIVING_FIXTURES], platforms: [],
     players: [{ x: -23.1, z: 15.1 }, { x: -23.1, z: 12.9 }, { x: -20.9, z: 12.9 }, { x: -20.9, z: 15.1 }],
     targets: [], props: [],
