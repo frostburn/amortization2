@@ -85,6 +85,18 @@ describe("Crossing contract", () => {
     expect(sim.events.filter(e => e.type === "bridge" && e.phase === "collapse")).toHaveLength(1);
   });
 
+  test("a settled disabled chassis on the deck requests recovery instead of hanging the movement queue", () => {
+    sim.mission!.deploy(); clearGuards();
+    const casualty = sim.squad[0]; casualty.body.setTranslation({ x: 0, y: .98, z: 0 }, true);
+    sim.damage(casualty, casualty.hp, zero, casualty.body.translation(), "pistol");
+    sim.selectGroup([2, 3, 4]); sim.move({ x: 13, z: 0 });
+    waitFor(() => sim.mission!.finished, 8);
+    expect(sim.mission!.phase).toBe("failed");
+    expect(sim.mission!.failureReason).toContain("blocking the bridge");
+    expect(sim.mission!.bridge!.collapsed).toBe(false);
+    expect(sim.squad.slice(1).every(a => !a.dead && !a.path.length)).toBe(true);
+  }, 15000);
+
   test("the last physical entry triggers exactly one alarm and a finite near-bank pursuit", () => {
     sim.mission!.deploy(); clearGuards();
     sim.squad.slice(0, 3).forEach((a, i) => a.body.setTranslation({ x: 11 + i * 2, y: .98, z: -3 }, true));

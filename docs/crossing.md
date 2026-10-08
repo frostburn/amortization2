@@ -79,7 +79,11 @@ is reused, with no per-frame bridge A* search and no body teleporting.
 Actual hulls, wrecks and loose cargo on the deck contribute their physical mass.
 An overload lasting 0.65 s buckles it and removes the deck collider. The load
 lamps turn amber when occupied and red during an overload. A collapsed bridge
-fails a stranded crossing immediately. Falling into the canal disables a
+fails a stranded crossing immediately. A settled disabled squad chassis blocking
+the deck for more than two seconds requests recovery if anyone still needs to
+cross, rather than leaving the bank queue waiting indefinitely. A wreck that is
+still moving has time to clear the deck; a lost final crosser does not strand the
+surviving robots already on the far bank. Falling into the canal disables a
 chassis; losing the whole squad requests recovery. Extraction allows casualties,
 but no living squad member can be left behind. Debriefs acknowledge the outcome.
 

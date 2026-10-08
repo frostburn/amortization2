@@ -82,6 +82,13 @@ export class CrossingMission extends Mission {
       this.failureReason = "The overloaded bridge collapsed";
       this.finish("failed"); return;
     }
+    const strandedWreck = this.sim.squad.some(a => a.dead && this.bridge!.onDeck(a.body.translation()) &&
+      this.sim.time - (a.deathTime ?? this.sim.time) > 2 &&
+      Math.hypot(a.body.linvel().x, a.body.linvel().y, a.body.linvel().z) < 0.3);
+    if (strandedWreck && survivors.some(a => this.bridge!.side(a.body.translation()) !== 1)) {
+      this.failureReason = "A disabled chassis is blocking the bridge";
+      this.finish("failed"); return;
+    }
     // Physical entry by the last surviving near-bank chassis, rather than a
     // queued click or the death of a teammate. Retreat never retriggers it.
     if (this.alarmAt === undefined && this.crossed.size > 0) {

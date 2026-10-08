@@ -316,6 +316,8 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
             ? "RELOADING · KEEP MOVING"
             : close === "minigun" && gunner.spooling && gunner.spin < 1
               ? `MINIGUN WIND-UP · ${Math.round(gunner.spin * 100)}% · KEEP HOLDING LMB`
+            : sim.active.some((a) => a.cover?.mode === "sector")
+              ? "COVERING · RMB MOVE · X CEASEFIRE"
             : sim.active.some((a) => a.braced)
               ? `BRACED${gunHeight} · RELEASE SPACE TO MOVE`
               : `${closeName}${gunHeight} · ${automaticGroup ? "LMB FIRES SELECTED AUTOMATIC WEAPONS" : "HOLD LMB TO FIRE"}`,
