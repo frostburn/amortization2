@@ -110,6 +110,9 @@ TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and 
 - [Arena waves and enemy combat](docs/arena.md)
 - [Squad choice, minigun and edited audio](docs/minigun.md)
 - [Visual direction](docs/art-direction.md)
+- [Campaign story outline](docs/story.md)
+- [Friendly human operations and support cast](docs/friendly-cast.md)
+- [Portrait assets, references and generation prompts](docs/story-art.md)
 
 In the browser console, `window.amortization2.inspect()` returns current state, `project({ x, y, z })` maps a world point to the screen, and `exportReport()` returns a JSON bug report. These are inspection helpers, not a save game or replay format.
 
