@@ -43,9 +43,12 @@ pump houses, workshop, depot, reflective windows, roads, traffic, CART routes,
 water and service van keep the location part of the existing city kit. Building
 lots clear both continuing roads and the canal.
 
-1. **Establish a foothold.** Three 132-integrity pistol guards hold the far bank.
-   They react to a chassis approaching the bridge mouth or damage to their
-   post. The near bank has space to arrange cover before crossing. They never
+1. **Establish a foothold.** Three 132-integrity pistol guards wait back from the
+   far bank, beyond pistol reach from the west mouth. The first living chassis
+   physically entering the deck commits them to the nearer firing posts;
+   queued clicks and distant fire do not lure them into a pre-crossing shootout.
+   They continue defending after a retreat. The near bank has space to arrange
+   cover before crossing. They never
    brace, use grenades or receive repairs. Their 0.6 s attack cadence overwhelms
    a lone unsupported robot, but concentrated covering fire can suppress and
    disable them. Player pistol damage, reach, magazines and reloads are unchanged.
@@ -85,7 +88,12 @@ cross, rather than leaving the bank queue waiting indefinitely. A wreck that is
 still moving has time to clear the deck; a lost final crosser does not strand the
 surviving robots already on the far bank. Falling into the canal disables a
 chassis; losing the whole squad requests recovery. Extraction allows casualties,
-but no living squad member can be left behind. Debriefs acknowledge the outcome.
+but no living squad member can be left behind. Morrow reports the contract
+outcome; Rook's portrait and assessment count the returned chassis, distinguish
+intact, lightly damaged, worn and critical frames, and acknowledge recovery for
+the ones left behind. Failed jobs get recovery instructions rather than a false
+claim that the surviving chassis are already home. Receiving uses the same
+hardware debrief.
 
 ## Validation
 

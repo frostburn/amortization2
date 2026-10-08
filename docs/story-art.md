@@ -12,8 +12,9 @@ Names, roles and dialogue belong in selectable UI text. Each portrait has a
 consistent head-and-shoulders crop, dark charcoal-olive background, warm upper-left
 light and restrained cool fill. The assets support small comms portraits and
 larger scene panels. The [Receiving contract](first-mission.md) displays Morrow
-and Vale in its briefing, radio messages and debrief. The other four assets
-remain ready for later campaign scenes.
+and Vale in its briefing and radio messages. Receiving and Crossing display
+Morrow's contract debrief and Rook's condition-aware hardware assessment.
+The other three assets remain ready for later campaign scenes.
 
 ## Asset index
 

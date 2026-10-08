@@ -1,13 +1,15 @@
 import type { Contact } from "./game/missions";
 import type { Simulation } from "./game/simulation";
+import { rookDebrief } from "./game/debrief";
 import { replayControls } from "./replay-ui";
 
 const CONTACTS = {
   morrow: { name: "MORROW", role: "Operations" },
   vale: { name: "VALE", role: "Recon / contacts" },
+  rook: { name: "ROOK", role: "Weapons / security" },
 };
 const portrait = (speaker: Contact) => `${import.meta.env.BASE_URL}portraits/${speaker}.webp`;
-const contact = (speaker: Contact, message: string) => `<article class="contact-line"><img src="${portrait(speaker)}" alt="${CONTACTS[speaker].name}" width="64" height="64"/><div><p class="contact-name">${CONTACTS[speaker].name}<span>${CONTACTS[speaker].role}</span></p><p>${message}</p></div></article>`;
+const contact = (speaker: Contact, message: string) => `<article class="contact-line" data-contact="${speaker}"><img src="${portrait(speaker)}" alt="${CONTACTS[speaker].name}" width="64" height="64"/><div><p class="contact-name">${CONTACTS[speaker].name}<span>${CONTACTS[speaker].role}</span></p><p>${message}</p></div></article>`;
 
 export const missionBriefing = `<section id="mission-briefing"></section>`;
 export const missionHUD = `
@@ -20,7 +22,7 @@ export const missionHUD = `
     <img id="comms-portrait" alt="" width="64" height="64"/><div><p class="contact-name" id="comms-name"></p><p id="comms-message"></p></div>
     <button id="dismiss-comms" aria-label="Dismiss radio message">×</button>
   </aside>`;
-export const missionResult = `<dialog id="mission-result" aria-labelledby="mission-result-title"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location" id="mission-result-state">CONTRACT COMPLETE</p><h2 id="mission-result-title">Receiving</h2>${contact("morrow", "")}<p id="mission-result-detail"></p><div class="mission-result-actions"><button id="mission-next" class="primary" hidden>NEXT CONTRACT · CROSSING <span>↗</span></button><button id="mission-replay">REPLAY CONTRACT</button><button id="mission-debug">PRACTICE / DEBUG</button></div>${replayControls}</div></dialog>`;
+export const missionResult = `<dialog id="mission-result" aria-labelledby="mission-result-title"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location" id="mission-result-state">CONTRACT COMPLETE</p><h2 id="mission-result-title">Receiving</h2>${contact("morrow", "")}${contact("rook", "")}<p id="mission-result-detail"></p><div class="mission-result-actions"><button id="mission-next" class="primary" hidden>NEXT CONTRACT · CROSSING <span>↗</span></button><button id="mission-replay">REPLAY CONTRACT</button><button id="mission-debug">PRACTICE / DEBUG</button></div>${replayControls}</div></dialog>`;
 
 const setText = (id: string, value: string) => {
   const element = document.getElementById(id)!;
@@ -86,10 +88,13 @@ export function updateMissionUI(sim: Simulation) {
       : damaged ? "The cargo hold is off. The cooperative will finish collection after the damaged equipment is recovered."
       : living.length < 4 ? "Yard reopened. Bring the damaged chassis to Rook's bench; the cooperative can arrange its pickups."
       : "They have their parts, and the dispatcher has the yard. Send the invoice. We're done here.";
-    const line = document.querySelector("#mission-result .contact-line > div > p:last-child")!;
+    const line = document.querySelector('#mission-result [data-contact="morrow"] > div > p:last-child')!;
     if (line.textContent !== message) line.textContent = message;
+    const rook = document.querySelector('#mission-result [data-contact="rook"] > div > p:last-child')!;
+    const assessment = rookDebrief(sim.squad, complete);
+    if (rook.textContent !== assessment) rook.textContent = assessment;
     const seconds = Math.floor((mission.finishedAt ?? sim.time) - mission.deployedAt);
-    setText("mission-result-detail", `${living.length} / 4 robots recovered · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} on site${damaged ? ` · ${damaged} civilian machines disabled` : ""}`);
+    setText("mission-result-detail", `${living.length} / 4 robots ${complete ? "recovered" : "still responding"} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} on site${damaged ? ` · ${damaged} civilian machines disabled` : ""}`);
   }
 }
 

@@ -8,7 +8,10 @@ export const CROSSING_SITES = {
   exit: { x: 24, z: 4, radius: 4.5 }, van: { x: 29, z: 4 },
   alarm: { x: -10.5, z: 2 },
 } as const;
-export const CROSSING_GUARDS = [{ x: 12, z: -5 }, { x: 15, z: 0 }, { x: 12, z: 5 }] as const;
+// Hold outside pistol reach even from the west mouth. The squad advances to
+// its firing posts only once a chassis physically steps onto the bridge.
+export const CROSSING_GUARDS = [{ x: 25, z: -5 }, { x: 27, z: 0 }, { x: 25, z: 5 }] as const;
+export const CROSSING_DEFENCE = [{ x: 12, z: -5 }, { x: 15, z: 0 }, { x: 12, z: 5 }] as const;
 export const CROSSING_PURSUERS = [{ x: -20, z: -5 }, { x: -22, z: 0 }, { x: -20, z: 5 }] as const;
 
 export const CROSSING_DISTRICT: CityDistrict = {

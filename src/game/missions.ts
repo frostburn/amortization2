@@ -4,7 +4,7 @@ import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
-export type Contact = "morrow" | "vale";
+export type Contact = "morrow" | "vale" | "rook";
 export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;

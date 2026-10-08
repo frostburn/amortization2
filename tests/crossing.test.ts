@@ -45,6 +45,36 @@ describe("Crossing contract", () => {
     }
   });
 
+  test("the defenders wait beyond west-bank pistol reach and cannot be picked off before crossing", () => {
+    sim.mission!.deploy(); sim.select(1);
+    sim.primary.body.setTranslation({ x: -8.2, y: .98, z: 0 }, true);
+    sim.setBrace(true);
+    for (const guard of sim.mission!.enemies) {
+      sim.aim = { ...guard.body.translation(), y: 1.25 }; sim.trigger = true;
+      ticks(sim, 3); sim.trigger = false; sim.reloadSelected(); ticks(sim, PISTOL.reload + STEP);
+      expect(guard.hp).toBe(guard.maxHp);
+    }
+    expect(sim.shots).toBeGreaterThan(12);
+    expect(sim.mission!.enemyShots).toBe(0);
+    expect(sim.mission!.inspect().defending).toBe(false);
+    expect(sim.mission!.enemies.every(a => distance2(a.body.translation(), a.spawn) < .15)).toBe(true);
+    sim.select(4); sim.move({ x: 11, z: 0 });
+    expect(sim.mission!.inspect().defending).toBe(false);
+    sim.move({ x: -22, z: 4 }); ticks(sim, 2);
+    expect(sim.mission!.inspect().defending).toBe(false);
+  }, 15000);
+
+  test("first physical bridge entry commits the defenders to their nearer firing posts", () => {
+    sim.mission!.deploy(); sim.select(4); sim.move({ x: 11, z: 0 });
+    waitFor(() => sim.mission!.inspect().defending === true, 8);
+    expect(sim.mission!.bridge!.onDeck(sim.primary.body.translation())).toBe(true);
+    expect(sim.mission!.enemies.every(a => a.ai!.state === "entering" && a.path.length > 0)).toBe(true);
+    sim.move({ x: -22, z: 4 }); ticks(sim, 2);
+    expect(sim.mission!.inspect().defending).toBe(true);
+    expect(sim.mission!.enemies.every(a => a.body.translation().x < a.spawn.x - 3)).toBe(true);
+    expect(sim.mission!.alarmAt).toBeUndefined();
+  }, 15000);
+
   test("the bank guards overpower a robot sent across without covering fire", () => {
     sim.mission!.deploy(); sim.select(4); sim.move({ x: 11, z: 0 });
     ticks(sim, 12);

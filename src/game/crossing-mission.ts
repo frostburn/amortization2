@@ -1,7 +1,7 @@
 import { PISTOL, STEP, distance2 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { Mission, type MissionDefinition } from "./missions";
-import { CROSSING_BRIDGE, CROSSING_GUARDS, CROSSING_PURSUERS, CROSSING_SITES } from "./crossing";
+import { CROSSING_BRIDGE, CROSSING_DEFENCE, CROSSING_GUARDS, CROSSING_PURSUERS, CROSSING_SITES } from "./crossing";
 import { SingleLoadBridge } from "./bridges";
 import type { Actor, Simulation } from "./simulation";
 
@@ -9,7 +9,7 @@ export const CROSSING_CONTRACT = {
   id: "crossing", number: "02", title: "Crossing", location: "Wharf Cooperative · Canal service walk",
   summary: "Gannet has locked the road bridge during a billing dispute. Take the maintenance footbridge and reach the cooperative's van on the other bank.",
   briefing: [
-    { speaker: "morrow", message: "Same equipment. The maintenance bridge takes one chassis at a time. Three hired machines hold the other end. Leave robots covering while the first one crosses; moving orders will queue at the bridge." },
+    { speaker: "morrow", message: "Same equipment. The maintenance bridge takes one chassis at a time. Gannet's machines are hanging back. They'll close on the crossing when you step onto it. Leave robots covering; moving orders will queue at the bridge." },
     { speaker: "vale", message: "Select your covering robots, press C, then click the bank they should watch. They'll stay planted and fire at anything hostile in that sector. Move orders release them; X orders ceasefire. The last chassis will trip the bridge's access alarm. Cover back from the far bank when the pursuers arrive." },
   ],
   objectives: ["Establish a foothold across the canal", "Cover the rest of the crossing", "Bring the surviving squad to the van"],
@@ -28,6 +28,7 @@ export class CrossingMission extends Mission {
   private pursuit: number[] = [];
   private crossed = new Set<number>();
   private pursuitSpawned = false;
+  private defenceCommitted = false;
   constructor(sim: Simulation) {
     super(sim);
     this.bridge = new SingleLoadBridge(sim, CROSSING_BRIDGE);
@@ -49,10 +50,18 @@ export class CrossingMission extends Mission {
     this.bridge!.update();
     const living = this.sim.squad.filter(a => !a.dead);
     const bankGuards = this.enemies.filter(a => this.guards.includes(a.id));
-    const alerted = this.guards.some(id => this.sim.actors.some(a => a.id === id && a.hp < a.maxHp));
+    if (!this.defenceCommitted && living.some(a => this.bridge!.onDeck(a.body.translation()))) {
+      this.defenceCommitted = true;
+      for (const guard of bankGuards) {
+        const post = CROSSING_DEFENCE[this.guards.indexOf(guard.id)];
+        guard.ai!.rally = { ...post };
+        guard.ai!.state = "entering";
+        guard.ai!.entryUntil = this.sim.time + 8;
+        this.sim.navigate(guard, post);
+      }
+    }
     for (const guard of bankGuards) {
-      const targets = living.filter(a => a.body.translation().x > -10.5 || alerted);
-      updateEnemy(this.sim, guard, targets, BANK_PROFILE);
+      updateEnemy(this.sim, guard, this.defenceCommitted ? living : [], BANK_PROFILE);
     }
     if (this.alarmAt !== undefined && !this.pursuitSpawned && this.sim.time - this.alarmAt >= 0.8) {
       this.pursuitSpawned = true;
@@ -120,6 +129,6 @@ export class CrossingMission extends Mission {
       enemyShots: this.enemyShots, deployedAt: this.deployedAt, finishedAt: this.finishedAt,
       survivors: this.sim.squad.filter(a => !a.dead).length, crossed: [...this.crossed],
       alarmAt: this.alarmAt, pursuers: this.pursuit.length, failureReason: this.failureReason,
-      bridge: this.bridge!.inspect() };
+      defending: this.defenceCommitted, bridge: this.bridge!.inspect() };
   }
 }
