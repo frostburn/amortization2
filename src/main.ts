@@ -637,7 +637,11 @@ async function start() {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement;
   window.addEventListener("keydown", (e) => {
-    if (resultDialog.open || isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (resultDialog.open) {
+      if (e.code === "Escape") e.preventDefault();
+      return;
+    }
+    if (isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Escape" && !dialog.open) {
       e.preventDefault();
       if (sim.sniping) exitSniping();
