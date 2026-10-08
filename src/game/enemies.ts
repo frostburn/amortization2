@@ -27,6 +27,8 @@ export type EnemyProfile = {
   attackInterval: number;
   noticeRange?: number;
   leash?: number;
+  reactionTime?: number;
+  pistolRange?: number;
 };
 
 /** Shared combat intentions; encounters own spawning, objectives and difficulty. */
@@ -53,7 +55,7 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
   if (brain.state === "holding") {
     brain.state = "advancing";
     brain.nextThink = now;
-    brain.nextAttack = Math.max(brain.nextAttack, now + 1);
+    brain.nextAttack = Math.max(brain.nextAttack, now + (profile.reactionTime ?? 1));
   }
   if (brain.state === "suppressed") brain.nextThink = now;
   if (brain.state === "entering") {
@@ -70,7 +72,7 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
     });
     if (brain.target !== target.id) {
       brain.target = target.id;
-      brain.nextAttack = Math.max(brain.nextAttack, now + (a.model === "sniper" ? 1.3 : 0.7));
+      brain.nextAttack = Math.max(brain.nextAttack, now + (profile.reactionTime ?? (a.model === "sniper" ? 1.3 : 0.7)));
       brain.burstUntil = 0;
     }
     const q = target.body.translation();
@@ -112,7 +114,7 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
       brain.state = "reloading";
       brain.burstUntil = 0;
       brain.nextAttack = Math.max(brain.nextAttack, now + 0.5);
-    } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? 24 : 38)) {
+    } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? profile.pistolRange ?? 24 : 38)) {
       a.braced = profile.brace;
       a.path = [];
       a.moveTarget = undefined;

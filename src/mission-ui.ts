@@ -1,9 +1,10 @@
 import { RECEIVING_CONTRACT, type Contact } from "./game/missions";
 import type { Simulation } from "./game/simulation";
+import { replayControls } from "./replay-ui";
 
 const CONTACTS = {
   morrow: { name: "MORROW", role: "Operations" },
-  sable: { name: "SABLE", role: "Recon / contacts" },
+  vale: { name: "VALE", role: "Recon / contacts" },
 };
 const portrait = (speaker: Contact) => `${import.meta.env.BASE_URL}portraits/${speaker}.webp`;
 const contact = (speaker: Contact, message: string) => `<article class="contact-line"><img src="${portrait(speaker)}" alt="${CONTACTS[speaker].name}" width="64" height="64"/><div><p class="contact-name">${CONTACTS[speaker].name}<span>${CONTACTS[speaker].role}</span></p><p>${message}</p></div></article>`;
@@ -19,7 +20,7 @@ export const missionHUD = `
     <img id="comms-portrait" alt="" width="64" height="64"/><div><p class="contact-name" id="comms-name"></p><p id="comms-message"></p></div>
     <button id="dismiss-comms" aria-label="Dismiss radio message">×</button>
   </aside>`;
-export const missionResult = `<dialog id="mission-result" aria-labelledby="mission-result-title"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location" id="mission-result-state">CONTRACT COMPLETE</p><h2 id="mission-result-title">Receiving</h2>${contact("morrow", "")}<p id="mission-result-detail"></p><div class="mission-result-actions"><button id="mission-replay" class="primary">REPLAY CONTRACT <span>↗</span></button><button id="mission-debug">PRACTICE / DEBUG</button></div></div></dialog>`;
+export const missionResult = `<dialog id="mission-result" aria-labelledby="mission-result-title"><div class="dialog-inner"><div class="dialog-rule"></div><p class="dialog-location" id="mission-result-state">CONTRACT COMPLETE</p><h2 id="mission-result-title">Receiving</h2>${contact("morrow", "")}<p id="mission-result-detail"></p><div class="mission-result-actions"><button id="mission-replay" class="primary">REPLAY CONTRACT <span>↗</span></button><button id="mission-debug">PRACTICE / DEBUG</button></div>${replayControls}</div></dialog>`;
 
 const setText = (id: string, value: string) => {
   const element = document.getElementById(id)!;

@@ -11,8 +11,8 @@ export const RECEIVING_SITES = {
   dispatch: { x: 21, z: 5, radius: 3 },
 } as const;
 export const RECEIVING_GUARDS = [
-  { x: -1, z: 5 }, { x: 5, z: -5 },
-  { x: 22, z: -7 }, { x: 28, z: 3 },
+  { x: -1, z: 5 }, { x: 2, z: 1 },
+  { x: 22, z: -2 }, { x: 27, z: 3 },
 ] as const;
 export const RECEIVING_FIXTURES: BoxSpec[] = [
   { ...RECEIVING_SITES.van, w: 2, d: 5.5, h: 2.15, style: "crate" },

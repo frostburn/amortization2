@@ -16,9 +16,9 @@
     {
       "id": "vale",
       "name": "Vale",
-      "role": "Systems",
+      "role": "Reconnaissance and contacts",
       "originalRole": "Systems",
-      "presence": "technical_reports",
+      "presence": "missions",
       "portrait": "vale.webp"
     },
     {
@@ -32,9 +32,9 @@
     {
       "id": "sable",
       "name": "Sable",
-      "role": "Reconnaissance and contacts",
+      "role": "Systems",
       "originalRole": "Recon",
-      "presence": "missions",
+      "presence": "technical_reports",
       "portrait": "sable.webp"
     },
     {

@@ -13,7 +13,7 @@ worth doing.
 ## Playing the contract
 
 **Receiving** is the default deployment. **Deploy squad** enables sound and
-starts the encounter after a short Morrow/Sable briefing. All four basic assault
+starts the encounter after a short Morrow/Vale briefing. All four basic assault
 chassis — ANCHOR, BREECH, LATCH and BOLT — carry only pistols. The practice squad
 preference is retained separately: selecting a heavy debug configuration cannot
 bring a rifle, machine gun, minigun or grenade into this contract.
@@ -22,13 +22,17 @@ Pistols use the existing shot sound, 12-round magazine, 28 m reach, 22 damage,
 0.35 s shot interval and 1.6 s reload. Hold LMB to fire selected units. Hold Space
 to brace; RMB orders and group selection work as in the ranges. Q retains the
 pistol. E and G have no mission weapon to select. The four guard chassis have
-66 integrity, fire single pistol shots with pauses, never brace, and react near
-their posts. They can move around blocked sight lines, but do not march across
-the entire district looking for the squad.
+132 integrity (six pistol hits), fire at 0.85 s intervals, and never brace. They
+work in two pairs: approaching within 20 m or damaging a guard alerts its
+partner, with a 0.45 s response and up to 28 m pistol reach. The unhurt partner
+can return fire while the targeted guard staggers. They move around blocked
+sight lines, but stay near their posts. A full squad needs two accurate volleys
+per guard; a lone robot takes longer and is exposed to its partner. This rewards
+concentrated fire without a minimum-squad gate, reinforcements or a timer.
 
 | Stage | Completion | Visible consequence |
 | --- | --- | --- |
-| Clear the pickup yard | Disable the four authored guards. | The dispatch pad becomes the active ground objective; Sable confirms the yard is clear. |
+| Clear the pickup yard | Disable the four authored guards. | The dispatch pad becomes the active ground objective; Vale confirms the yard is clear. |
 | Release the cargo | Keep at least one living robot on the yellow dispatch pad for two uninterrupted seconds. | The terminal light turns green and held PORTER work orders resume. Moving away resets release progress. |
 | Return to the van | Bring every surviving squad member inside the return ring for one second. | Combat freezes and Morrow gives the debrief. One robot cannot extract teammates left at dispatch. Disabled chassis do not block recovery. |
 
@@ -57,7 +61,7 @@ their loads and withdraw, then resume when safe. Their routine transfers make
 reopening the yard visible. Neutral traffic and damage keep their existing
 physics; civilian machines never count as the four guards.
 
-Morrow owns the contract briefing and result. Sable supplies the local picture
+Morrow owns the contract briefing and result. Vale supplies the local picture
 and the two meaningful changes during play. Their portrait URLs respect Vite's
 deployment base. Names and dialogue remain selectable text; live radio messages
 can be dismissed. Auxiliary labels can hide the control hints while preserving
@@ -84,7 +88,8 @@ mission-unlock screen, persistence of mission progress or voiced dialogue yet.
 ## Validation
 
 Focused physics tests exercise held briefings, every saved squad configuration,
-real pistol damage/reloads, guard reactions, ordered objectives, interrupted
+real pistol damage/reloads, paired guard reactions, one-versus-four combat,
+walking past disabled guard hulls, ordered objectives, interrupted
 release, full-squad walking through the yard, resumed cargo transfers, extraction
 with casualties, failure after release, replay and debug-floor isolation.
 The existing arena/stagger/cover tests protect the shared-tactics extraction.

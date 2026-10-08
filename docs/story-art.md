@@ -12,7 +12,7 @@ Names, roles and dialogue belong in selectable UI text. Each portrait has a
 consistent head-and-shoulders crop, dark charcoal-olive background, warm upper-left
 light and restrained cool fill. The assets support small comms portraits and
 larger scene panels. The [Receiving contract](first-mission.md) displays Morrow
-and Sable in its briefing, radio messages and debrief. The other four assets
+and Vale in its briefing, radio messages and debrief. The other four assets
 remain ready for later campaign scenes.
 
 ## Asset index
@@ -28,9 +28,9 @@ identifies its speakers through image alternatives and live radio status.
 | Portrait | Reference identity | Role |
 | --- | --- | --- |
 | [Morrow](../public/portraits/morrow.webp) | Original crew atlas, top-left | Operations |
-| [Vale](../public/portraits/vale.webp) | Original crew atlas, top-right | Systems |
+| [Vale](../public/portraits/vale.webp) | Original crew atlas, top-right | Reconnaissance and contacts |
 | [Rook](../public/portraits/rook.webp) | Original crew atlas, bottom-left | Weapons and security |
-| [Sable](../public/portraits/sable.webp) | Original crew atlas, bottom-right | Reconnaissance and contacts |
+| [Sable](../public/portraits/sable.webp) | Original crew atlas, bottom-right | Systems |
 | [Iona Voss](../public/portraits/voss.webp) | Original witness atlas, left | Engineering |
 | [Ren Quill](../public/portraits/quill.webp) | Corrected individual male portrait | Agreements |
 

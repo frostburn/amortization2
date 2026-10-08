@@ -3,7 +3,7 @@ import { updateEnemy, type EnemyProfile } from "./enemies";
 import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 
-export type Contact = "morrow" | "sable";
+export type Contact = "morrow" | "vale";
 export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "complete" | "failed";
 export const RECEIVING_CONTRACT = {
   id: "receiving",
@@ -13,7 +13,7 @@ export const RECEIVING_CONTRACT = {
   summary: "A disputed storage charge has put a small freight yard on hold. The cooperative wants its parts released before the afternoon pickups.",
   briefing: [
     { speaker: "morrow", message: "Door motors and kettle elements. That's the shipment. Gannet has put four hired machines on the yard. Clear them, release the hold at dispatch, and come back to the van. Pistols will do." },
-    { speaker: "sable", message: "Two posts by the containers, two at dispatch. The loaders are still holding yesterday's work. The cooperative's dispatcher will resume their jobs once you reach the yellow pad." },
+    { speaker: "vale", message: "Two pairs: the containers and dispatch. They cover each other, so bring the squad. The loaders are still holding yesterday's work. The cooperative's dispatcher will resume their jobs once you reach the yellow pad." },
   ] as const,
   objectives: ["Clear the pickup yard", "Release the cargo at dispatch", "Return the surviving squad to the van"],
   releaseSeconds: 2,
@@ -22,7 +22,7 @@ export const RECEIVING_CONTRACT = {
 
 const GUARD_PROFILE: EnemyProfile = {
   brace: false, grenades: false, automaticBurst: 0.06,
-  attackInterval: 1.45, noticeRange: 20, leash: 14,
+  attackInterval: 0.85, reactionTime: 0.45, pistolRange: PISTOL.range, leash: 14,
 };
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
@@ -34,6 +34,7 @@ export class Mission {
   enemyShots = 0;
   deployedAt = 0;
   finishedAt?: number;
+  private alertedPairs = new Set<number>();
 
   constructor(private sim: Simulation) {
     for (const [i, position] of RECEIVING_GUARDS.entries()) {
@@ -42,12 +43,12 @@ export class Mission {
       guard.weapon = "pistol";
       guard.ammo = 0;
       guard.pistol.ammo = PISTOL.magazine;
-      guard.hp = guard.maxHp = 66;
+      guard.hp = guard.maxHp = 132;
       guard.ai = {
         squad: Math.floor(i / 2), gate: "PICKUP YARD", rally: { ...position },
         flank: i % 2 ? 0.45 : -0.45, target: null,
         aim: { ...position, y: 1.25 }, state: "holding",
-        nextThink: i * 0.04, nextRoute: 0, nextAttack: 1.5,
+        nextThink: i * 0.04, nextRoute: 0, nextAttack: 0,
         entryUntil: 0, nextGrenade: Infinity, burstUntil: 0, visible: false, fire: false,
       };
     }
@@ -72,8 +73,19 @@ export class Mission {
   }
   updateCombat() {
     const living = this.sim.squad.filter(a => !a.dead);
-    if (living.length)
-      for (const guard of this.enemies) updateEnemy(this.sim, guard, living, GUARD_PROFILE);
+    if (!living.length) return;
+    for (const squad of [0, 1]) {
+      const pair = this.enemies.filter(a => a.ai!.squad === squad);
+      if (pair.some(a => a.hp < a.maxHp || living.some(target =>
+        distance2(a.body.translation(), target.body.translation()) < 20)))
+        this.alertedPairs.add(squad);
+      // A shot or nearby intruder warns both posts, without granting knowledge
+      // of distant robots. The unhurt partner can fire while the other staggers.
+      const radius = this.alertedPairs.has(squad) ? PISTOL.range + 2 : 20;
+      const targets = living.filter(target => pair.some(a =>
+        distance2(a.body.translation(), target.body.translation()) < radius));
+      for (const guard of pair) updateEnemy(this.sim, guard, targets, GUARD_PROFILE);
+    }
   }
   updateObjectives() {
     if (this.stopped) return;
@@ -81,7 +93,7 @@ export class Mission {
     if (!living.length) { this.finish("failed"); return; }
     if (this.phase === "yard" && !this.enemies.length) {
       this.phase = "dispatch";
-      this.sim.events.push({ type: "comms", speaker: "sable", message: "Yard's clear. Dispatch is on the yellow pad." });
+      this.sim.events.push({ type: "comms", speaker: "vale", message: "Yard's clear. Dispatch is on the yellow pad." });
     }
     const inside = (actor: typeof living[number], site: { x: number; z: number; radius: number }) => {
       const p = actor.body.translation();
@@ -93,7 +105,7 @@ export class Mission {
       if (this.releaseProgress >= 1) {
         this.phase = "return";
         for (const porter of this.sim.city!.porters) this.sim.city!.workers.resume(porter.route.id);
-        this.sim.events.push({ type: "comms", speaker: "sable", message: "Release accepted. The dispatcher has the loaders moving again. I'll meet you at the van." });
+        this.sim.events.push({ type: "comms", speaker: "vale", message: "Release accepted. The dispatcher has the loaders moving again. I'll meet you at the van." });
       }
     }
     if (this.phase === "return") {

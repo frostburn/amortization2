@@ -3,14 +3,16 @@
 The returning cast has aged **twelve years**. Morrow, Vale, Rook and Sable retain
 their first-game identities while moving into operations and support for the
 robots. Iona Voss and Ren Quill have independent, useful jobs after their rescue.
-The roles below guide future mission writing and presentation.
+Vale now owns reconnaissance and contacts; Sable owns systems. Their identities,
+portraits and first-game specialties remain intact. The roles below guide future
+mission writing and presentation.
 
 | Person | Responsibility | Principal presence | Portrait |
 | --- | --- | --- | --- |
 | Morrow | Operations; original field lead | Clients, briefings, changed assignments and debriefs | [morrow.webp](../public/portraits/morrow.webp) |
-| Vale | Systems and reliable information | Calibration, meaningful technical exceptions and recovered records | [vale.webp](../public/portraits/vale.webp) |
+| Vale | Reconnaissance and local relationships | District briefings, sourced observations, contacts and recovery arrangements | [vale.webp](../public/portraits/vale.webp) |
 | Rook | Weapons, preparation and field security | Range, workshop, loadout preparation and selected live operations | [rook.webp](../public/portraits/rook.webp) |
-| Sable | Reconnaissance and local relationships | District briefings, sourced observations, contacts and recovery arrangements | [sable.webp](../public/portraits/sable.webp) |
+| Sable | Systems and reliable information | Calibration, meaningful technical exceptions and recovered records | [sable.webp](../public/portraits/sable.webp) |
 | Iona Voss | Engineering programme and structural limits | Primarily workshop cutscenes | [voss.webp](../public/portraits/voss.webp) |
 | Ren Quill | Agreements and durable outcomes | Primarily client and coalition cutscenes | [quill.webp](../public/portraits/quill.webp) |
 
@@ -42,20 +44,24 @@ Visual continuity: short dark hair, distinctive brows and face, a charcoal high
 collar. Twelve years show through restrained greying, eye and forehead lines,
 and a mature expression. She remains active and capable.
 
-## Vale — systems
+## Vale — reconnaissance and contacts
 
-Vale maintains calibration, communication, onboard behaviour and trustworthy
-recordings. Early range work introduces him through the actual machines. Later
-reports concern meaningful exceptions, unreliable information and traced orders;
-routine readiness remains visible feedback.
+Vale provides the district's local picture. He walks streets, watches changes
+of shift and speaks to people. His reports interpret visible activity and have
+sources and boundaries:
 
-> The sight is steady. The chassis is still settling.
+> The blue van belongs here. Those two behind it do not.
 
-He initially trusts good records to protect the crew. Selectively presented
-footage then turns an intervention into a justification for seizure. He learns
-to establish context and responsibility with witnesses and Quill. Show him
-inspecting recovered units, connecting independent local systems and listening
-to workers whose accounts contradict the official report.
+He identifies an approaching recovery convoy or workers in a supposedly empty
+building. If he loses sight of something he says so. The first mechanic he
+introduces can later supply a workshop; a dispatcher can arrange an extraction;
+a shopkeeper can remember an earlier intervention. Districts accumulate
+relationships through him.
+
+His arc grows from recon specialist into someone building a network that can
+survive without a central corporate operator. By the end people bring him
+information before he asks. He returns from fieldwork with weather on his coat
+and details that were absent from the brief.
 
 Visual continuity: dark curly hair, glasses, beard and a black utility jacket.
 Preserve his face and eyewear; add twelve years of grey in hair and beard and
@@ -83,24 +89,20 @@ Visual continuity: Black man, broad build, shaved head, short beard and the
 original facial structure. Age his skin and beard by twelve years while retaining
 his physical presence. Work clothing remains substantial charcoal fabric.
 
-## Sable — reconnaissance and contacts
+## Sable — systems
 
-Sable provides the district's local picture. She walks streets, watches changes
-of shift and speaks to people. Her reports interpret visible activity and have
-sources and boundaries:
+Sable maintains calibration, communication, onboard behaviour and trustworthy
+recordings. Early range work introduces her through the actual machines. Later
+reports concern meaningful exceptions, unreliable information and traced orders;
+routine readiness remains visible feedback.
 
-> The blue van belongs here. Those two behind it do not.
+> The sight is steady. The chassis is still settling.
 
-She identifies an approaching recovery convoy or workers in a supposedly empty
-building. If she loses sight of something she says so. The first mechanic she
-introduces can later supply a workshop; a dispatcher can arrange an extraction;
-a shopkeeper can remember an earlier intervention. Districts accumulate
-relationships through her.
-
-Her arc grows from recon specialist into someone building a network that can
-survive without a central corporate operator. By the end people bring her
-information before she asks. She returns from fieldwork with weather on her coat
-and details that were absent from the brief.
+She initially trusts good records to protect the crew. Selectively presented
+footage then turns an intervention into a justification for seizure. She learns
+to establish context and responsibility with witnesses and Quill. Show her
+inspecting recovered units, connecting independent local systems and listening
+to workers whose accounts contradict the official report.
 
 Visual continuity: the same face and short asymmetric silver hair. Her hair was
 already silver in the original; ageing must also appear in facial and neck
@@ -109,7 +111,7 @@ structure, skin texture and lines. Preserve her alert expression.
 ## Iona Voss — engineering
 
 Voss develops major modifications, investigates failures and judges what can
-safely return to service. Vale maintains behaviour and electronics; Rook handles
+safely return to service. Sable maintains behaviour and electronics; Rook handles
 weapons and combat preparation; Voss understands structural limits across the
 whole machine. She works with technicians and produces useful results, including
 unwelcome conclusions. Repairs and capabilities have time, parts and explanations
@@ -144,9 +146,9 @@ in the original witness atlas is not Ren and must not be used as his reference.
 
 ## Familiarity over the campaign
 
-1. At the range, Rook prepares the robots and Vale checks their systems. Familiar
+1. At the range, Rook prepares the robots and Sable checks their systems. Familiar
    work establishes their relationship.
-2. On the first port deployment, Morrow owns the assignment and Sable the local
+2. On the first port deployment, Morrow owns the assignment and Vale the local
    picture. The player learns which information belongs to whom.
 3. Voss examines the first difficult return; Quill subsequently exposes the wider
    claim behind the incident.
@@ -156,13 +158,13 @@ in the original witness atlas is not Ren and must not be used as his reference.
    with Morrow trusting decisions made without her immediate permission.
 
 Use a few recurring places: operations vehicle, range, workshop, client meetings
-and returning districts. Rook has his bench; Vale repairs the same terminal;
-Sable comes back with observations; Morrow checks the support crew as well as the
+and returning districts. Rook has his bench; Sable repairs the same terminal;
+Vale comes back with observations; Morrow checks the support crew as well as the
 machines. Most missions need one briefing owner and one principal live contact.
-When Rook interrupts Sable's report, something has reached the support vehicle.
+When Rook interrupts Vale's report, something has reached the support vehicle.
 
 All names, roles and dialogue are selectable UI text rather than baked into
-portraits. The [Receiving contract](first-mission.md) uses Morrow and Sable in
+portraits. The [Receiving contract](first-mission.md) uses Morrow and Vale in
 its briefing, radio messages and debrief; the remaining portraits are ready for
 later operations and scenes. See [story artwork](story-art.md)
 for image provenance, prompts, file specifications and integration guidance.

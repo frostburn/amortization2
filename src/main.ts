@@ -12,6 +12,7 @@ import {
 } from "./game/config";
 import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
+import type { HumanReplayRecorder } from "./game/replay";
 
 const { canvas, dialog, resultDialog } = mountUI();
 const audio = new RangeAudio();
@@ -28,6 +29,23 @@ async function start() {
   } catch { /* Optional local preferences. */ }
   const sim = await Simulation.create("receiving", fourthModel);
   const scene = await RangeScene.create(canvas, sim);
+  let replay: HumanReplayRecorder | undefined;
+  if (import.meta.env.DEV) {
+    const { HumanReplayRecorder } = await import("./game/replay");
+    replay = new HumanReplayRecorder(__REPLAY_REVISION__);
+    replay.begin(sim);
+    sim.onInput = action => replay!.action(sim, action);
+    sim.onReset = phase => phase === "before" ? replay!.finish(sim) : replay!.begin(sim);
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-export-replay]"))
+      button.addEventListener("click", () => {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(sim), null, 2)], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `amortization2-replay-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+  }
   let paused = true,
     entered = false,
     last = performance.now(),
@@ -187,6 +205,7 @@ async function start() {
     }
     button.disabled = false;
     dialog.close();
+    if (sim.mission?.phase === "briefing") replay?.action(sim, { type: "deploy" });
     sim.mission?.deploy();
     entered = true;
     paused = false;
@@ -723,6 +742,10 @@ async function start() {
       }),
       project: (p: Vec3) => scene.project(p),
       reset,
+      ...(import.meta.env.DEV ? {
+        exportReplay: () => JSON.stringify(replay!.export(sim), null, 2),
+        inspectReplay: () => replay!.status,
+      } : {}),
       exportReport: () =>
         JSON.stringify(
           {
@@ -781,7 +804,9 @@ async function start() {
       accumulator += delta;
       let steps = 0;
       while (accumulator >= STEP && steps < 6) {
+        replay?.beforeStep(sim);
         sim.step();
+        replay?.afterStep(sim);
         accumulator -= STEP;
         steps++;
       }
@@ -789,6 +814,8 @@ async function start() {
       scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag);
     } else scene.updateAim(ground, false);
     audio.setListener(scene.listenerPosition, scene.listenerRight);
+    replay?.frame(sim, { camera: scene.inspectCamera(), scope: scene.scope.inspect(), paused,
+      width: canvas.clientWidth, height: canvas.clientHeight });
     for (const event of sim.events.splice(0)) {
       scene.event(event);
       audio.event(event);
@@ -835,6 +862,13 @@ async function start() {
     uiTime += delta;
     if (uiTime > 0.08) {
       updateUI(sim, audio);
+      if (replay) {
+        const { stopReason, seconds } = replay.status;
+        const label = stopReason ? `Recording stopped: ${stopReason} · partial replay`
+          : `Development recording · ${Math.floor(seconds)} s · JSON`;
+        for (const status of document.querySelectorAll(".replay-recording-status"))
+          if (status.textContent !== label) status.textContent = label;
+      }
       uiTime = 0;
     }
     requestAnimationFrame(frame);

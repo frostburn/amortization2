@@ -100,7 +100,7 @@ count. Each can support several small districts and combat-focused operations.
 The [first playable contract](first-mission.md) starts with a smaller dispute:
 release a cooperative's door motors and kettle elements from a pickup yard.
 Four hired pistol guards enforce a storage hold. Morrow accepts a limited
-assignment, Sable knows the dispatcher, and reopening access gets idle PORTERs
+assignment, Vale knows the dispatcher, and reopening access gets idle PORTERs
 moving again. The wider seizures below develop after this modest intervention.
 
 A freight cooperative at the marine port hires the crew to recover impounded
@@ -111,8 +111,8 @@ Suggested operations: reclaim a loading yard; escort departing service vans past
 a recovery squad. The opening image is a PORTER still holding a box beside a
 locked stand: its work has become impossible, but nobody cancelled the task.
 
-Rook and Vale introduce the squad at the range. Morrow introduces the contract;
-Sable supplies the local picture. Voss examines the first damaged machine after
+Rook and Sable introduce the squad at the range. Morrow introduces the contract;
+Vale supplies the local picture. Voss examines the first damaged machine after
 its return. Quill discovers that Gannet bought future operating rights shortly
 before the cooperative's business was interrupted.
 
@@ -131,15 +131,15 @@ arrive or a workshop becomes a later recovery point.
 
 ### 3. Quiet Enjoyment
 
-Sable notices the same recovery vehicles arriving unusually quickly after
-unrelated incidents. Vale follows the orders and records. Civic Guarantee has
+Vale notices the same recovery vehicles arriving unusually quickly after
+unrelated incidents. Sable follows the orders and records. Civic Guarantee has
 been financing both competing providers and acquiring takeover rights whenever
 their disputes interrupt service. Its guarantees also constrain the recipients.
 
 Suggested operations: protect witnesses and recovered dispatch equipment;
 hold a newly reopened service yard against a second seizure attempt. Evidence
 is recovered through the fighting and explained in scenes, rather than requiring
-slow terminal puzzles. Accurate footage alone is insufficient: Vale and Quill
+slow terminal puzzles. Accurate footage alone is insufficient: Sable and Quill
 establish context and responsibility with the people involved.
 
 ### 4. Margin Call
@@ -154,7 +154,7 @@ through contested blocks; prevent equipment seizures at several connected
 approaches. The old liberated district supplies resources and volunteers.
 Its first-game victory has become strong enough to help its neighbours.
 
-The human team's work converges. Sable organises local contacts, Vale maintains
+The human team's work converges. Vale organises local contacts, Sable maintains
 trustworthy communications, Rook prepares the machines and withdrawal routes,
 Morrow coordinates the response, and Voss and Quill make its practical future
 possible. Morrow must increasingly trust decisions made without her permission.
@@ -205,8 +205,8 @@ End on the victory and the life it enables.
   comprehension.
 - Most operations have one briefing owner and one principal live contact. A new
   speaker signals a meaningful change. Do not narrate routine visible actions.
-- Reports have identifiable sources and limits. Sable does not see through every
-  roof; Vale cannot substitute a network command for a physical operation.
+- Reports have identifiable sources and limits. Vale does not see through every
+  roof; Sable cannot substitute a network command for a physical operation.
 - Routine weapon readiness, damage and positioning remain visual feedback.
   Dialogue introduces behaviours once or reports exceptions that matter.
 - Contracts, claims and evidence motivate concrete fights. The sequel's emphasis

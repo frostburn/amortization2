@@ -1078,3 +1078,5 @@ a:hover {
   pointer-events: none;
   z-index: 1;
 }
+.replay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0; }
+.replay-recording-status { color: var(--muted, #9aabad); font-size: 11px; }

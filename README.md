@@ -1,6 +1,6 @@
 # Amortization II — Futures Contract
 
-A desktop browser real-time tactics game about controlling a squad of machines. The first playable contract, **Receiving**, is a low-stakes, pistols-only job at a cooperative's pickup yard: clear four guards, release the cargo and return to the service van. Morrow and Sable introduce the operation using the returning cast's portraits. The existing ranges, endless arena and city/port sandboxes remain under **Practice / debug**.
+A desktop browser real-time tactics game about controlling a squad of machines. The first playable contract, **Receiving**, is a low-stakes, pistols-only job at a cooperative's pickup yard: clear four guards, release the cargo and return to the service van. Morrow and Vale introduce the operation using the returning cast's portraits. The existing ranges, endless arena and city/port sandboxes remain under **Practice / debug**.
 
 The overhead view is true isometric: 45° yaw, 35.3° elevation, and world axes projected at 120°. Wider maps and a lower default zoom give the squad more room to manoeuvre. Automatic fire centres on **herding**: track an opponent to push it out of cover, change firing angle to redirect it, and regroup during a reload. Hits briefly stagger robots, interrupting walking and firing while physical knockback continues. Orders resume after recovery, and robots can return fire between staggers. **Bracing recovers 2.5× faster.** Torso jolts, bright ground rings and squad-card status show the reaction. See [camera and kinetic combat tuning](docs/combat-feel.md).
 
@@ -119,7 +119,7 @@ TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and 
 - [Friendly human operations and support cast](docs/friendly-cast.md)
 - [Portrait assets, references and generation prompts](docs/story-art.md)
 
-In the browser console, `window.amortization2.inspect()` returns current state, `project({ x, y, z })` maps a world point to the screen, and `exportReport()` returns a JSON bug report. These are inspection helpers, not a save game or replay format.
+In the browser console, `window.amortization2.inspect()` returns current state, `project({ x, y, z })` maps a world point to the screen, and `exportReport()` returns a JSON bug report. These are current-state inspection helpers. In Vite development mode, **Controls & settings → Export human replay** (also available in the mission debrief) downloads commands and observed combat across attempts. Inspect it with `npm run inspect:replay -- /path/to/replay.json`. See [human replays](docs/human-replays.md) for capture limits and version matching.
 
 This is a combat test range, not yet a campaign: missions, progression, multiplayer, controller support, and mobile controls remain future work. The arena refines live combat; the city district establishes reusable mission scenery and civilian activity. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
 

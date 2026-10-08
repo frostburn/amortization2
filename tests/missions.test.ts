@@ -56,6 +56,41 @@ describe("Receiving contract", () => {
     expect(sim.grenades).toHaveLength(0);
   });
 
+  test("shooting a post alerts its unhurt partner at pistol range, while dispatch remains quiet", () => {
+    sim.mission!.deploy(); sim.select(1); sim.setBrace(true);
+    const [guard, partner, ...dispatch] = sim.mission!.enemies;
+    sim.aim = { ...guard.body.translation(), y: 1.25 }; sim.trigger = true; sim.step(); sim.trigger = false;
+    expect(guard.hp).toBe(110); expect(partner.hp).toBe(132);
+    ticks(sim, 1.5);
+    expect(partner.ai!.target).not.toBeNull();
+    expect(sim.events.some(e => e.type === "shot" && e.actor === partner.id)).toBe(true);
+    expect(dispatch.every(a => a.ai!.target === null && a.pistol.ammo === PISTOL.magazine)).toBe(true);
+  });
+
+  test.each([1, 4])("a %i-robot walk-up and concentrated fire approach has a meaningful squad advantage", members => {
+    sim.mission!.deploy(); sim.select(members === 4 ? 5 : 1);
+    const fight = (seconds: number) => {
+      sim.setBrace(true);
+      for (let i = 0; i < seconds / STEP && sim.active.length; i++) {
+        const nearby = sim.mission!.enemies.filter(g => distance2(g.body.translation(), sim.primary.body.translation()) < PISTOL.range)
+          .sort((a, b) => distance2(a.body.translation(), sim.primary.body.translation()) - distance2(b.body.translation(), sim.primary.body.translation()));
+        sim.trigger = !!nearby[0];
+        if (nearby[0]) sim.aim = { ...nearby[0].body.translation(), y: nearby[0].body.translation().y + .25 };
+        sim.step();
+      }
+      sim.release();
+    };
+    sim.move({ x: -9, z: 5 }); ticks(sim, 4); fight(8);
+    if (members === 1) {
+      expect(sim.squad[0].dead).toBe(true); expect(sim.mission!.enemies.length).toBeGreaterThanOrEqual(3);
+    } else {
+      sim.move({ x: 11, z: 1 }); ticks(sim, 5); fight(10);
+      expect(sim.mission!.phase).toBe("dispatch");
+      expect(sim.squad.every(a => !a.dead)).toBe(true);
+      expect(sim.squad.some(a => a.hp < a.maxHp)).toBe(true);
+    }
+  }, 15000);
+
   test("selected pistols use real damage, independent magazines and friendly-safe fire", () => {
     sim.mission!.deploy();
     const guard = sim.mission!.enemies[0];
@@ -63,16 +98,36 @@ describe("Receiving contract", () => {
     sim.setBrace(true);
     sim.trigger = true;
     sim.step();
-    expect(guard.dead).toBe(true);
-    expect(guard.killedBy).toBe("pistol");
+    expect(guard.dead).toBe(false);
+    expect(guard.hp).toBe(132 - 4 * PISTOL.damage);
     expect(sim.squad.every(a => a.pistol.ammo === PISTOL.magazine - 1 && a.ammo === 0)).toBe(true);
     expect(sim.shots).toBe(4);
     expect(sim.squad.every(a => a.hp === a.maxHp)).toBe(true);
+    ticks(sim, PISTOL.interval + STEP);
+    expect(guard.dead).toBe(true);
+    expect(guard.killedBy).toBe("pistol");
+    expect(sim.shots).toBe(8);
     sim.trigger = false;
     sim.reloadSelected();
     ticks(sim, PISTOL.reload + STEP);
     expect(sim.squad.every(a => a.pistol.ammo === PISTOL.magazine)).toBe(true);
   });
+
+  test("real pistol wrecks do not strand a squad member crossing the yard", () => {
+    sim.mission!.deploy(); sim.setBrace(true);
+    for (const id of [100, 101]) {
+      const guard = sim.actors.find(a => a.id === id)!;
+      sim.trigger = true;
+      for (let i = 0; i < 2 / STEP && !guard.dead; i++) {
+        sim.aim = { ...guard.body.translation(), y: guard.body.translation().y + .25 }; sim.step();
+      }
+      sim.trigger = false;
+      expect(guard.dead).toBe(true);
+    }
+    clearGuards(); sim.release(); sim.select(5); sim.move({ x: 11, z: 1 });
+    ticks(sim, 12);
+    for (const a of sim.squad) expect(distance2(a.body.translation(), a.moveTarget!)).toBeLessThan(.15);
+  }, 15000);
 
   test("dispatch requires clearing the yard and uninterrupted physical presence", () => {
     sim.mission!.deploy();
