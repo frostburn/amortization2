@@ -55,7 +55,7 @@ export class Mission {
     for (const porter of sim.city!.porters) sim.city!.workers.hold(porter.route.id);
   }
 
-  get enemies() { return this.sim.actors.filter(a => a.kind === "enemy" && !a.dead); }
+  get enemies() { return this.sim.actors.filter(a => a.kind === "enemy" && !a.flight && !a.dead); }
   get finished() { return this.phase === "complete" || this.phase === "failed"; }
   get stopped() { return this.phase === "briefing" || this.finished; }
   get cargoReleased() { return this.releaseProgress >= 1; }

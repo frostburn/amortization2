@@ -22,6 +22,7 @@ import type {
 import { CityView } from "./city";
 import { MissionView } from "./mission";
 import { CartFleet } from "./carts";
+import { makeWatch } from "./security";
 import { KiteFleet } from "./kites";
 import { PorterFleet, makeTote } from "./porters";
 import { TrafficFleet } from "./traffic";
@@ -156,6 +157,8 @@ type ActorVisual = {
   primaryGun?: THREE.Group;
   pistol?: THREE.Group;
   barrels?: THREE.Group;
+  rotors?: THREE.Group[];
+  beacon?: THREE.Mesh;
   dead: boolean;
 };
 type Particle = {
@@ -890,8 +893,10 @@ export class RangeScene {
     let bipod: THREE.Group | undefined;
     let primaryGun: THREE.Group | undefined, pistol: THREE.Group | undefined;
     let barrels: THREE.Group | undefined;
+    let rotors: THREE.Group[] | undefined, beacon: THREE.Mesh | undefined;
     if (sniper) model.scale.x = 0.74;
-    if (a.model || a.kind === "heavy") {
+    if (a.flight) ({ rotors, beacon } = makeWatch(model, torso));
+    else if (a.model || a.kind === "heavy") {
       for (const x of [-0.24, 0.24]) {
         const leg = new THREE.Group();
         leg.position.set(x, 0.8, 0);
@@ -1047,7 +1052,7 @@ export class RangeScene {
       new THREE.MeshBasicMaterial({ color: 0xffdc9c }),
     );
     flash.scale.set(0.65, 0.65, 2);
-    flash.position.set(0.28, 0.3, sniper ? 1.76 : 1.24);
+    flash.position.set(a.flight ? 0 : .28, a.flight ? 0 : .3, a.flight ? .65 : sniper ? 1.76 : 1.24);
     torso.add(flash);
     flash.visible = false;
     const healthTexture = labelTexture(
@@ -1067,7 +1072,7 @@ export class RangeScene {
     this.dynamic.add(health);
     health.visible = false;
     this.dynamic.add(root);
-    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, barrels, dead: false };
+    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, barrels, rotors, beacon, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -1190,7 +1195,8 @@ export class RangeScene {
   private updateCamera() {
     // Orthographic zoom can bring the camera below aircraft, clipping them and
     // starting pick rays behind them. Back up along the same viewing direction.
-    const flightCeiling = Math.max(0, ...(this.sim.city?.district.flights ?? []).map(f => f.altitude));
+    const flightCeiling = Math.max(0, ...(this.sim.city?.district.flights ?? []).map(f => f.altitude),
+      ...(this.sim.security?.drones ?? []).map(a => a.body.translation().y + 2));
     this.camera.position
       .copy(this.cameraOffset)
       .multiplyScalar(Math.max(1 / this.zoom, (flightCeiling + 6) / this.cameraOffset.y))
@@ -1268,7 +1274,7 @@ export class RangeScene {
       // Unbraced automatic bursts clear low cover; bracing gives precise
       // surface aim, including legs and the ground. Elevated hits keep their height.
       if (automatic && !braced && !actor.dead) {
-        const p = actor.body.translation(), upperBody = p.y + AUTOMATIC_AIM.bodyOffset;
+        const p = actor.body.translation(), upperBody = p.y + (actor.flight ? 0 : AUTOMATIC_AIM.bodyOffset);
         if (aim.y < upperBody)
           aim = { x: p.x, y: upperBody, z: p.z };
       }
@@ -1289,7 +1295,7 @@ export class RangeScene {
       (this.sim.city?.neutral(hit.collider.handle) || this.sim.city?.windows.has(hit.collider.handle) ||
       this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle)))) {
       const p = actor?.body.translation();
-      const raised = p ? { x: p.x, y: p.y + AUTOMATIC_AIM.bodyOffset, z: p.z }
+      const raised = p ? { x: p.x, y: p.y + (actor?.flight ? 0 : AUTOMATIC_AIM.bodyOffset), z: p.z }
         : { x: aim.x, y: AUTOMATIC_AIM.height, z: aim.z };
       if (aim.y < raised.y && this.sim.active.some(a => a.braced &&
         this.sim.followsOrder(a, this.sim.weapon) && this.sim.clearsLowCover(a, aim, raised))) aim = raised;
@@ -1693,7 +1699,7 @@ export class RangeScene {
         ? 0
         : aimingFirearm
           ? -Math.atan2(
-              aim.y - p.y - 0.42,
+              aim.y - p.y - (a.flight ? -.28 : .42),
               Math.hypot(aim.x - p.x, aim.z - p.z),
             ) -
             a.recoil * 0.13
@@ -1704,7 +1710,15 @@ export class RangeScene {
       if (v.pistol) v.pistol.visible = a.weapon === "pistol";
       if (v.bipod) v.bipod.visible = a.braced && a.weapon === "rifle" && !a.dead;
       if (v.barrels && !a.dead) v.barrels.rotation.z += delta * a.spin * Math.PI * 10;
-      v.flash.position.z = FIREARMS[a.weapon].muzzle;
+      v.flash.position.z = a.flight ? .65 : FIREARMS[a.weapon].muzzle;
+      if (a.flight) {
+        v.rotors?.forEach((rotor, i) => { rotor.rotation.y += delta * a.flight!.rotors * 100 * (i % 2 ? -1 : 1); });
+        if (v.beacon) v.beacon.visible = !a.dead && Math.sin(elapsed * 9 + a.id) > .1;
+        if (!a.dead) {
+          v.root.rotation.x = clamp((velocity.x * Math.sin(a.yaw) + velocity.z * Math.cos(a.yaw)) * .02, -.14, .14);
+          v.root.rotation.z = clamp((velocity.x * Math.cos(a.yaw) - velocity.z * Math.sin(a.yaw)) * -.02, -.14, .14);
+        }
+      }
       v.torso.rotation.z = a.dead
         ? 0
         : Math.sin(elapsed * 35) * (1 - a.stability) * 0.1;
@@ -1721,7 +1735,7 @@ export class RangeScene {
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
         stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced ? AMBER : MINT,
       );
-      v.ring.scale.setScalar(stagger > 0 ? 1 + stagger * 0.2 : a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
+      v.ring.scale.setScalar(a.flight ? 1.7 : stagger > 0 ? 1 + stagger * 0.2 : a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
       v.health.visible =
         !a.dead &&
         (a.kind === "enemy" || (a.hp < a.maxHp &&

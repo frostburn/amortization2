@@ -22,7 +22,7 @@ export function replaySnapshot(sim: Simulation) {
     tick: tick(sim), mission: sim.mission?.inspect() ?? null, arena: sim.arena?.inspect() ?? null,
     selected: [...sim.selected], aim: { ...sim.aim }, trigger: sim.trigger, sniping: sim.sniping,
     shots: sim.shots, hits: sim.hits, throws: sim.throws,
-    actors: sim.actors.map(a => ({ id: a.id, kind: a.kind, model: a.model, hp: a.hp,
+    actors: sim.actors.map(a => ({ id: a.id, kind: a.kind, model: a.flight ? "WATCH" : a.model, hp: a.hp,
       position: position(a.body.translation()), yaw: rounded(a.yaw), weapon: a.weapon,
       ammo: sim.ammunition(a).ammo, reload: rounded(sim.ammunition(a).reload),
       braced: a.braced, firing: a.firing, stagger: rounded(a.stagger),
@@ -42,6 +42,7 @@ export type HumanReplay = {
   format: "amortization2-human-replay"; version: 1; step: number; revision: string;
   createdAt: string; exportedAt: string; stopReason: string | null; sessions: ReplaySession[];
 };
+export type ReplayExportScope = "current" | "all";
 
 /** Development capture of resolved player intentions and observed combat, not
  * video or a save file. Physics uses the original fixed ticks and seeded RNG. */
@@ -138,13 +139,14 @@ export class HumanReplayRecorder {
       session.views.push({ tick: tick(sim), wallMs: Math.round(performance.now() - this.started), data: structuredClone(view) }); this.view = key;
     }
   }
-  export(sim: Simulation): HumanReplay {
+  export(sim: Simulation, scope: ReplayExportScope = "all"): HumanReplay {
     this.finish(sim);
     return structuredClone({ format: "amortization2-human-replay", version: 1, step: STEP,
       revision: this.revision, createdAt: this.createdAt, exportedAt: new Date().toISOString(),
-      stopReason: this.stopReason, sessions: this.sessions });
+      stopReason: this.stopReason, sessions: scope === "current" ? this.sessions.slice(-1) : this.sessions });
   }
-  get status() { return { sessions: this.sessions.length, entries: this.entries, seconds: this.totalTicks * STEP, stopReason: this.stopReason }; }
+  get status() { return { sessions: this.sessions.length, entries: this.entries, seconds: this.totalTicks * STEP,
+    currentSeconds: (this.sessions.at(-1)?.endTick ?? 0) * STEP, stopReason: this.stopReason }; }
 }
 
 export function applyReplayAction(sim: Simulation, input: ReplayAction) {

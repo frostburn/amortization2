@@ -12,7 +12,7 @@ import {
 } from "./game/config";
 import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
-import type { HumanReplayRecorder } from "./game/replay";
+import type { HumanReplayRecorder, ReplayExportScope } from "./game/replay";
 import type { ReplayViewer } from "./replay-viewer";
 
 const { canvas, dialog, resultDialog } = mountUI();
@@ -39,12 +39,14 @@ async function start() {
     replay.begin(sim);
     sim.onInput = action => replay!.action(sim, action);
     sim.onReset = phase => phase === "before" ? replay!.finish(sim) : replay!.begin(sim);
-    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-export-replay]"))
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-export-replay], [data-export-all-replays]"))
       button.addEventListener("click", () => {
-        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(recordedSim), null, 2)], { type: "application/json" }));
+        const scope = button.hasAttribute("data-export-all-replays") ? "all" : "current";
+        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(recordedSim, scope), null, 2)], { type: "application/json" }));
         const link = document.createElement("a");
         link.href = url;
-        link.download = `amortization2-replay-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        const attempt = scope === "all" ? "all-attempts" : `attempt-${replay!.status.sessions}`;
+        link.download = `amortization2-replay-${attempt}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
@@ -809,7 +811,7 @@ async function start() {
       project: (p: Vec3) => scene.project(p),
       reset,
       ...(import.meta.env.DEV ? {
-        exportReplay: () => JSON.stringify(replay!.export(recordedSim), null, 2),
+        exportReplay: (scope: ReplayExportScope = "current") => JSON.stringify(replay!.export(recordedSim, scope), null, 2),
         inspectReplay: () => replay!.status,
         inspectPlayback: () => viewer!.inspect(),
       } : {}),
@@ -935,9 +937,9 @@ async function start() {
     if (uiTime > 0.08) {
       updateUI(sim, audio);
       if (replay) {
-        const { stopReason, seconds } = replay.status;
+        const { stopReason, sessions, currentSeconds } = replay.status;
         const label = stopReason ? `Recording stopped: ${stopReason} · partial replay`
-          : `Development recording · ${Math.floor(seconds)} s · JSON`;
+          : `Development recording · attempt ${sessions} · ${Math.floor(currentSeconds)} s`;
         for (const status of document.querySelectorAll(".replay-recording-status"))
           if (status.textContent !== label) status.textContent = label;
       }

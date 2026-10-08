@@ -57,7 +57,7 @@ export function updateCoverFire(sim: Simulation) {
       let target: number | null = null;
       for (const enemy of candidates) {
         const q = enemy.body.translation();
-        const heights = a.weapon === "gun" || a.weapon === "minigun"
+        const heights = enemy.flight ? [0] : a.weapon === "gun" || a.weapon === "minigun"
           ? [AUTOMATIC_AIM.bodyOffset, 0.25] : [0.25, AUTOMATIC_AIM.bodyOffset];
         for (const height of heights) {
           const aim = { x: q.x, y: q.y + height, z: q.z };

@@ -39,7 +39,7 @@ export class RangeAudio {
   private voices = new Map<number, Voice>();
   private rotary = new Map<number, RotaryVoice>();
   private cartMotors = new Map<number, CartMotor>();
-  private kiteRotors = new Map<number, CartMotor>();
+  private kiteRotors = new Map<number, CartMotor & { security: boolean }>();
   private porterServos = new Map<number, CartMotor & { step: number }>();
   private transients = new Set<AudioScheduledSourceNode>();
   private pending?: Promise<void>;
@@ -287,11 +287,13 @@ export class RangeAudio {
 
   private updateKites(sim: Simulation) {
     const ctx = this.context!;
-    const flying = (sim.city?.kites ?? []).filter(c => c.rotors > 0.04 && this.civilianVolume > 0)
+    const aircraft = [...(sim.city?.kites ?? []).map(c => ({ ...c, security: false })),
+      ...(sim.security?.drones ?? []).map(a => ({ id: a.id, body: a.body, rotors: a.flight!.rotors, security: true }))];
+    const flying = aircraft.filter(c => c.rotors > .04 && (c.security || this.civilianVolume > 0))
       .sort((a, b) => {
         const distance = (p: Vec3) => Math.hypot(p.x - this.listener.x, p.y - this.listener.y, p.z - this.listener.z);
         return distance(a.body.translation()) - distance(b.body.translation());
-      }).slice(0, 3);
+      }).slice(0, 6);
     for (const [id, voice] of this.kiteRotors) if (!flying.some(c => c.id === id)) {
       this.stopCart(voice); this.kiteRotors.delete(id);
     }
@@ -308,15 +310,15 @@ export class RangeAudio {
         sources[0].type = "triangle"; sources[1].type = "triangle"; sources[2].type = "sine";
         sources[0].connect(motors); sources[1].connect(motors);
         sources[2].connect(flutter); flutter.connect(motors.gain); sources.forEach(s => s.start());
-        voice = { sources, gain: amp, pan, filter }; this.kiteRotors.set(c.id, voice);
+        voice = { sources, gain: amp, pan, filter, security: c.security }; this.kiteRotors.set(c.id, voice);
         sources[2].onended = () => { sources.forEach(s => s.disconnect()); motors.disconnect(); flutter.disconnect(); filter.disconnect(); amp.disconnect(); pan.disconnect(); };
       }
-      const pitch = (145 + Math.max(0, velocity.y) * 12 + Math.hypot(velocity.x, velocity.z) * 3) * Math.max(0.2, c.rotors);
+      const pitch = ((c.security ? 115 : 145) + Math.max(0, velocity.y) * 12 + Math.hypot(velocity.x, velocity.z) * 3) * Math.max(0.2, c.rotors);
       voice.sources[0].frequency.setTargetAtTime(pitch, ctx.currentTime, 0.12);
       voice.sources[1].frequency.setTargetAtTime(pitch * 1.023, ctx.currentTime, 0.12);
       voice.sources[2].frequency.setTargetAtTime(pitch / 4, ctx.currentTime, 0.12);
       const distance = Math.hypot(p.x - this.listener.x, p.y - this.listener.y, p.z - this.listener.z);
-      voice.gain.gain.setTargetAtTime(0.026 * this.civilianVolume * c.rotors / (1 + distance / 24), ctx.currentTime, 0.09);
+      voice.gain.gain.setTargetAtTime((c.security ? .045 : .026 * this.civilianVolume) * c.rotors / (1 + distance / 24), ctx.currentTime, 0.09);
       voice.pan.pan.setTargetAtTime(spatialPan(p, this.listener, this.listenerRight), ctx.currentTime, 0.08);
     }
   }
@@ -503,10 +505,11 @@ export class RangeAudio {
     strength: number,
     seconds: number,
     endFrequency = frequency * 0.84,
+    delay = 0,
   ) {
     if (!this.context) return;
     const ctx = this.context,
-      now = ctx.currentTime;
+      now = ctx.currentTime + delay;
     const { amp, pan } = this.bus(position, strength);
     const osc = ctx.createOscillator();
     osc.type = "sine";
@@ -515,7 +518,7 @@ export class RangeAudio {
     amp.gain.setValueAtTime(strength, now);
     amp.gain.exponentialRampToValueAtTime(0.0001, now + seconds);
     osc.connect(amp);
-    osc.start();
+    osc.start(now);
     this.transients.add(osc);
     osc.stop(now + seconds);
     osc.onended = () => {
@@ -527,6 +530,12 @@ export class RangeAudio {
   }
   event(e: GameEvent) {
     if (!this.ready) return;
+    if (e.type === "security") {
+      const frequency = e.phase === "standdown" ? 540 : 780;
+      this.tone(e.position, frequency, .12 * this.distanceGain(e.position), .09, frequency * .9);
+      this.tone(e.position, frequency * (e.phase === "standdown" ? .8 : 1.3), .1 * this.distanceGain(e.position), .11, frequency, .15);
+      return;
+    }
     if (e.type === "glass") this.glass(e.position);
     else if (e.type === "shot") {
       if (e.weapon === "rifle") {
@@ -579,7 +588,8 @@ export class RangeAudio {
       buffers: [...this.buffers.keys()],
       loops: this.voices.size,
       cartMotors: this.cartMotors.size,
-      kiteRotors: this.kiteRotors.size,
+      kiteRotors: [...this.kiteRotors.values()].filter(v => !v.security).length,
+      securityRotors: [...this.kiteRotors.values()].filter(v => v.security).length,
       porterServos: this.porterServos.size,
       miniguns: [...this.rotary].map(([actor, voice]) => ({ actor, phase: voice.phase, spin: voice.spin, firing: !!voice.fire })),
       transients: this.transients.size,

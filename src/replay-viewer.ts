@@ -70,14 +70,15 @@ export class ReplayViewer {
     const replay = readHumanReplay(value);
     if (!replay.sessions.length) throw new Error("Replay has no recorded attempts");
     // Allocate and validate before touching the live game or an existing viewer.
-    const sim = await Simulation.create(replay.sessions[0].range, replay.sessions[0].fourthModel);
+    const attempt = replay.sessions.length - 1, session = replay.sessions[attempt];
+    const sim = await Simulation.create(session.range, session.fourthModel);
     let playback: ReplayPlayback;
-    try { playback = new ReplayPlayback(sim, replay.sessions[0]); }
+    try { playback = new ReplayPlayback(sim, session); }
     catch (error) { sim.world.free(); throw error; }
     this.close();
     this.replay = replay;
     this.playback = playback;
-    this.attempt = 0;
+    this.attempt = attempt;
     this.hooks.enter(sim);
     document.body.classList.add("viewing-replay");
     this.panel.hidden = false;
@@ -89,6 +90,7 @@ export class ReplayViewer {
       option.textContent = `${i + 1} · ${session.range}`;
       return option;
     }));
+    select.value = String(attempt);
     this.prepare();
     this.play.focus();
   }

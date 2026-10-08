@@ -25,6 +25,7 @@ import {
   type Firearm,
 } from "./config";
 import { CityLife } from "./civilians";
+import { SecurityResponse, WATCH, type SecurityFlight } from "./security";
 import { vehicleFootprint } from "./traffic";
 import { dryGround } from "./city";
 import { NavigationGrid, segmentClear } from "./navigation";
@@ -44,6 +45,7 @@ export interface Actor {
   weapons: readonly Weapon[];
   pistol: { ammo: number; reload: number; shotWait: number };
   ai?: EnemyBrain;
+  flight?: SecurityFlight;
   cover?: CoverBrain;
   deathTime?: number;
   body: RAPIER.RigidBody;
@@ -109,6 +111,7 @@ export type GameEvent =
       normal: Vec3;
     }
   | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" | "neutral"; vehicle?: number }
+  | { type: "security"; phase: "dispatch" | "arrival" | "standdown"; position: Vec3; level: number }
   | { type: "glass"; position: Vec3; normal: Vec3 }
   | {
       type: "throw" | "bounce" | "reload" | "empty" | "down";
@@ -142,6 +145,7 @@ export class Simulation {
   arena?: ArenaCombat;
   mission?: Mission;
   city?: CityLife;
+  security?: SecurityResponse;
   time = 0;
   shots = 0;
   hits = 0;
@@ -175,6 +179,7 @@ export class Simulation {
     this.range = range;
     this.fourthModel = fourthModel;
     this.mission = undefined;
+    this.security = undefined;
     this.navigation = new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
@@ -263,6 +268,7 @@ export class Simulation {
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
     this.mission = range === "receiving" ? new Mission(this) : undefined;
+    this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
     this.arena = range === "arena" ? new ArenaCombat(this) : undefined;
@@ -363,6 +369,17 @@ export class Simulation {
 
   addEnemy(model: RobotModel, position: Vec2) {
     return this.addActor(this.nextId++, "enemy", position.x, position.z, 0, model);
+  }
+  addSecurityDrone(position: Vec3) {
+    const a = this.addActor(this.nextId++, "enemy", position.x, position.z, position.y - .98, "assault");
+    this.world.removeCollider(a.collider, true);
+    a.collider = this.world.createCollider(RAPIER.ColliderDesc.cylinder(WATCH.halfHeight, WATCH.radius)
+      .setMass(WATCH.mass).setFriction(.6).setRestitution(.08), a.body);
+    a.body.setLinearDamping(.12);
+    a.weapon = "pistol"; a.weapons = ["pistol"];
+    a.pistol.ammo = PISTOL.magazine;
+    a.hp = a.maxHp = WATCH.hp;
+    return a;
   }
   retireEnemy(actor: Actor) {
     if (actor.kind !== "enemy") return;
@@ -691,6 +708,11 @@ export class Simulation {
   }
   muzzle(a: Actor, toward: Vec3 = this.actorAim(a), weapon: Firearm = a.weapon): Vec3 {
     const p = a.body.translation();
+    if (a.flight) {
+      const dy = toward.y - p.y + .28, dx = toward.x - p.x, dz = toward.z - p.z;
+      const length = Math.hypot(dx, dy, dz) || 1;
+      return { x: p.x + dx / length * .65, y: p.y - .28 + dy / length * .65, z: p.z + dz / length * .65 };
+    }
     const dx = toward.x - p.x,
       dz = toward.z - p.z,
       length = Math.hypot(dx, dz) || 1;
@@ -849,6 +871,7 @@ export class Simulation {
         },
         to,
         weapon,
+        this.team(a),
       );
       if (a.kind === "player" && hitOpponent) {
         if (covering) this.coverHits++;
@@ -858,12 +881,15 @@ export class Simulation {
       const cart = this.city.neutral(hit.collider.handle)!;
       const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
       this.city.damage(cart, spec.damage, { x: dir.x * strength,
-        y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to);
+        y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to, this.team(a));
     } else if (!glass && hit?.collider.parent()?.isDynamic()) {
       // Break the grip before the shot impulse can transfer into PORTER's hull.
       if (rifle) {
         const porter = this.city?.porters.find(p => p.grip && p.cargo.body.handle === hit.collider.parent()!.handle);
-        if (porter) this.city!.workers.release(porter);
+        if (porter) {
+          if (a.kind === "player") this.security?.report(to, porter.id);
+          this.city!.workers.release(porter);
+        }
       }
       hit.collider
         .parent()!
@@ -909,7 +935,9 @@ export class Simulation {
     impulse: Vec3,
     point: Vec3,
     source?: Weapon | "vehicle",
+    responsible?: "player" | "enemy",
   ) {
+    if (responsible === "player" && amount > 0 && !a.dead) this.security?.attacked(a);
     const bullet = source === "gun" || source === "minigun" || source === "pistol";
     const multiplier = a.braced ? (bullet ? KINETIC.bracedBullet : 0.28) : 1;
     const applied = { x: impulse.x * multiplier, y: impulse.y * multiplier, z: impulse.z * multiplier };
@@ -1054,8 +1082,8 @@ export class Simulation {
   blastExposure(origin: Vec3, actor: Actor, source?: RAPIER.RigidBody): number {
     const p = actor.body.translation();
     let visible = 0;
-    for (const y of [0.25, 0.75, 1.35]) {
-      const sample = { x: p.x, y: p.y - 0.96 + y, z: p.z };
+    for (const y of actor.flight ? [-.15, 0, .15] : [.25, .75, 1.35]) {
+      const sample = { x: p.x, y: p.y + (actor.flight ? y : -.96 + y), z: p.z };
       const hit = this.ray(
         origin,
         sample,
@@ -1108,6 +1136,7 @@ export class Simulation {
         },
         p,
         vehicle === undefined ? "grenade" : "vehicle",
+        team === "neutral" ? undefined : team,
       );
       if (wasAlive && team !== "neutral" && (team === "player" ? a.kind !== "player" : a.kind === "player")) {
         affected++;
@@ -1137,7 +1166,7 @@ export class Simulation {
         true,
       );
     }
-    this.city?.blast(origin, source);
+    this.city?.blast(origin, source, team);
     this.city?.windows.blast(origin, source);
     this.events.push({ type: "explosion", position: origin, affected, team, ...(vehicle === undefined ? {} : { vehicle }) });
   }
@@ -1151,6 +1180,7 @@ export class Simulation {
     this.time += STEP;
     this.arena?.update();
     this.mission?.updateCombat();
+    this.security?.update();
     updateCoverFire(this);
     for (const a of this.actors) {
       a.grenadeCooldown = Math.max(0, a.grenadeCooldown - STEP);
@@ -1215,7 +1245,8 @@ export class Simulation {
           this.shoot(a);
         }
         if (fire && state.ammo === 0) this.reloadActor(a);
-        this.drive(a);
+        if (a.flight) this.security?.fly(a);
+        else this.drive(a);
         if (selected || a.cover || (a.kind === "enemy" && a.ai?.target)) {
           const p = a.body.translation();
           const aim = this.actorAim(a);
@@ -1333,6 +1364,7 @@ export class Simulation {
         (other) =>
           other !== a &&
           (!other.dead || !!other.model) &&
+          (!other.flight || Math.abs(other.body.translation().y - p.y) < 1.3) &&
           distance2(p, other.body.translation()) < 5,
       )
       .map((other) => {
@@ -1342,9 +1374,9 @@ export class Simulation {
         const q = wreck ? other.body.rotation() : null;
         return {
           p: other.body.translation(), v: other.body.linvel(),
-          player: !!other.model && !wreck,
-          w: q ? 0.74 + 1.12 * Math.abs(2 * (q.x * q.y - q.w * q.z)) : this.range === "long" ? 0.6 : 0.96,
-          d: q ? 0.74 + 1.12 * Math.abs(2 * (q.w * q.x + q.y * q.z)) : this.range === "long" ? 0.96 : 0.6,
+          player: !!other.model && !wreck && !other.flight,
+          w: other.flight ? WATCH.radius * 2 : q ? 0.74 + 1.12 * Math.abs(2 * (q.x * q.y - q.w * q.z)) : this.range === "long" ? 0.6 : 0.96,
+          d: other.flight ? WATCH.radius * 2 : q ? 0.74 + 1.12 * Math.abs(2 * (q.w * q.x + q.y * q.z)) : this.range === "long" ? 0.96 : 0.6,
         };
       });
     if (!neighbours.length) return preferred;
@@ -1463,6 +1495,7 @@ export class Simulation {
       arena: this.arena?.inspect() ?? null,
       mission: this.mission?.inspect() ?? null,
       city: this.city?.inspect() ?? null,
+      security: this.security?.inspect() ?? null,
       aim: vcopy(this.aim),
       time: this.time,
       shots: this.shots,
@@ -1490,7 +1523,7 @@ export class Simulation {
       actors: this.actors.map((a) => ({
         id: a.id,
         kind: a.kind,
-        model: a.model,
+        model: a.flight ? "WATCH" : a.model,
         weapon: a.weapon,
         weapons: [...a.weapons],
         pistol: { ...a.pistol, shotWait: Math.max(0, a.pistol.shotWait) },
