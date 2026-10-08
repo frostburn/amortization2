@@ -91,7 +91,7 @@ export class CrossingMission extends Mission {
     }
     // Physical entry by the last surviving near-bank chassis, rather than a
     // queued click or the death of a teammate. Retreat never retriggers it.
-    if (this.alarmAt === undefined && this.crossed.size > 0) {
+    if (this.alarmAt === undefined) {
       const remaining = survivors.filter(a => this.bridge!.side(a.body.translation()) !== 1);
       if (remaining.length === 1 && this.bridge!.onDeck(remaining[0].body.translation()) &&
           !this.bridge!.onDeck(remaining[0].previous) && remaining[0].body.translation().x > remaining[0].previous.x) {

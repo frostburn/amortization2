@@ -128,6 +128,22 @@ describe("Crossing contract", () => {
     expect(sim.mission!.inspect().pursuers).toBe(3);
   }, 15000);
 
+  test("a sole survivor still trips the pursuit alarm on physical entry", () => {
+    sim.mission!.deploy(); clearGuards();
+    for (const a of sim.squad.slice(0, 3)) sim.damage(a, a.hp, zero, a.body.translation(), "pistol");
+    sim.step(); sim.select(4); sim.move({ x: 13, z: 3 });
+    expect(sim.mission!.inspect().survivors).toBe(1);
+    expect(sim.mission!.inspect().crossed).toEqual([]);
+    expect(sim.mission!.alarmAt).toBeUndefined();
+    waitFor(() => sim.mission!.alarmAt !== undefined, 8);
+    expect(sim.mission!.bridge!.onDeck(sim.squad[3].body.translation())).toBe(true);
+    const alarm = sim.mission!.alarmAt;
+    ticks(sim, 2);
+    expect(sim.mission!.alarmAt).toBe(alarm);
+    expect(sim.mission!.inspect().pursuers).toBe(3);
+    expect(sim.events.filter(e => e.type === "bridge" && e.phase === "alarm")).toHaveLength(1);
+  }, 15000);
+
   test("steering updates and a queued follow-up retain the bridge reservation and waypoints", () => {
     sim.mission!.deploy(); clearGuards(); sim.select(1); sim.move({ x: 13, z: -3 });
     waitFor(() => sim.mission!.bridge!.onDeck(sim.primary.body.translation()), 8);

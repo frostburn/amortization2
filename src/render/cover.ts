@@ -22,7 +22,7 @@ export class CoverOrderView {
       const p = a.body.translation();
       const preview = this.preview && sim.selected.has(a.id);
       const direction = preview ? { x: this.preview!.x - p.x, z: this.preview!.z - p.z } : a.cover?.direction;
-      line.visible = !a.dead && !!direction && !sim.sniping && (sim.selected.has(a.id) || !!a.cover?.fire);
+      line.visible = !a.dead && !!direction && !sim.sniping && (!!preview || a.cover?.mode === "sector");
       if (!line.visible || !direction) continue;
       const angle = Math.atan2(direction.x, direction.z), radius = preview ? 6 : 4.5;
       const positions = line.geometry.getAttribute("position");
