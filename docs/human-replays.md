@@ -3,8 +3,10 @@
 Run `npm run dev` and play normally. Open **Controls & settings → Export human
 replay** to download a JSON capture. The mission debrief also has the export
 button, so a failure or completed contract can be exported immediately. The
-recorder starts when the game loads; exports include earlier retries and debug
-floors from that page session. Reloading the page starts a new capture.
+recorder starts when the game loads. **Export human replay** downloads the current
+attempt, including after Retry, Reset or Shift+R; its filename includes the attempt
+number. **Export all attempts** includes earlier retries and debug floors from
+that page session. Either export keeps recording. Reloading the page starts a new capture.
 
 This is **Vite development mode**; this project does not use Vue. Production
 builds omit the recorder, its controls and the replay console helpers. Debug
@@ -13,7 +15,8 @@ ranges and the existing current-state `exportReport()` remain available.
 ## Viewing an export in the game
 
 In development, open **Controls & settings → View replay** (also in the debrief)
-and choose an exported JSON file. The viewer starts paused. Use Play/Pause, the
+and choose an exported JSON file. The viewer starts paused on the latest attempt
+in the file; earlier attempts remain available in the selector. Use Play/Pause, the
 time slider, ±5 seconds, the speed selector (¼×–4×) and the attempt selector.
 **Exit replay** or Escape returns to your live game, paused, with its camera and
 squad state preserved. Each file is read locally; it is never uploaded.
@@ -47,7 +50,8 @@ versions. The revision records the checkout at dev-server startup, including a
 precise revision is needed.
 
 For console inspection in development, `window.amortization2.exportReplay()`
-returns the same JSON and `inspectReplay()` reports recorder status. Exporting
+returns the current attempt; `exportReplay("all")` returns the full page history.
+`inspectReplay()` reports the attempt number and current/total recorded time. Exporting
 pauses neither the game nor the recorder and never resets an attempt.
 
 ## Contents and limits

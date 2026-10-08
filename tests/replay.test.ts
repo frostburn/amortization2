@@ -104,6 +104,43 @@ describe("development human replays", () => {
     readHumanReplay(capped);
   });
 
+  test("current exports follow same-floor retries without consuming earlier attempts", async () => {
+    const sim = await create("proving"), { recorder, advance } = capture(sim);
+    const downloads = [];
+    for (const id of [1, 2, 3]) {
+      if (id > 1) sim.reset();
+      sim.select(id); sim.move({ x: -8 + id, z: -4 }); advance(.15);
+      const current = readHumanReplay(recorder.export(sim, "current"));
+      expect(current.sessions).toHaveLength(1);
+      expect(current.sessions[0].final.selected).toEqual([id]);
+      expect(current.sessions[0].inputs.some(i => i.data.type === "select" && i.data.id === id)).toBe(true);
+      downloads.push(current);
+    }
+    const history = readHumanReplay(recorder.export(sim, "all"));
+    expect(history.sessions).toHaveLength(3);
+    expect(history.sessions.map(s => s.final)).toEqual(downloads.map(r => r.sessions[0].final));
+    expect(recorder.status.sessions).toBe(3);
+    expect(recorder.status.currentSeconds).toBeCloseTo(sim.time);
+    const fresh = await create("proving");
+    for (const download of downloads)
+      expect(playRecordedSession(fresh, download.sessions[0])).toEqual(download.sessions[0].final);
+  });
+
+  test("repeated current exports include continued play and leave earlier downloads unchanged", async () => {
+    const sim = await create("proving"), { recorder, advance } = capture(sim);
+    sim.select(1); advance(.1);
+    const first = recorder.export(sim, "current"), saved = structuredClone(first);
+    sim.select(2); sim.move({ x: -3, z: -7 }); advance(.2);
+    const second = recorder.export(sim, "current");
+    expect(first).toEqual(saved);
+    expect(second.sessions).toHaveLength(1);
+    expect(second.sessions[0].endTick).toBeGreaterThan(first.sessions[0].endTick);
+    expect(second.sessions[0].final.selected).toEqual([2]);
+    expect(recorder.status.sessions).toBe(1);
+    const fresh = await create("proving");
+    expect(playRecordedSession(fresh, second.sessions[0])).toEqual(second.sessions[0].final);
+  });
+
   test("export captures aim and trigger changes made between fixed ticks", async () => {
     const sim = await create(); const { recorder } = capture(sim);
     sim.aim = { x: 12, y: 3, z: 5 }; sim.trigger = true;
