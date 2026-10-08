@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "year": 2038,
+  "yearsAfterFirstGame": 12,
+  "width": 512,
+  "height": 512,
+  "characters": [
+    {
+      "id": "morrow",
+      "name": "Morrow",
+      "role": "Operations",
+      "originalRole": "Field lead",
+      "presence": "missions",
+      "portrait": "morrow.webp"
+    },
+    {
+      "id": "vale",
+      "name": "Vale",
+      "role": "Systems",
+      "originalRole": "Systems",
+      "presence": "technical_reports",
+      "portrait": "vale.webp"
+    },
+    {
+      "id": "rook",
+      "name": "Rook",
+      "role": "Weapons and security",
+      "originalRole": "Security",
+      "presence": "range_and_workshop",
+      "portrait": "rook.webp"
+    },
+    {
+      "id": "sable",
+      "name": "Sable",
+      "role": "Reconnaissance and contacts",
+      "originalRole": "Recon",
+      "presence": "missions",
+      "portrait": "sable.webp"
+    },
+    {
+      "id": "voss",
+      "name": "Iona Voss",
+      "role": "Engineering",
+      "originalRole": "Engineer",
+      "presence": "cutscenes",
+      "portrait": "voss.webp"
+    },
+    {
+      "id": "quill",
+      "name": "Ren Quill",
+      "role": "Agreements",
+      "originalRole": "Auditor",
+      "presence": "cutscenes",
+      "portrait": "quill.webp"
+    }
+  ]
+}

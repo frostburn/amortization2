@@ -33,6 +33,8 @@ The game's MIT code license does not replace these sample licenses. Credit is re
 
 `public/textures/concrete.webp` is an original AI-generated concrete surface, created for this project and converted to WebP. The development concept image was also AI-generated; it is not a runtime background or a shipped screenshot. See [the art direction record](docs/art-direction.md).
 
+`public/portraits/` contains six original AI-generated sequel portraits of Morrow, Vale, Rook, Sable, Iona Voss and Ren Quill. The first game's original generated portraits supplied identity and style references; each returning character is depicted twelve years older. The selected portraits were resized and encoded as WebP for future comms and cutscenes. These generated asset files are released under the repository's MIT license. [Story artwork](docs/story-art.md) records the exact prompt set, reference identities and integration guidance.
+
 All scene geometry, robot and weapon models, target markings, interface icons, and effects are authored in this repository. There are no third-party model packs, fonts, or remote image dependencies.
 
 ## Software
