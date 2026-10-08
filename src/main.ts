@@ -13,6 +13,7 @@ import {
 import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
 import type { HumanReplayRecorder } from "./game/replay";
+import type { ReplayViewer } from "./replay-viewer";
 
 const { canvas, dialog, resultDialog } = mountUI();
 const audio = new RangeAudio();
@@ -27,7 +28,9 @@ async function start() {
     const saved = JSON.parse(localStorage.getItem("amortization2.settings.v1") ?? "{}");
     if (["sniper", "minigunner", "assault"].includes(saved.fourthModel)) fourthModel = saved.fourthModel;
   } catch { /* Optional local preferences. */ }
-  const sim = await Simulation.create("receiving", fourthModel);
+  let sim = await Simulation.create("receiving", fourthModel);
+  const recordedSim = sim;
+  let viewer: ReplayViewer | undefined;
   const scene = await RangeScene.create(canvas, sim);
   let replay: HumanReplayRecorder | undefined;
   if (import.meta.env.DEV) {
@@ -38,7 +41,7 @@ async function start() {
     sim.onReset = phase => phase === "before" ? replay!.finish(sim) : replay!.begin(sim);
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-export-replay]"))
       button.addEventListener("click", () => {
-        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(sim), null, 2)], { type: "application/json" }));
+        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(recordedSim), null, 2)], { type: "application/json" }));
         const link = document.createElement("a");
         link.href = url;
         link.download = `amortization2-replay-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
@@ -183,6 +186,7 @@ async function start() {
   }
   document.getElementById("dismiss-comms")!.addEventListener("click", dismissComms);
   function pause(title?: string) {
+    if (viewer?.active) { viewer.pause(); return; }
     paused = true;
     exitSniping();
     sim.release();
@@ -195,6 +199,7 @@ async function start() {
     if (!dialog.open) dialog.showModal();
   }
   async function resume() {
+    if (viewer?.active) return;
     const button = document.querySelector<HTMLButtonElement>("#resume")!;
     button.disabled = true;
     try {
@@ -204,6 +209,7 @@ async function start() {
       audio.failed = true;
     }
     button.disabled = false;
+    if (viewer?.active) return;
     dialog.close();
     if (sim.mission?.phase === "briefing") replay?.action(sim, { type: "deploy" });
     sim.mission?.deploy();
@@ -214,6 +220,7 @@ async function start() {
     canvas.focus();
   }
   function reset() {
+    if (viewer?.active) return;
     nextPausedRender = 0;
     resultDialog.close();
     dismissComms();
@@ -235,6 +242,7 @@ async function start() {
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
+    if (viewer?.active) return;
     if (sim.mission && weapon !== "pistol") return;
     if (!sim.chooseWeapon(weapon)) {
       toast(
@@ -255,6 +263,7 @@ async function start() {
     canvas.focus();
   }
   function switchRange(range: RangeId) {
+    if (viewer?.active) return;
     nextPausedRender = 0;
     resultDialog.close();
     dismissComms();
@@ -284,7 +293,7 @@ async function start() {
       );
   for (const id of ["loadout-select", "menu-loadout"])
     document.getElementById(id)!.addEventListener("change", (e) => {
-      if (sim.mission) return;
+      if (sim.mission || viewer?.active) return;
       const model = (e.target as HTMLSelectElement).value as RobotModel;
       if (!["sniper", "minigunner", "assault"].includes(model) || model === sim.fourthModel) return;
       exitSniping();
@@ -367,6 +376,7 @@ async function start() {
     .getElementById("grenade")!
     .addEventListener("click", () => chooseWeapon("grenade"));
   document.getElementById("all")!.addEventListener("click", () => {
+    if (viewer?.active) return;
     sim.select(5);
     canvas.focus();
   });
@@ -374,6 +384,7 @@ async function start() {
     "[data-unit]",
   ))
     button.addEventListener("click", (event) => {
+      if (viewer?.active) return;
       sim.select(Number(button.dataset.unit), event.shiftKey);
       canvas.focus();
     });
@@ -385,14 +396,14 @@ async function start() {
     if (document.hidden && entered) pause();
   });
   window.addEventListener("blur", () => {
-    if (entered && !paused) pause();
+    if (viewer?.active || entered && !paused) pause();
   });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener(
     "wheel",
     (e) => {
       e.preventDefault();
-      if (!paused) scene.zoomBy(e.deltaY);
+      if (!paused && !viewer?.active) scene.zoomBy(e.deltaY);
     },
     { passive: false },
   );
@@ -457,6 +468,7 @@ async function start() {
   }
   document.addEventListener("pointerlockerror", captureFailed);
   document.addEventListener("pointerlockchange", () => {
+    if (viewer?.active) return;
     const wasCaptured = sightCaptured;
     sightCaptured = document.pointerLockElement === canvas;
     capturePending = false;
@@ -496,6 +508,7 @@ async function start() {
   }
   // Mouse events retain per-button transitions when firing and steering together.
   window.addEventListener("mousemove", (e) => {
+    if (viewer?.active) return;
     if (paused) return;
     if (sim.sniping) {
       if (document.pointerLockElement === canvas) {
@@ -553,6 +566,7 @@ async function start() {
     if (moveDrag?.queued) updateMove();
   });
   canvas.addEventListener("mousedown", (e) => {
+    if (viewer?.active) return;
     if (paused) return;
     e.preventDefault();
     canvas.focus();
@@ -607,6 +621,7 @@ async function start() {
     }
   });
   window.addEventListener("mouseup", (e) => {
+    if (viewer?.active) return;
     if (paused) return;
     if (sim.sniping) {
       if (e.button === 0) sim.trigger = false;
@@ -647,6 +662,7 @@ async function start() {
     if (e.button === 1) middleDrag = null;
   });
   canvas.addEventListener("pointercancel", () => {
+    if (viewer?.active) return;
     exitSniping();
     cancelDrags();
     sim.release();
@@ -656,6 +672,14 @@ async function start() {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement;
   window.addEventListener("keydown", (e) => {
+    if (viewer?.active) {
+      if (e.code === "Escape") { e.preventDefault(); viewer.close(); }
+      // Native buttons and form controls retain their keyboard behavior.
+      else if (e.code === "Space" && e.target === document.body && !e.repeat) {
+        e.preventDefault(); void viewer.toggle();
+      }
+      return;
+    }
     if (resultDialog.open) {
       if (e.code === "Escape") e.preventDefault();
       return;
@@ -714,9 +738,51 @@ async function start() {
     } else if (e.code === "KeyF" && !sim.sniping) scene.center();
   });
   window.addEventListener("keyup", (e) => {
+    if (viewer?.active) return;
     keys.delete(e.code);
     if (e.code === "Space" && sim.weapon !== "rifle") sim.setBrace(false);
   });
+
+  if (import.meta.env.DEV) {
+    const { ReplayViewer } = await import("./replay-viewer");
+    let savedView: { camera: ReturnType<typeof scene.inspectCamera>; scope: ReturnType<typeof scene.scope.inspect> };
+    const surfaces = [...document.querySelectorAll<HTMLElement>(".topbar, .bottom-bar, #field")];
+    viewer = new ReplayViewer(scene, audio, {
+      enter(playSim) {
+        for (const element of document.querySelectorAll("[data-replay-error]")) element.textContent = "";
+        savedView = { camera: scene.inspectCamera(), scope: scene.scope.inspect() };
+        if (!paused) recordedSim.release();
+        replay!.finish(recordedSim);
+        paused = true;
+        audio.stop(); keys.clear(); cancelDrags(); dismissComms();
+        pointer.inside = false;
+        sniperPointer = null;
+        sightCaptured = capturePending = skipCaptureWarp = false;
+        accumulator = 0;
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
+        dialog.close(); resultDialog.close();
+        sim = playSim;
+        scene.sim = playSim;
+        surfaces.forEach(element => { element.inert = true; });
+      },
+      leave() {
+        sim = recordedSim;
+        scene.sim = sim;
+        scene.resetEnvironment(); scene.resetDynamic();
+        scene.restoreCamera(savedView.camera); scene.scope.restore(savedView.scope, sim, true);
+        surfaces.forEach(element => { element.inert = false; });
+        last = performance.now(); nextPausedRender = 0;
+        configureMenu(); updateUI(sim, audio);
+        if (sim.mission?.finished) resultDialog.showModal();
+        else dialog.showModal();
+      },
+      hud: playbackSim => updateUI(playbackSim, audio),
+      error: message => {
+        for (const element of document.querySelectorAll("[data-replay-error]")) element.textContent = message;
+        toast(message, true);
+      },
+    });
+  }
 
   // Read-only state plus deliberate development controls, useful for bug reports and authored drills.
   Object.assign(window, {
@@ -743,8 +809,9 @@ async function start() {
       project: (p: Vec3) => scene.project(p),
       reset,
       ...(import.meta.env.DEV ? {
-        exportReplay: () => JSON.stringify(replay!.export(sim), null, 2),
+        exportReplay: () => JSON.stringify(replay!.export(recordedSim), null, 2),
         inspectReplay: () => replay!.status,
+        inspectPlayback: () => viewer!.inspect(),
       } : {}),
       exportReport: () =>
         JSON.stringify(
@@ -769,6 +836,11 @@ async function start() {
   function frame(now: number) {
     const delta = Math.min((now - last) / 1000, 0.1);
     last = now;
+    if (viewer?.active) {
+      viewer.frame(delta, now);
+      requestAnimationFrame(frame);
+      return;
+    }
     if (!paused) {
       if (!sim.sniping) {
         if (document.pointerLockElement === canvas) document.exitPointerLock();

@@ -1316,6 +1316,22 @@ export class RangeScene {
     const camera = this.sim.sniping ? this.scope.camera : this.camera;
     return { x: camera.matrixWorld.elements[0], z: camera.matrixWorld.elements[2] };
   }
+  restoreCamera(value: object) {
+    const v = value as { target?: Vec3; zoom?: number; halfHeight?: number };
+    if (!v.target || ![v.target.x, v.target.y, v.target.z, v.zoom].every(Number.isFinite)) return;
+    this.cameraTarget.set(v.target.x, v.target.y, v.target.z);
+    this.zoom = clamp(v.zoom!, 0.25, 4);
+    // Update projection only: repeatedly resizing the drawing buffer is costly.
+    const aspect = this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight);
+    const half = Number.isFinite(v.halfHeight) && v.halfHeight! > 0 && v.halfHeight! < 2000
+      ? v.halfHeight! : tacticalHalfHeight(this.sim.range, aspect, this.zoom);
+    this.camera.top = half;
+    this.camera.bottom = -half;
+    this.camera.left = -half * aspect;
+    this.camera.right = half * aspect;
+    this.camera.updateProjectionMatrix();
+    this.updateCamera();
+  }
   inspectCamera() {
     return { target: { x: this.cameraTarget.x, y: this.cameraTarget.y, z: this.cameraTarget.z },
       zoom: this.zoom, halfHeight: this.camera.top, right: this.listenerRight };

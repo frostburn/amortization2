@@ -200,7 +200,7 @@ export function readHumanReplay(value: unknown): HumanReplay {
   return replay;
 }
 
-function validateSession(session: ReplaySession) {
+export function validateSession(session: ReplaySession) {
   if (!session || !Object.hasOwn(RANGES, session.range) || !["sniper", "minigunner", "assault"].includes(session.fourthModel) ||
       session.seed !== 1729 || !Number.isInteger(session.endTick) || session.endTick < 0 || session.endTick > 20 * 60 / STEP)
     throw new Error("Unsupported replay session");

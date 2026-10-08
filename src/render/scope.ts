@@ -102,6 +102,18 @@ export class SniperView {
   zoomBy(delta: number) {
     this.camera.fov = clamp(this.camera.fov * Math.exp(delta * 0.001), 6, 24);
   }
+  restore(value: object, sim: Simulation, restoreVisibility = false) {
+    const v = value as { visible?: boolean; fov?: number; yaw?: number; pitch?: number; invertX?: boolean; invertY?: boolean };
+    if (![v.fov, v.yaw, v.pitch].every(Number.isFinite)) return;
+    if (restoreVisibility) this.visible = v.visible === true;
+    this.camera.fov = clamp(v.fov!, 6, 24);
+    this.yaw = v.yaw!;
+    this.pitch = clamp(v.pitch!, -Math.PI / 2, Math.PI / 2);
+    this.operator = sim.sniping ? sim.rifleOperator : undefined;
+    if (typeof v.invertX === "boolean") this.invertX = v.invertX;
+    if (typeof v.invertY === "boolean") this.invertY = v.invertY;
+    this.orient(sim);
+  }
   resetSight() {
     this.operator = undefined;
   }
@@ -143,7 +155,7 @@ export class SniperView {
       new THREE.Vector3().copy(sim.aim),
     );
     const covering = sim.squad.filter((a) => !a.dead && a.cover).length;
-    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${staggered ? "STAGGER" : operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"} · ${covering} COVERING${captured ? "" : " · CLICK TO CAPTURE"}`;
+    this.label.textContent = `NEEDLE · ${Math.round(range)} m · HEIGHT ${heightDifference >= 0 ? "+" : ""}${heightDifference.toFixed(1)} m · ${staggered ? "STAGGER" : operator.reload > 0 ? "RELOADING" : ready ? "BRACED" : "SETTLING"} · ${covering} COVERING${document.body.classList.contains("viewing-replay") ? " · REPLAY" : captured ? "" : " · CLICK TO CAPTURE"}`;
 
     const visibility = hiddenObjects.map((o) => o.visible);
     hiddenObjects.forEach((o) => (o.visible = false));

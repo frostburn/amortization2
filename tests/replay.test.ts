@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { STEP } from "../src/game/config";
 import { HumanReplayRecorder, playRecordedSession, readHumanReplay, replaySnapshot } from "../src/game/replay";
+import { ReplayPlayback } from "../src/game/replay-playback";
 import { Simulation } from "../src/game/simulation";
 
 const view = { camera: { zoom: 1 }, scope: { visible: false }, paused: false, width: 1440, height: 900 };
@@ -23,6 +24,34 @@ describe("development human replays", () => {
     };
     return { recorder, advance };
   };
+
+  test("incremental playback bounds seeking, rewinds and applies final-tick commands", async () => {
+    const live = await create("proving"), { recorder, advance } = capture(live);
+    live.select(5); live.move({ x: -12, z: -4 }); advance(.4);
+    live.setBrace(true); live.select(2); // Includes commands on the final tick.
+    const session = recorder.export(live).sessions[0];
+    const fresh = await create("proving"), player = new ReplayPlayback(fresh, session);
+    expect(player.advanceTo(session.endTick, 3)).toBe(false);
+    expect(player.tick).toBe(3);
+    player.advanceTo(session.endTick);
+    expect(replaySnapshot(fresh)).toEqual(session.final);
+    player.advanceTo(6);
+    expect(player.tick).toBe(6);
+    player.advanceTo(session.endTick);
+    expect(replaySnapshot(fresh)).toEqual(session.final);
+    expect(replaySnapshot(live)).toEqual(session.final);
+    expect(recorder.status.sessions).toBe(1);
+  });
+
+  test("incremental playback rejects recorder worlds and unsafe seek times", async () => {
+    const live = await create("proving"), { recorder } = capture(live);
+    const session = recorder.export(live).sessions[0];
+    expect(() => new ReplayPlayback(live, session)).toThrow("unrecorded simulation");
+    const fresh = await create("proving"), player = new ReplayPlayback(fresh, session);
+    expect(() => player.advanceTo(NaN)).toThrow("Invalid replay time");
+    expect(player.advanceTo(999)).toBe(true);
+    expect(player.tick).toBe(0);
+  });
 
   test("exported mission intentions reproduce real pistol damage, reload and formation movement", async () => {
     const sim = await create();

@@ -10,6 +10,23 @@ This is **Vite development mode**; this project does not use Vue. Production
 builds omit the recorder, its controls and the replay console helpers. Debug
 ranges and the existing current-state `exportReport()` remain available.
 
+## Viewing an export in the game
+
+In development, open **Controls & settings → View replay** (also in the debrief)
+and choose an exported JSON file. The viewer starts paused. Use Play/Pause, the
+time slider, ±5 seconds, the speed selector (¼×–4×) and the attempt selector.
+**Exit replay** or Escape returns to your live game, paused, with its camera and
+squad state preserved. Each file is read locally; it is never uploaded.
+
+The viewer re-simulates commands on a separate physics world and follows recorded
+overhead and scope cameras. Pauses in the original playthrough are skipped.
+Seeking runs in bounded batches so long captures do not block the UI. Playback
+cannot issue squad orders and does not enter the human recorder. At the end,
+combat counters, robot health/ammo and final positions are checked against the
+capture; differing code or physics can produce a visible divergence warning.
+`window.amortization2.inspectPlayback()` exposes viewer progress in development.
+The viewer and file controls are absent from production builds.
+
 ## Inspecting an export
 
 Attach the JSON when describing a combat or movement problem. In the matching
