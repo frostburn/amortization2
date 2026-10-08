@@ -37,8 +37,9 @@ long sandbox sessions. Live overhead aircraft do not become ground-pathfinding
 obstacles; a fallen wreck does participate in local ground avoidance.
 
 Arrival columns check static collision, including building and ship shells.
-Repositioning uses local air goals and climbs above intervening roofs, without
-calling squad A*. No position teleports are used for flight or withdrawal. After
+Repositioning sweeps WATCH's full cylindrical hull, including rotor clearance,
+along local air goals and climbs above intervening roofs during pursuit and
+withdrawal, without calling squad A*. No position teleports are used for flight or withdrawal. After
 26 seconds without further attacks on civilians or WATCH, survivors stop firing
 and climb out. New interference can recall them; reset restores a quiet district.
 Receiving continues to count only its four authored guards for the cargo

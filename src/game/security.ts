@@ -155,9 +155,15 @@ export class SecurityResponse {
   fly(a: Actor) {
     const f = a.flight!, p = a.body.translation(), v = a.body.linvel();
     let goal = f.goal;
-    const blocked = this.sim.ray(p, goal, a.body, staticHull);
+    const travel = { x: goal.x - p.x, y: goal.y - p.y, z: goal.z - p.z };
+    const length = Math.hypot(travel.x, travel.y, travel.z);
+    // Holding a hover needs no transit query; normalize longer sweeps so tiny
+    // velocities do not create a numerically difficult time-of-impact search.
+    const blocked = length > .05 ? this.sim.world.castShape(p, a.body.rotation(),
+      { x: travel.x / length, y: travel.y / length, z: travel.z / length }, a.collider.shape,
+      .05, length, true, undefined, undefined, undefined, a.body, staticHull) : null;
     // Lift over rooflines before crossing; descend only through a checked column.
-    if (blocked && f.state !== "withdrawing") goal = { ...goal, y: this.ceiling };
+    if (blocked) goal = { ...goal, y: this.ceiling + (f.state === "withdrawing" ? 8 : 0) };
     const horizontal = Math.hypot(goal.x - p.x, goal.z - p.z);
     const crossing = blocked && p.y < this.ceiling - 1;
     const speed = crossing ? 0 : Math.min(WATCH.speed, horizontal * 1.5);

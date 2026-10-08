@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import RAPIER from "@dimforge/rapier3d-compat";
 import { STEP, RIFLE } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { WATCH } from "../src/game/security";
@@ -128,6 +129,28 @@ describe("civilian security response", () => {
     sim.time = drone.deathTime! + WATCH.wreckSeconds + .1; sim.security!.update();
     expect(sim.actors).not.toContain(drone);
   });
+
+  test.each(["pursuing", "withdrawing"] as const)("%s flight lifts its whole hull past a wall that clears the centerline", state => {
+    stage(); harm(); sim.time = 3; sim.security!.update();
+    const drone = sim.security!.active[0], flight = drone.flight!;
+    drone.body.setTranslation({ x: 0, y: 5.5, z: 0 }, true);
+    drone.body.setLinvel(noImpulse, true);
+    flight.state = state;
+    flight.goal = { x: 0, y: state === "withdrawing" ? sim.security!.ceiling + 8 : 5.5, z: 10 };
+    drone.ai!.nextThink = Infinity; drone.ai!.nextAttack = Infinity;
+    // The ray misses this wall, but its edge overlaps the 1.38 m rotor/hull radius.
+    sim.world.createCollider(RAPIER.ColliderDesc.cuboid(.2, 8, .4).setTranslation(1.3, 8, 4));
+    sim.world.step();
+    expect(sim.ray(drone.body.translation(), flight.goal, drone.body)).toBeNull();
+    let maxHeight = 0, last = { ...drone.body.translation() };
+    for (let i = 0; i < 7 / STEP; i++) {
+      sim.step(); sim.events.length = 0;
+      if (!sim.actors.includes(drone)) break;
+      last = { ...drone.body.translation() }; maxHeight = Math.max(maxHeight, last.y);
+    }
+    expect(maxHeight).toBeGreaterThan(16.3);
+    expect(last.z).toBeGreaterThan(6);
+  }, 15000);
 
   test("sniper support aims at the thin airborne hull rather than a biped chest", () => {
     stage(); harm(); sim.time = 3; sim.security!.update();
