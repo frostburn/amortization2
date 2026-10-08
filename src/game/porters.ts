@@ -27,6 +27,7 @@ function lineDistance(p: Vec2, a: Vec2, b: Vec2) {
 /** Authored cargo aisles, local yielding and physical two-handed loads. No per-tick A*. */
 export class CargoWorkers {
   porters: CivilianPorter[] = [];
+  private heldRoutes = new Set<string>();
   constructor(private sim: Simulation, private district: CityDistrict) {
     for (const [i, route] of (district.porterRoutes ?? []).entries()) {
       const start = route.points[0], yaw = start.station!.yaw;
@@ -52,6 +53,25 @@ export class CargoWorkers {
     }
   }
   neutral(handle: number) { return this.porters.find(p => p.collider.handle === handle); }
+  /** Suspend a work order while preserving its physical load. Safety reactions
+   * still take priority, and lifting resumes without spawning replacement cargo. */
+  hold(route: string) {
+    this.heldRoutes.add(route);
+    for (const p of this.porters.filter(p => p.route.id === route)) {
+      if (!p.grip) this.attach(p);
+      p.grip?.setAnchor1({ x: 0, y: TOTE.carryHeight, z: TOTE.reach });
+    }
+  }
+  resume(route: string) {
+    if (!this.heldRoutes.delete(route)) return;
+    for (const p of this.porters.filter(p => p.route.id === route)) {
+      if (p.grip && p.alertUntil <= this.sim.time) {
+        p.next = (p.cargoStation + 1) % p.route.points.length;
+        p.phase = 0;
+        p.state = "travel";
+      }
+    }
+  }
   release(p: CivilianPorter) {
     if (p.grip) this.sim.world.removeImpulseJoint(p.grip, true);
     p.grip = undefined;
@@ -143,6 +163,13 @@ export class CargoWorkers {
       if (!p.impactUntil && this.district.water.some(w => inWater(at, w)))
         this.damage(p, 0, { x: 0, y: 0, z: 0 }, at);
       if (p.impactUntil && !this.recover(p)) continue;
+      if (this.heldRoutes.has(p.route.id) && p.alertUntil <= this.sim.time) {
+        p.state = "waiting";
+        const mass = PORTER.mass + (p.grip ? TOTE.mass : 0);
+        p.body.applyImpulse({ x: clamp(-velocity.x, -STEP * 3, STEP * 3) * mass,
+          y: 0, z: clamp(-velocity.z, -STEP * 3, STEP * 3) * mass }, true);
+        continue;
+      }
       // A physical shove can move a waiting worker off its station. Its pause
       // must still expire so the drive can return it to the loading stand.
       p.wait = Math.max(0, p.wait - STEP);

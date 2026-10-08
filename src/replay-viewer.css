@@ -1,0 +1,19 @@
+#replay-viewer {
+  position: fixed; z-index: 20; bottom: 112px; left: 50%; transform: translateX(-50%);
+  width: min(760px, calc(100vw - 32px)); padding: 14px 18px;
+  background: #142024f5; border: 1px solid #71948b; box-shadow: 0 12px 36px #0009;
+}
+#replay-viewer[hidden] { display: none; }
+.replay-heading, .replay-transport { display: flex; align-items: center; gap: 12px; }
+.replay-heading { margin-bottom: 12px; }
+.replay-heading strong { color: #9be6cd; letter-spacing: .15em; }
+.replay-heading [data-name] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.replay-heading [data-close] { margin-left: auto; flex-shrink: 0; }
+.replay-transport label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.replay-transport output { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 13px; }
+#replay-viewer select { color: #d8e3dc; background: #17272a; border: 1px solid #617970; padding: 4px 6px; font: inherit; max-width: 180px; }
+#replay-viewer [data-time] { display: block; width: 100%; margin: 12px 0 8px; accent-color: #9be6cd; }
+#replay-viewer [data-status] { display: block; color: #a8b9b8; overflow-wrap: anywhere; }
+.viewing-replay #mode-hint, .viewing-replay #arena-defeat { display: none !important; }
+@media (max-width: 850px) { .replay-transport { flex-wrap: wrap; } }
+[data-replay-error]:empty { display: none; }

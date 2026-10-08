@@ -1,5 +1,6 @@
 import "./style.css";
 import { mountUI, updateUI } from "./ui";
+import { showComms } from "./mission-ui";
 import {
   STEP,
   clamp,
@@ -11,8 +12,10 @@ import {
 } from "./game/config";
 import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
+import type { HumanReplayRecorder } from "./game/replay";
+import type { ReplayViewer } from "./replay-viewer";
 
-const { canvas, dialog } = mountUI();
+const { canvas, dialog, resultDialog } = mountUI();
 const audio = new RangeAudio();
 
 async function start() {
@@ -25,13 +28,33 @@ async function start() {
     const saved = JSON.parse(localStorage.getItem("amortization2.settings.v1") ?? "{}");
     if (["sniper", "minigunner", "assault"].includes(saved.fourthModel)) fourthModel = saved.fourthModel;
   } catch { /* Optional local preferences. */ }
-  const sim = await Simulation.create("proving", fourthModel);
+  let sim = await Simulation.create("receiving", fourthModel);
+  const recordedSim = sim;
+  let viewer: ReplayViewer | undefined;
   const scene = await RangeScene.create(canvas, sim);
+  let replay: HumanReplayRecorder | undefined;
+  if (import.meta.env.DEV) {
+    const { HumanReplayRecorder } = await import("./game/replay");
+    replay = new HumanReplayRecorder(__REPLAY_REVISION__);
+    replay.begin(sim);
+    sim.onInput = action => replay!.action(sim, action);
+    sim.onReset = phase => phase === "before" ? replay!.finish(sim) : replay!.begin(sim);
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-export-replay]"))
+      button.addEventListener("click", () => {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(recordedSim), null, 2)], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `amortization2-replay-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+  }
   let paused = true,
     entered = false,
     last = performance.now(),
     accumulator = 0,
-    uiTime = 0;
+    uiTime = 0,
+    nextPausedRender = 0;
   let pointer = { x: 0, y: 0, inside: false },
     ground: Vec3 = { x: -14, y: 0, z: -7 };
   let middleDrag: { x: number; y: number } | null = null;
@@ -50,6 +73,7 @@ async function start() {
   const selectionBox = document.getElementById("selection-box")!;
   const keys = new Set<string>();
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let commsTimer: ReturnType<typeof setTimeout> | undefined;
   const toast = (message: string, essential = false) => {
     const element = document.getElementById("toast")!;
     element.classList.toggle("aux-label", !essential);
@@ -139,7 +163,30 @@ async function start() {
     });
   }
 
-  function pause(title = "Range paused") {
+  function configureMenu() {
+    document.getElementById("menu-title")!.textContent = sim.mission ? "Receiving"
+      : sim.range === "port" ? "Marine port" : sim.range === "city" ? "City district"
+      : sim.arena ? "Endless arena" : sim.range === "long" ? "Long range" : "Proving ground";
+    document.getElementById("menu-intro")!.textContent = sim.mission ? sim.mission.definition.summary
+      : sim.range === "port" ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
+      : sim.range === "city" ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
+      : sim.arena ? "Survive incoming robot squads. Survivors repair and rearm between waves. Shift+R restarts."
+      : sim.range === "long" ? "Sight a target with NEEDLE and press Space for braced first-person sniping. Elevated platforms need elevated aim."
+      : "Test sustained fire, move heavy targets, and throw grenades over cover.";
+    document.getElementById("resume")!.innerHTML = sim.mission
+      ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
+      : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
+    canvas.setAttribute("aria-label", sim.mission
+      ? "Receiving mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. Hold Space to brace. Clear the guards, reach dispatch, then return to the van."
+      : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
+  }
+  function dismissComms() {
+    clearTimeout(commsTimer);
+    document.getElementById("mission-comms")!.hidden = true;
+  }
+  document.getElementById("dismiss-comms")!.addEventListener("click", dismissComms);
+  function pause(title?: string) {
+    if (viewer?.active) { viewer.pause(); return; }
     paused = true;
     exitSniping();
     sim.release();
@@ -147,12 +194,12 @@ async function start() {
     keys.clear();
     cancelDrags();
     accumulator = 0;
-    document.getElementById("menu-title")!.textContent = title;
-    document.getElementById("resume")!.innerHTML =
-      "RESUME RANGE <span>↗</span>";
+    configureMenu();
+    document.getElementById("menu-title")!.textContent = title ?? (sim.mission ? "Contract paused" : "Range paused");
     if (!dialog.open) dialog.showModal();
   }
   async function resume() {
+    if (viewer?.active) return;
     const button = document.querySelector<HTMLButtonElement>("#resume")!;
     button.disabled = true;
     try {
@@ -162,7 +209,10 @@ async function start() {
       audio.failed = true;
     }
     button.disabled = false;
+    if (viewer?.active) return;
     dialog.close();
+    if (sim.mission?.phase === "briefing") replay?.action(sim, { type: "deploy" });
+    sim.mission?.deploy();
     entered = true;
     paused = false;
     last = performance.now();
@@ -170,6 +220,10 @@ async function start() {
     canvas.focus();
   }
   function reset() {
+    if (viewer?.active) return;
+    nextPausedRender = 0;
+    resultDialog.close();
+    dismissComms();
     exitSniping();
     cancelDrags();
     keys.clear();
@@ -180,10 +234,16 @@ async function start() {
     scene.updateAim(ground, false);
     audio.stop();
     accumulator = 0;
-    toast(sim.range === "port" ? "Port restored." : sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
+    if (sim.mission) {
+      paused = true;
+      configureMenu();
+      if (!dialog.open) dialog.showModal();
+    } else toast(sim.range === "port" ? "Port restored." : sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
+    if (viewer?.active) return;
+    if (sim.mission && weapon !== "pistol") return;
     if (!sim.chooseWeapon(weapon)) {
       toast(
         weapon === "rifle"
@@ -203,6 +263,10 @@ async function start() {
     canvas.focus();
   }
   function switchRange(range: RangeId) {
+    if (viewer?.active) return;
+    nextPausedRender = 0;
+    resultDialog.close();
+    dismissComms();
     exitSniping();
     cancelDrags();
     keys.clear();
@@ -213,18 +277,11 @@ async function start() {
     scene.resetDynamic();
     scene.resetCamera();
     accumulator = 0;
-    document.getElementById("menu-title")!.textContent =
-      range === "port" ? "Marine port" : range === "city" ? "City district" : range === "arena" ? "Endless arena" : range === "long" ? "Long range" : "Proving ground";
-    document.getElementById("menu-intro")!.textContent =
-      range === "port"
-        ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
-        : range === "city"
-        ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
-        : range === "arena"
-        ? "Survive incoming robot squads. Watch the marked entrances, move around cover, and interrupt enemy bursts. Survivors are repaired and rearmed between waves; disabled robots stay down. Shift+R restarts."
-        : range === "long"
-        ? "NEEDLE trades armour for a powerful rifle. Sight a target and press Space to enter braced first-person sniping. Aim above the raised platforms before firing."
-        : "Test sustained fire, move heavy targets, and throw grenades over cover.";
+    configureMenu();
+    if (sim.mission) {
+      paused = true;
+      if (!dialog.open) dialog.showModal();
+    }
     updateUI(sim, audio);
     if (!paused) canvas.focus();
   }
@@ -236,6 +293,7 @@ async function start() {
       );
   for (const id of ["loadout-select", "menu-loadout"])
     document.getElementById(id)!.addEventListener("change", (e) => {
+      if (sim.mission || viewer?.active) return;
       const model = (e.target as HTMLSelectElement).value as RobotModel;
       if (!["sniper", "minigunner", "assault"].includes(model) || model === sim.fourthModel) return;
       exitSniping();
@@ -282,9 +340,18 @@ async function start() {
   });
   document
     .getElementById("help")!
-    .addEventListener("click", () => pause("Controls & settings"));
+    .addEventListener("click", () => {
+      pause("Controls & settings");
+      (document.getElementById("menu-settings") as HTMLDetailsElement).open = true;
+    });
   document.getElementById("reset")!.addEventListener("click", reset);
   document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
+  document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
+  document.getElementById("mission-debug")!.addEventListener("click", () => {
+    switchRange("proving");
+    pause("Proving ground");
+  });
+  resultDialog.addEventListener("cancel", event => event.preventDefault());
   document.getElementById("sound")!.addEventListener("click", async () => {
     try {
       await audio.unlock();
@@ -309,6 +376,7 @@ async function start() {
     .getElementById("grenade")!
     .addEventListener("click", () => chooseWeapon("grenade"));
   document.getElementById("all")!.addEventListener("click", () => {
+    if (viewer?.active) return;
     sim.select(5);
     canvas.focus();
   });
@@ -316,6 +384,7 @@ async function start() {
     "[data-unit]",
   ))
     button.addEventListener("click", (event) => {
+      if (viewer?.active) return;
       sim.select(Number(button.dataset.unit), event.shiftKey);
       canvas.focus();
     });
@@ -327,14 +396,14 @@ async function start() {
     if (document.hidden && entered) pause();
   });
   window.addEventListener("blur", () => {
-    if (entered && !paused) pause();
+    if (viewer?.active || entered && !paused) pause();
   });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener(
     "wheel",
     (e) => {
       e.preventDefault();
-      if (!paused) scene.zoomBy(e.deltaY);
+      if (!paused && !viewer?.active) scene.zoomBy(e.deltaY);
     },
     { passive: false },
   );
@@ -399,6 +468,7 @@ async function start() {
   }
   document.addEventListener("pointerlockerror", captureFailed);
   document.addEventListener("pointerlockchange", () => {
+    if (viewer?.active) return;
     const wasCaptured = sightCaptured;
     sightCaptured = document.pointerLockElement === canvas;
     capturePending = false;
@@ -438,6 +508,7 @@ async function start() {
   }
   // Mouse events retain per-button transitions when firing and steering together.
   window.addEventListener("mousemove", (e) => {
+    if (viewer?.active) return;
     if (paused) return;
     if (sim.sniping) {
       if (document.pointerLockElement === canvas) {
@@ -495,6 +566,7 @@ async function start() {
     if (moveDrag?.queued) updateMove();
   });
   canvas.addEventListener("mousedown", (e) => {
+    if (viewer?.active) return;
     if (paused) return;
     e.preventDefault();
     canvas.focus();
@@ -549,6 +621,7 @@ async function start() {
     }
   });
   window.addEventListener("mouseup", (e) => {
+    if (viewer?.active) return;
     if (paused) return;
     if (sim.sniping) {
       if (e.button === 0) sim.trigger = false;
@@ -589,6 +662,7 @@ async function start() {
     if (e.button === 1) middleDrag = null;
   });
   canvas.addEventListener("pointercancel", () => {
+    if (viewer?.active) return;
     exitSniping();
     cancelDrags();
     sim.release();
@@ -598,6 +672,18 @@ async function start() {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement;
   window.addEventListener("keydown", (e) => {
+    if (viewer?.active) {
+      if (e.code === "Escape") { e.preventDefault(); viewer.close(); }
+      // Native buttons and form controls retain their keyboard behavior.
+      else if (e.code === "Space" && e.target === document.body && !e.repeat) {
+        e.preventDefault(); void viewer.toggle();
+      }
+      return;
+    }
+    if (resultDialog.open) {
+      if (e.code === "Escape") e.preventDefault();
+      return;
+    }
     if (isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === "Escape" && !dialog.open) {
       e.preventDefault();
@@ -652,9 +738,51 @@ async function start() {
     } else if (e.code === "KeyF" && !sim.sniping) scene.center();
   });
   window.addEventListener("keyup", (e) => {
+    if (viewer?.active) return;
     keys.delete(e.code);
     if (e.code === "Space" && sim.weapon !== "rifle") sim.setBrace(false);
   });
+
+  if (import.meta.env.DEV) {
+    const { ReplayViewer } = await import("./replay-viewer");
+    let savedView: { camera: ReturnType<typeof scene.inspectCamera>; scope: ReturnType<typeof scene.scope.inspect> };
+    const surfaces = [...document.querySelectorAll<HTMLElement>(".topbar, .bottom-bar, #field")];
+    viewer = new ReplayViewer(scene, audio, {
+      enter(playSim) {
+        for (const element of document.querySelectorAll("[data-replay-error]")) element.textContent = "";
+        savedView = { camera: scene.inspectCamera(), scope: scene.scope.inspect() };
+        if (!paused) recordedSim.release();
+        replay!.finish(recordedSim);
+        paused = true;
+        audio.stop(); keys.clear(); cancelDrags(); dismissComms();
+        pointer.inside = false;
+        sniperPointer = null;
+        sightCaptured = capturePending = skipCaptureWarp = false;
+        accumulator = 0;
+        if (document.pointerLockElement === canvas) document.exitPointerLock();
+        dialog.close(); resultDialog.close();
+        sim = playSim;
+        scene.sim = playSim;
+        surfaces.forEach(element => { element.inert = true; });
+      },
+      leave() {
+        sim = recordedSim;
+        scene.sim = sim;
+        scene.resetEnvironment(); scene.resetDynamic();
+        scene.restoreCamera(savedView.camera); scene.scope.restore(savedView.scope, sim, true);
+        surfaces.forEach(element => { element.inert = false; });
+        last = performance.now(); nextPausedRender = 0;
+        configureMenu(); updateUI(sim, audio);
+        if (sim.mission?.finished) resultDialog.showModal();
+        else dialog.showModal();
+      },
+      hud: playbackSim => updateUI(playbackSim, audio),
+      error: message => {
+        for (const element of document.querySelectorAll("[data-replay-error]")) element.textContent = message;
+        toast(message, true);
+      },
+    });
+  }
 
   // Read-only state plus deliberate development controls, useful for bug reports and authored drills.
   Object.assign(window, {
@@ -680,6 +808,11 @@ async function start() {
       }),
       project: (p: Vec3) => scene.project(p),
       reset,
+      ...(import.meta.env.DEV ? {
+        exportReplay: () => JSON.stringify(replay!.export(recordedSim), null, 2),
+        inspectReplay: () => replay!.status,
+        inspectPlayback: () => viewer!.inspect(),
+      } : {}),
       exportReport: () =>
         JSON.stringify(
           {
@@ -697,11 +830,17 @@ async function start() {
     "Welcome to Amortization II. window.amortization2: inspect(), project({x,y,z}), reset(), exportReport().",
   );
   document.getElementById("loading")!.classList.add("hidden");
+  configureMenu();
   updateUI(sim, audio);
   dialog.showModal();
   function frame(now: number) {
     const delta = Math.min((now - last) / 1000, 0.1);
     last = now;
+    if (viewer?.active) {
+      viewer.frame(delta, now);
+      requestAnimationFrame(frame);
+      return;
+    }
     if (!paused) {
       if (!sim.sniping) {
         if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -737,7 +876,9 @@ async function start() {
       accumulator += delta;
       let steps = 0;
       while (accumulator >= STEP && steps < 6) {
+        replay?.beforeStep(sim);
         sim.step();
+        replay?.afterStep(sim);
         accumulator -= STEP;
         steps++;
       }
@@ -745,10 +886,17 @@ async function start() {
       scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag);
     } else scene.updateAim(ground, false);
     audio.setListener(scene.listenerPosition, scene.listenerRight);
+    replay?.frame(sim, { camera: scene.inspectCamera(), scope: scene.scope.inspect(), paused,
+      width: canvas.clientWidth, height: canvas.clientHeight });
     for (const event of sim.events.splice(0)) {
       scene.event(event);
       audio.event(event);
       if (event.type === "drill" || event.type === "wave") toast(event.message);
+      if (event.type === "comms") {
+        showComms(event.speaker, event.message);
+        clearTimeout(commsTimer);
+        commsTimer = setTimeout(dismissComms, 9000);
+      }
       if (event.type === "throw" && sim.actors.find((a) => a.id === event.actor)?.kind === "enemy")
         toast("Incoming grenade. Move or take cover.", true);
       if (event.type === "explosion" && !sim.city)
@@ -760,15 +908,39 @@ async function start() {
         );
     }
     audio.update(sim, paused);
-    scene.render(
-      paused ? 1 : accumulator / STEP,
-      paused ? 0 : delta,
-      sim.time,
-      paused,
-    );
+    if (sim.mission?.finished && !resultDialog.open) {
+      paused = true;
+      sim.release();
+      audio.stop();
+      keys.clear();
+      cancelDrags();
+      dismissComms();
+      updateUI(sim, audio);
+      if (dialog.open) dialog.close();
+      resultDialog.showModal();
+      nextPausedRender = 0;
+    }
+    // Briefings and settings freeze the world. Refresh for resize/settings
+    // feedback without continuously drawing the entire district behind a modal.
+    if (!paused || now >= nextPausedRender) {
+      scene.render(
+        paused ? 1 : accumulator / STEP,
+        paused ? 0 : delta,
+        sim.time,
+        paused,
+      );
+      nextPausedRender = now + 250;
+    }
     uiTime += delta;
     if (uiTime > 0.08) {
       updateUI(sim, audio);
+      if (replay) {
+        const { stopReason, seconds } = replay.status;
+        const label = stopReason ? `Recording stopped: ${stopReason} · partial replay`
+          : `Development recording · ${Math.floor(seconds)} s · JSON`;
+        for (const status of document.querySelectorAll(".replay-recording-status"))
+          if (status.textContent !== label) status.textContent = label;
+      }
       uiTime = 0;
     }
     requestAnimationFrame(frame);

@@ -10,8 +10,9 @@ import {
 
 import { CITY_DISTRICT, buildingSolid, waterSolids, type CityDistrict } from "./city";
 import { MARINE_PORT, portSolids } from "./port";
+import { RECEIVING_FIXTURES, RECEIVING_YARD } from "./receiving";
 
-export type RangeId = "proving" | "long" | "arena" | "city" | "port";
+export type RangeId = "receiving" | "proving" | "long" | "arena" | "city" | "port";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -31,6 +32,12 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  receiving: {
+    name: "01 · RECEIVING", city: RECEIVING_YARD, bounds: RECEIVING_YARD.bounds,
+    barriers: [...portSolids(RECEIVING_YARD), ...RECEIVING_FIXTURES], platforms: [],
+    players: [{ x: -23.1, z: 15.1 }, { x: -23.1, z: 12.9 }, { x: -20.9, z: 12.9 }, { x: -20.9, z: 15.1 }],
+    targets: [], props: [],
+  },
   port: {
     name: "MARINE PORT", city: MARINE_PORT, bounds: MARINE_PORT.bounds,
     barriers: portSolids(MARINE_PORT), platforms: [],
