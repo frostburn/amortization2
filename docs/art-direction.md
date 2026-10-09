@@ -23,3 +23,7 @@ The resulting texture is shipped at `public/textures/concrete.webp`, used on the
 - Treat generated concept detail as an art reference, not evidence of implemented gameplay or a shipped screenshot.
 
 The tactical camera now uses true isometric projection: 45° yaw and 35.3° elevation, with the world axes separated by 120°. Default framing keeps robots small enough to read the surrounding combat space, while close zoom remains available for inspection. WASD and middle drag follow screen directions. The expanded maps retain simplified mesh detail, explicit drill objectives, named squad cards and native mouse/keyboard controls. Higher-detail models, surface normals, decals and environmental dressing can be added without replacing the physics layout.
+
+## Human civilians
+
+Use original, faceless adult figures with natural proportions and matte everyday clothing. Skin-toned blank faces, short hair, visible necks and hands keep people distinct from the working bipeds; soft silhouettes replace the robot cast's rigid panels. The first maintenance-worker study and its orbitable, true-scale comparison room are described in [Faceless humans](faceless-humans.md).

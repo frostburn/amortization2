@@ -120,6 +120,8 @@ See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original fi
 
 TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and Web Audio. No backend is required.
 
+Open **`/model-room.html`** (or **Controls & settings → Model room**) to orbit the original faceless maintenance worker beside the squad, civilian robots and self-driving vehicles. Switch between standing, walking and crouching, inspect the front/back, or use the game's isometric and tactical-scale camera. Models retain their original relative sizes. See [faceless human direction and viewer controls](docs/faceless-humans.md).
+
 - [Range design and implementation](docs/proving-ground.md)
 - [Receiving — first playable contract](docs/first-mission.md)
 - [Crossing — covering orders](docs/crossing.md)
