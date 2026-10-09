@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { STEP } from "../src/game/config";
+import { STEP, distance2 } from "../src/game/config";
 import { HumanReplayRecorder, playRecordedSession, readHumanReplay, replaySnapshot } from "../src/game/replay";
 import { ReplayPlayback } from "../src/game/replay-playback";
 import { Simulation } from "../src/game/simulation";
@@ -42,6 +42,32 @@ describe("development human replays", () => {
     expect(replaySnapshot(live)).toEqual(session.final);
     expect(recorder.status.sessions).toBe(1);
   });
+
+  test("covering orders, bridge admission and the last-crossing alarm resimulate exactly", async () => {
+    const sim = await create("crossing"), { recorder, advance } = capture(sim);
+    recorder.action(sim, { type: "deploy" }); sim.mission!.deploy();
+    const walk = (timeout: number) => {
+      for (let i = 0; i < timeout / STEP && !sim.active.every(a =>
+        !a.dead && a.moveTarget && distance2(a.body.translation(), a.moveTarget) < .15); i++) advance(STEP);
+      expect(sim.active.every(a => !a.dead && a.moveTarget && distance2(a.body.translation(), a.moveTarget) < .15)).toBe(true);
+    };
+    sim.selectGroup([1, 2, 3]); sim.move({ x: -12, z: -4 }); walk(8);
+    sim.coverSector({ x: 15, z: 0 });
+    sim.select(4); sim.move({ x: 10, z: 0 }); walk(14); sim.coverSector({ x: -15, z: 0 });
+    for (const id of [3, 1, 2]) {
+      sim.select(id); sim.move({ x: 10 + id, z: (id - 2) * 2.5 }); walk(12); sim.coverSector({ x: -15, z: 0 });
+    }
+    advance(2);
+    sim.ceasefire();
+    const replay = readHumanReplay(recorder.export(sim));
+    expect(replay.sessions[0].events.filter(e => e.data.type === "bridge" && e.data.phase === "alarm")).toHaveLength(1);
+    expect(replay.sessions[0].inputs.some(i => i.data.type === "cover")).toBe(true);
+    expect(replay.sessions[0].inputs.some(i => i.data.type === "ceasefire")).toBe(true);
+    const fresh = await create();
+    expect(playRecordedSession(fresh, replay.sessions[0])).toEqual(replay.sessions[0].final);
+    expect(fresh.squad.map(a => a.cover)).toEqual(sim.squad.map(a => a.cover));
+    expect(fresh.coverHits).toBe(sim.coverHits);
+  }, 20000);
 
   test("incremental playback rejects recorder worlds and unsafe seek times", async () => {
     const live = await create("proving"), { recorder } = capture(live);

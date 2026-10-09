@@ -21,6 +21,7 @@ import type {
 } from "../game/simulation";
 import { CityView } from "./city";
 import { MissionView } from "./mission";
+import { CoverOrderView } from "./cover";
 import { CartFleet } from "./carts";
 import { makeWatch } from "./security";
 import { KiteFleet } from "./kites";
@@ -182,6 +183,7 @@ export class RangeScene {
   private environment = new THREE.Group();
   private cityView?: CityView;
   private missionView?: MissionView;
+  private coverView?: CoverOrderView;
   private cartFleet?: CartFleet;
   private kiteFleet?: KiteFleet;
   private porterFleet?: PorterFleet;
@@ -447,7 +449,7 @@ export class RangeScene {
       this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
       if (this.sim.mission) {
-        this.missionView = new MissionView();
+        this.missionView = new MissionView(this.sim);
         this.environment.add(this.missionView.root);
       }
       return;
@@ -1117,6 +1119,8 @@ export class RangeScene {
   }
 
   resetDynamic() {
+    this.coverView?.dispose();
+    this.coverView = new CoverOrderView();
     this.cartFleet?.dispose();
     this.cartFleet = undefined;
     this.kiteFleet?.dispose();
@@ -1131,6 +1135,7 @@ export class RangeScene {
       if (object instanceof THREE.Mesh && object.geometry.userData.owned) object.geometry.dispose();
     });
     this.dynamic.clear();
+    this.dynamic.add(this.coverView.root);
     this.actors.clear();
     this.props.clear();
     this.grenades.clear();
@@ -1346,6 +1351,7 @@ export class RangeScene {
     this.destinationPreview = null;
     this.destinationAge = 0;
   }
+  previewCover(point: Vec2 | null) { if (this.coverView) this.coverView.preview = point; }
   previewMove(targets: MoveDestination[]) {
     this.destinationPreview = targets;
     this.destinationAge = 0;
@@ -1629,6 +1635,7 @@ export class RangeScene {
     this.updateCamera();
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
     this.missionView?.update(this.sim, this.reducedMotion);
+    this.coverView?.update(this.sim);
     this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
     this.kiteFleet?.update(alpha, paused ? 0 : delta);
     this.porterFleet?.update(alpha);

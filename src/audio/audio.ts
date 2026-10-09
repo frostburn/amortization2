@@ -530,6 +530,16 @@ export class RangeAudio {
   }
   event(e: GameEvent) {
     if (!this.ready) return;
+    if (e.type === "bridge") {
+      if (e.phase === "alarm") {
+        const gain = 0.22 * this.distanceGain(e.position);
+        for (let i = 0; i < 4; i++) this.tone(e.position, i % 2 ? 720 : 960, gain, 0.32, i % 2 ? 690 : 920, i * 0.38);
+      } else {
+        this.impact(e.position, true, 1);
+        this.tone(e.position, 65, 0.3 * this.distanceGain(e.position), 0.6, 28);
+      }
+      return;
+    }
     if (e.type === "security") {
       const frequency = e.phase === "standdown" ? 540 : 780;
       this.tone(e.position, frequency, .12 * this.distanceGain(e.position), .09, frequency * .9);

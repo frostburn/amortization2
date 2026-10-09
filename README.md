@@ -27,6 +27,10 @@ The `dist/` directory is self-contained and uses relative asset URLs. Serve it o
 
 Four basic chassis carry pistols; heavy equipment is unavailable for this job. Clear the four guards, keep a robot on the yellow dispatch pad for two seconds to release the cargo, then bring every surviving squad member back to the van. PORTER work resumes after release. There are no reinforcements, timed failure or objective refits. Losing the squad triggers recovery; completing the return opens Morrow's debrief. **Replay contract** deploys a fresh squad; **Shift+R** restores the briefing. Debug squad preferences stay available in the ranges. See [the first mission](docs/first-mission.md).
 
+## Crossing
+
+**02 · Crossing** continues with the fixed four-pistol squad. A canal footbridge carries one robot at a time. Select covering robots, press **C**, then click a direction: they hold, brace, watch that sector and fire at visible hostiles. **X** ceases fire; moving replaces their cover order. Selection changes preserve it. Three far-bank guards overwhelm an unsupported crossing. The last robot entering the bridge trips an alarm and calls three west-bank pursuers; reverse the far-bank cover, then bring every survivor to the van. Group movement queues on dry bank slots and reforms on arrival. Physical overload can collapse the bridge. See [Crossing and covering orders](docs/crossing.md).
+
 ## Proving Ground
 
 - **Ballistics:** clear six orange plate targets with the machine gun or minigun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.
