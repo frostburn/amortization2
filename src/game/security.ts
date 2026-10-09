@@ -12,6 +12,7 @@ export const WATCH = {
 export type SecurityFlight = {
   state: "descending" | "pursuing" | "withdrawing" | "disabled";
   goal: Vec3; hover: number; rotors: number; slot: number; spawnedAt: number;
+  contract?: boolean;
 };
 
 /** Local, bounded air response. No ground navigation and no civilian/enemy blame. */
@@ -28,7 +29,7 @@ export class SecurityResponse {
       ...sim.layout.platforms.map(b => (b.y ?? 0) + b.h + 5));
   }
   get level() { return this.pressure >= 7 ? 3 : this.pressure >= 3 ? 2 : this.pressure > 0 ? 1 : 0; }
-  get active() { return this.drones.filter(a => !a.dead); }
+  get active() { return this.drones.filter(a => !a.dead && !a.flight!.contract); }
   report(position: Vec3, victim: number, destroyed = false) {
     // One complaint per burst, but a destruction always counts immediately.
     if (!destroyed && this.sim.time - (this.reported.get(victim) ?? -Infinity) < .75) {
@@ -49,7 +50,7 @@ export class SecurityResponse {
     }
   }
   attacked(a: Actor) {
-    if (!a.flight || a.dead) return;
+    if (!a.flight || a.dead || a.flight.contract) return;
     this.report(a.body.translation(), a.id);
   }
   private columnClear(point: Vec3) {
@@ -72,16 +73,24 @@ export class SecurityResponse {
     for (let i = 0; i < count; i++) {
       const slot = this.active.length, position = this.arrival(slot);
       if (!position) continue; // Try again later rather than placing a hull inside scenery.
-      const actor = this.sim.addSecurityDrone(position);
-      actor.flight = { state: "descending", goal: { ...position, y: WATCH.hover + slot % 2 },
-        hover: WATCH.hover + slot % 2, rotors: 1, slot, spawnedAt: this.sim.time };
-      actor.ai = { squad: -1, gate: "air", rally: position, flank: 0, target: null,
-        aim: { ...position, y: 0 }, state: "entering", nextThink: this.sim.time, nextRoute: 0,
-        nextAttack: this.sim.time + 1, entryUntil: 0, nextGrenade: Infinity, burstUntil: 0, visible: false, fire: false };
-      this.drones.push(actor);
+      this.launch(position, slot);
       this.sim.events.push({ type: "security", phase: "arrival", position: { ...position }, level: this.level });
     }
     this.nextDispatch = this.sim.time + WATCH.reinforcementDelay;
+  }
+  /** Authored hostiles share flight, hit physics, wreck cleanup and rendering,
+   * but never create complaints or stand down with civilian security. */
+  launch(position: Vec3, slot: number, contract = false): Actor | undefined {
+    if (!this.columnClear(position)) return undefined;
+    const actor = this.sim.addSecurityDrone(position), hover = contract ? 4.2 : WATCH.hover + slot % 2;
+    actor.flight = { state: "descending", goal: { ...position, y: hover },
+      hover, rotors: 1, slot, spawnedAt: this.sim.time, contract };
+    if (contract) actor.hp = actor.maxHp = 44;
+    actor.ai = { squad: -1, gate: contract ? "FACILITY RESPONSE" : "air", rally: position, flank: 0, target: null,
+      aim: { ...position, y: 0 }, state: "entering", nextThink: this.sim.time, nextRoute: 0,
+      nextAttack: this.sim.time + 1, entryUntil: 0, nextGrenade: Infinity, burstUntil: 0, visible: false, fire: false };
+    this.drones.push(actor);
+    return actor;
   }
   update() {
     const now = this.sim.time, living = this.sim.squad.filter(a => !a.dead);
@@ -138,7 +147,7 @@ export class SecurityResponse {
           for (const offset of [0, .7, -.7, 1.4, -1.4, Math.PI]) {
             const goal = { x: clamp(q.x + Math.sin(bearing + offset) * 13, bounds.left + 3, bounds.right - 3),
               y: flight.hover, z: clamp(q.z + Math.cos(bearing + offset) * 13, bounds.back + 3, bounds.front - 3) };
-            if (!this.columnClear(goal) || this.active.some(other => other !== a && distance2(other.body.translation(), goal) < 3)) continue;
+            if (!this.columnClear(goal) || this.drones.some(other => !other.dead && other !== a && distance2(other.body.translation(), goal) < 3)) continue;
             flight.goal = goal;
             break;
           }
@@ -146,7 +155,7 @@ export class SecurityResponse {
       }
       if (brain.visible && now >= brain.nextAttack && !a.pistol.reload) {
         brain.burstUntil = now + .08;
-        brain.nextAttack = now + 1.05;
+        brain.nextAttack = now + (flight.contract ? 1.6 : 1.05);
       }
       brain.fire = brain.visible && now < brain.burstUntil;
       if (brain.fire) brain.state = "firing";
@@ -183,7 +192,7 @@ export class SecurityResponse {
     return { phase: this.pressure ? this.active.length ? "engaged" : "dispatched" : this.active.length ? "withdrawing" : "quiet",
       level: this.level, pressure: this.pressure, lastIncident: Number.isFinite(this.lastIncident) ? this.lastIncident : null,
       dispatchIn: Number.isFinite(this.nextDispatch) ? Math.max(0, this.nextDispatch - this.sim.time) : null,
-      drones: this.drones.map(a => ({ id: a.id, model: "WATCH", state: a.flight!.state, hp: a.hp,
+      drones: this.drones.map(a => ({ id: a.id, model: "WATCH", contract: !!a.flight!.contract, state: a.flight!.state, hp: a.hp,
         position: { ...a.body.translation() }, velocity: { ...a.body.linvel() }, rotors: a.flight!.rotors, target: a.ai!.target })) };
   }
 }

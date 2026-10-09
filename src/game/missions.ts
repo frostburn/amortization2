@@ -1,11 +1,11 @@
-import { PISTOL, STEP, distance2 } from "./config";
+import { PISTOL, STEP, distance2, type BoxSpec } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
 export type Contact = "morrow" | "vale" | "rook";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "complete" | "failed";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];
@@ -38,6 +38,8 @@ export abstract class Mission {
   bridge?: SingleLoadBridge;
   alarmAt?: number;
   failureReason?: string;
+  /** Runtime solids such as a locked entrance; never mutate shared range data. */
+  obstacles: BoxSpec[] = [];
   phase: MissionPhase = "briefing";
   releaseProgress = 0;
   returnProgress = 0;

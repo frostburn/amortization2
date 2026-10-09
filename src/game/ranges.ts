@@ -13,7 +13,9 @@ import { MARINE_PORT, portSolids } from "./port";
 import { RECEIVING_FIXTURES, RECEIVING_YARD } from "./receiving";
 import { CROSSING_DISTRICT, CROSSING_FIXTURES } from "./crossing";
 
-export type RangeId = "receiving" | "crossing" | "proving" | "long" | "arena" | "city" | "port";
+import { HANDLING_DISTRICT, HANDLING_FIXTURES } from "./handling";
+
+export type RangeId = "receiving" | "crossing" | "handling" | "proving" | "long" | "arena" | "city" | "port";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -34,6 +36,12 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  handling: {
+    name: "03 · HANDLING", contract: true, city: HANDLING_DISTRICT, bounds: HANDLING_DISTRICT.bounds,
+    barriers: HANDLING_FIXTURES, platforms: [],
+    players: [{ x: -25.1, z: 1.1 }, { x: -25.1, z: -1.1 }, { x: -22.9, z: -1.1 }, { x: -22.9, z: 1.1 }],
+    targets: [], props: [],
+  },
   crossing: {
     name: "02 · CROSSING", contract: true, city: CROSSING_DISTRICT, bounds: CROSSING_DISTRICT.bounds,
     barriers: CROSSING_FIXTURES, platforms: [],

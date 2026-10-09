@@ -530,6 +530,16 @@ export class RangeAudio {
   }
   event(e: GameEvent) {
     if (!this.ready) return;
+    if (e.type === "cargo") {
+      if (e.phase === "accept") {
+        this.tone(e.position, 620, .1 * this.distanceGain(e.position), .1, 640);
+        this.tone(e.position, 880, .08 * this.distanceGain(e.position), .12, 900, .12);
+      } else {
+        this.sample("rifleReload", e.position, (e.heavy ? .42 : .28) * this.distanceGain(e.position), e.heavy ? .78 : 1);
+        if (e.phase === "drop") this.impact(e.position, true, e.heavy ? .6 : .3);
+      }
+      return;
+    }
     if (e.type === "bridge") {
       if (e.phase === "alarm") {
         const gain = 0.22 * this.distanceGain(e.position);

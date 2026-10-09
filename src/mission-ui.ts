@@ -43,6 +43,7 @@ export function updateMissionUI(sim: Simulation) {
   for (const selector of ["#loadout-description", ".loadout-note", "#debug-controls", ".aim-settings"])
     (document.querySelector(selector) as HTMLElement).hidden = !!mission;
   document.getElementById("mission-controls")!.hidden = !mission;
+  document.getElementById("haul-controls")!.hidden = !sim.hauling;
   if (!mission) return;
 
   const briefing = document.getElementById("mission-briefing")!;
@@ -53,32 +54,45 @@ export function updateMissionUI(sim: Simulation) {
   }
   setText("mission-name", `${mission.definition.number} / ${mission.definition.title.toUpperCase()}`);
   setText("mission-result-title", mission.definition.title);
-  document.getElementById("mission-next")!.hidden = mission.definition.id !== "receiving" || mission.phase !== "complete";
+  const next = document.getElementById("mission-next")!;
+  next.hidden = !["receiving", "crossing"].includes(mission.definition.id) || mission.phase !== "complete";
+  const nextContract = mission.definition.id === "receiving" ? "CROSSING" : "HANDLING";
+  if (next.dataset.contract !== nextContract) {
+    next.innerHTML = `NEXT CONTRACT · ${nextContract} <span>↗</span>`;
+    next.dataset.contract = nextContract;
+  }
 
-  setText("mission-stage", `${mission.objective + 1} / 3`);
+  setText("mission-stage", `${mission.objective + 1} / ${mission.definition.objectives.length}`);
   setText("mission-objective", mission.definition.objectives[mission.objective]);
   const living = sim.squad.filter(a => !a.dead);
   const marker = mission.marker;
   const near = marker ? living.filter(a => Math.hypot(a.body.translation().x - marker.x,
     a.body.translation().z - marker.z) < marker.radius).length : 0;
   const across = mission.bridge ? living.filter(a => mission.bridge!.shore(a.body.translation()) === 1).length : 0;
-  setText("mission-detail", mission.phase === "crossing" ? `${across} / ${living.length} across${mission.alarmAt !== undefined ? " · West-bank pursuit" : " · One chassis at a time"}`
+  const load = sim.hauling?.available();
+  setText("mission-detail", sim.hauling && ["delivery", "haul"].includes(mission.phase)
+    ? load?.carriers.length ? `${load.carriers.length} / ${load.hands} carriers · ${load.state === "approaching" ? "Collecting" : load.state === "lifting" ? "Lifting" : "H puts cargo down"}`
+      : `${load?.hands ?? 1} ${load?.hands === 2 ? "robots" : "robot"} needed · H to collect`
+    : mission.phase === "crossing" ? `${across} / ${living.length} across${mission.alarmAt !== undefined ? " · West-bank pursuit" : " · One chassis at a time"}`
     : mission.phase === "withdraw" ? `${near} / ${living.length} at the van`
     : mission.phase === "dispatch" ? near ? "Dispatcher accepting release…" : "Bring one robot onto the yellow pad"
     : mission.phase === "return" ? `${near} / ${living.length} robots at the van`
-    : mission.phase === "complete" ? mission.bridge ? "Canal crossed · Squad recovered" : "Cargo released · Squad recovered"
+    : mission.phase === "complete" ? sim.hauling ? "Tools recovered · Squad recovered" : mission.bridge ? "Canal crossed · Squad recovered" : "Cargo released · Squad recovered"
     : mission.phase === "failed" ? "Squad requires recovery"
     : `${mission.enemies.length} guards remaining`);
   const progress = document.getElementById("mission-progress") as HTMLProgressElement;
-  progress.hidden = !marker;
-  progress.value = mission.phase === "dispatch" ? mission.releaseProgress : mission.returnProgress;
+  progress.hidden = !marker || !!sim.hauling && mission.phase === "delivery" && !mission.releaseProgress;
+  progress.value = (mission.phase === "dispatch" || mission.phase === "delivery") ? mission.releaseProgress : mission.returnProgress;
 
   if (mission.finished) {
     const complete = mission.phase === "complete";
     setText("mission-result-state", complete ? "CONTRACT COMPLETE" : "RECOVERY REQUIRED");
     const civilians = [...sim.city!.carts, ...sim.city!.kites, ...sim.city!.porters, ...sim.city!.vehicles];
     const damaged = civilians.filter(c => c.hp <= 0).length;
-    const message = mission.bridge ? !complete
+    const message = sim.hauling ? complete
+      ? "The cooperative has its tools back. Send the return receipt to Gannet; their inventory can argue with itself."
+      : `${mission.failureReason ?? "Squad recovery required"}. Rook will arrange a recovery crew for the yard.`
+      : mission.bridge ? !complete
       ? `${mission.failureReason ?? "Squad recovery required"}. We'll arrange a recovery crew at the canal.`
       : living.length < 4 ? "The surviving chassis are across. Rook will arrange recovery for the ones we lost."
       : "All four across. The cooperative has its crew back, and Gannet has another invoice to dispute."

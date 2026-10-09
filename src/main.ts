@@ -188,7 +188,7 @@ async function start() {
       ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
       : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
     canvas.setAttribute("aria-label", sim.mission
-      ? `${sim.mission.definition.title} mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
+      ? `${sim.mission.definition.title} mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. ${sim.hauling ? "H collects or puts down cargo; two robots are needed for the chest. " : ""}Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
       : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
   }
   function dismissComms() {
@@ -358,7 +358,7 @@ async function start() {
   document.getElementById("reset")!.addEventListener("click", reset);
   document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
   document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
-  document.getElementById("mission-next")!.addEventListener("click", () => switchRange("crossing"));
+  document.getElementById("mission-next")!.addEventListener("click", () => switchRange(sim.range === "receiving" ? "crossing" : "handling"));
   document.getElementById("mission-debug")!.addEventListener("click", () => {
     switchRange("proving");
     pause("Proving ground");
@@ -392,6 +392,14 @@ async function start() {
     sim.select(5);
     canvas.focus();
   });
+  function haulCargo() {
+    if (viewer?.active || paused) return;
+    cancelDrags(); armCover(false); sim.release();
+    const message = sim.haulCargo();
+    if (message) toast(message, true);
+    updateUI(sim, audio); canvas.focus();
+  }
+  document.getElementById("haul-order")!.addEventListener("click", haulCargo);
   coverButton.addEventListener("click", () => {
     if (viewer?.active || paused) return;
     const armed = !covering;
@@ -735,6 +743,7 @@ async function start() {
         "KeyR",
         "KeyF",
         "KeyC",
+        "KeyH",
         "KeyX",
         "Digit1",
         "Digit2",
@@ -754,7 +763,8 @@ async function start() {
       exitSniping();
       sim.release();
       armCover(armed);
-    } else if (e.code === "KeyX") { armCover(false); sim.ceasefire(); }
+    } else if (e.code === "KeyH") haulCargo();
+    else if (e.code === "KeyX") { armCover(false); sim.ceasefire(); }
     else if (e.code === "KeyG") chooseWeapon("grenade");
     else if (e.code === "KeyQ") chooseWeapon(sim.nextCloseWeapon);
     else if (e.code === "KeyE") chooseWeapon("rifle");
