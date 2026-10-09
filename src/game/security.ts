@@ -1,8 +1,26 @@
-import type RAPIER from "@dimforge/rapier3d-compat";
-import { STEP, clamp, distance2, type Vec3 } from "./config";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { STEP, clamp, distance2, type Vec3, type RoofedArea } from "./config";
 import type { Actor, Simulation } from "./simulation";
 
 const staticHull = (c: RAPIER.Collider) => !c.parent() || c.parent()!.isFixed();
+const identity = { x: 0, y: 0, z: 0, w: 1 };
+
+/** Conservative hull/volume sweep for roofs omitted by the cutaway renderer. */
+function crossesArea(from: Vec3, to: Vec3, area: RoofedArea, margin = WATCH.radius, bottom = area.y ?? 0) {
+  let enter = 0, leave = 1;
+  for (const [start, end, low, high] of [
+    [from.x, to.x, area.x - area.w / 2 - margin, area.x + area.w / 2 + margin],
+    [from.z, to.z, area.z - area.d / 2 - margin, area.z + area.d / 2 + margin],
+    [from.y, to.y, bottom - (margin ? WATCH.halfHeight : 0), (area.y ?? 0) + area.h + (margin ? WATCH.halfHeight : 0)],
+  ]) {
+    const delta = end - start;
+    if (Math.abs(delta) < 1e-8) { if (start < low || start > high) return false; continue; }
+    const a = (low - start) / delta, b = (high - start) / delta;
+    enter = Math.max(enter, Math.min(a, b)); leave = Math.min(leave, Math.max(a, b));
+    if (enter > leave) return false;
+  }
+  return true;
+}
 
 export const WATCH = {
   hp: 66, mass: 30, radius: 1.38, halfHeight: .22,
@@ -10,9 +28,10 @@ export const WATCH = {
   reinforcementDelay: 8, quietSeconds: 26, maxActive: 6, wreckSeconds: 12,
 };
 export type SecurityFlight = {
-  state: "descending" | "pursuing" | "withdrawing" | "disabled";
+  state: "descending" | "pursuing" | "holding" | "withdrawing" | "disabled";
   goal: Vec3; hover: number; rotors: number; slot: number; spawnedAt: number;
   contract?: boolean;
+  transit?: { goal: Vec3; stage: "climb" | "cross" | "descend" };
 };
 
 /** Local, bounded air response. No ground navigation and no civilian/enemy blame. */
@@ -24,9 +43,11 @@ export class SecurityResponse {
   private nextDispatch = Infinity;
   private reported = new Map<number, number>();
   readonly ceiling: number;
+  private hull = new RAPIER.Cylinder(WATCH.halfHeight, WATCH.radius);
   constructor(private sim: Simulation) {
     this.ceiling = Math.max(16, ...sim.layout.barriers.filter(b => !b.navigationOnly).map(b => (b.y ?? 0) + b.h + 5),
-      ...sim.layout.platforms.map(b => (b.y ?? 0) + b.h + 5));
+      ...sim.layout.platforms.map(b => (b.y ?? 0) + b.h + 5),
+      ...(sim.layout.shelters ?? []).map(b => (b.y ?? 0) + b.h + 5));
   }
   get level() { return this.pressure >= 7 ? 3 : this.pressure >= 3 ? 2 : this.pressure > 0 ? 1 : 0; }
   get active() { return this.drones.filter(a => !a.dead && !a.flight!.contract); }
@@ -46,6 +67,7 @@ export class SecurityResponse {
     }
     for (const a of this.active) if (a.flight!.state === "withdrawing") {
       a.flight!.state = "pursuing";
+      a.flight!.transit = undefined;
       a.ai!.nextThink = this.sim.time;
     }
   }
@@ -54,9 +76,36 @@ export class SecurityResponse {
     this.report(a.body.translation(), a.id);
   }
   private columnClear(point: Vec3) {
-    return [[0, 0], [-WATCH.radius, 0], [WATCH.radius, 0], [0, -WATCH.radius], [0, WATCH.radius]].every(([dx, dz]) =>
-      !this.sim.ray({ x: point.x + dx, y: this.ceiling + 2, z: point.z + dz },
-        { x: point.x + dx, y: 2.5, z: point.z + dz }, undefined, staticHull));
+    const from = { ...point, y: this.ceiling + 2 }, to = { ...point, y: 2.5 };
+    return !this.blocked(from, to);
+  }
+  private blocked(from: Vec3, to: Vec3, exclude?: RAPIER.RigidBody) {
+    if (this.sim.layout.shelters?.some(area => crossesArea(from, to, area))) return true;
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, length = Math.hypot(dx, dy, dz);
+    return length > .05 && !!this.sim.world.castShape(from, identity,
+      { x: dx / length, y: dy / length, z: dz / length }, this.hull,
+      .05, length, true, undefined, undefined, undefined, exclude, staticHull);
+  }
+  private holdingGoal(area: RoofedArea, a: Actor, target: Vec3) {
+    const exits = area.exits.slice().sort((x, y) => distance2(x, target) - distance2(y, target));
+    for (const exit of exits) {
+      const outward = { x: exit.x - area.x, z: exit.z - area.z }, length = Math.hypot(outward.x, outward.z) || 1;
+      // Four distinct outdoor banks leave room for a hauling pair at the door.
+      const banks = Array.from({ length: 4 }, (_, slot) => {
+        const spread = (slot - 1.5) * 3.2;
+        return { x: exit.x - outward.z / length * spread, y: a.flight!.hover,
+          z: exit.z + outward.x / length * spread };
+      });
+      // Keep a reserved bank. New arrivals choose nearby banks so opposite
+      // approaches do not cross and jam their wide physical rotor guards.
+      const cost = (point: Vec3) => distance2(point, a.flight!.goal) < .1 ? -1 : distance2(point, a.body.translation());
+      banks.sort((x, y) => cost(x) - cost(y));
+      for (const point of banks) {
+        if (this.drones.some(other => other !== a && !other.dead && other.flight!.state === "holding" &&
+          distance2(other.flight!.goal, point) < 3)) continue;
+        if (this.columnClear(point)) return point;
+      }
+    }
   }
   private arrival(slot: number): Vec3 | undefined {
     const bounds = this.sim.layout.bounds;
@@ -102,6 +151,7 @@ export class SecurityResponse {
       for (const a of this.active) if (a.flight!.state !== "withdrawing") {
         const p = a.body.translation();
         a.flight!.state = "withdrawing";
+        a.flight!.transit = undefined;
         a.flight!.goal = { x: p.x + (a.flight!.slot % 2 ? 18 : -18), y: this.ceiling + 8, z: p.z + 12 };
       }
     }
@@ -136,12 +186,20 @@ export class SecurityResponse {
         if (brain.target !== target.id) { brain.nextAttack = now + .7; brain.burstUntil = 0; }
         brain.target = target.id;
         const q = target.body.translation();
+        const shelter = this.sim.layout.shelters?.find(area => Math.abs(q.x - area.x) < area.w / 2 &&
+          Math.abs(q.z - area.z) < area.d / 2 && q.y < (area.y ?? 0) + area.h);
         brain.aim = { x: q.x, y: q.y + .25, z: q.z };
         const muzzle = this.sim.muzzle(a, brain.aim);
         brain.visible = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) < 26 &&
+          !this.sim.layout.shelters?.some(area => crossesArea(muzzle, brain.aim, area, 0, (area.y ?? 0) + area.h - .15)) &&
           this.sim.fireRay(a, muzzle, brain.aim)?.collider.handle === target.collider.handle;
         brain.state = a.pistol.reload ? "reloading" : brain.visible ? "aiming" : "advancing";
-        if (!brain.visible || distance2(p, q) < 8 || distance2(p, q) > 18) {
+        flight.state = shelter ? "holding" : "pursuing";
+        if (shelter) {
+          const goal = this.holdingGoal(shelter, a, q);
+          if (goal) flight.goal = goal;
+          if (!brain.visible && !a.pistol.reload) brain.state = "holding";
+        } else if (!brain.visible || distance2(p, q) < 8 || distance2(p, q) > 18) {
           const bearing = Math.atan2(p.x - q.x, p.z - q.z);
           const bounds = this.sim.layout.bounds;
           for (const offset of [0, .7, -.7, 1.4, -1.4, Math.PI]) {
@@ -164,18 +222,26 @@ export class SecurityResponse {
   fly(a: Actor) {
     const f = a.flight!, p = a.body.translation(), v = a.body.linvel();
     let goal = f.goal;
-    const travel = { x: goal.x - p.x, y: goal.y - p.y, z: goal.z - p.z };
-    const length = Math.hypot(travel.x, travel.y, travel.z);
-    // Holding a hover needs no transit query; normalize longer sweeps so tiny
-    // velocities do not create a numerically difficult time-of-impact search.
-    const blocked = length > .05 ? this.sim.world.castShape(p, a.body.rotation(),
-      { x: travel.x / length, y: travel.y / length, z: travel.z / length }, a.collider.shape,
-      .05, length, true, undefined, undefined, undefined, a.body, staticHull) : null;
-    // Lift over rooflines before crossing; descend only through a checked column.
-    if (blocked) goal = { ...goal, y: this.ceiling + (f.state === "withdrawing" ? 8 : 0) };
+    const altitude = this.ceiling + (f.state === "withdrawing" ? 8 : 0);
+    if (!f.transit && this.blocked(p, goal, a.body)) f.transit = { goal: { ...goal }, stage: "climb" };
+    if (f.transit) {
+      const route = f.transit;
+      // Finish the checked outdoor approach before accepting another pursuit
+      // goal. Recomputing a diagonal descent each tick could cut through a roof.
+      if (route.stage === "climb") {
+        goal = { x: p.x, y: this.ceiling, z: p.z };
+        if (p.y >= this.ceiling - .25) route.stage = "cross";
+      } else if (route.stage === "cross") {
+        goal = { ...route.goal, y: altitude };
+        if (distance2(p, route.goal) < .25 && Math.hypot(v.x, v.z) < .7)
+          route.stage = "descend";
+      } else if (this.columnClear(route.goal) || f.state === "withdrawing") {
+        goal = route.goal;
+        if (distance2(p, goal) < .25 && Math.abs(p.y - goal.y) < .25) f.transit = undefined;
+      } else goal = { x: p.x, y: altitude, z: p.z };
+    }
     const horizontal = Math.hypot(goal.x - p.x, goal.z - p.z);
-    const crossing = blocked && p.y < this.ceiling - 1;
-    const speed = crossing ? 0 : Math.min(WATCH.speed, horizontal * 1.5);
+    const speed = Math.min(WATCH.speed, horizontal * 1.5);
     const desired = { x: (goal.x - p.x) / (horizontal || 1) * speed + a.knockback.x,
       y: clamp((goal.y - p.y) * 1.5, -WATCH.climb, WATCH.climb),
       z: (goal.z - p.z) / (horizontal || 1) * speed + a.knockback.z };
@@ -193,6 +259,8 @@ export class SecurityResponse {
       level: this.level, pressure: this.pressure, lastIncident: Number.isFinite(this.lastIncident) ? this.lastIncident : null,
       dispatchIn: Number.isFinite(this.nextDispatch) ? Math.max(0, this.nextDispatch - this.sim.time) : null,
       drones: this.drones.map(a => ({ id: a.id, model: "WATCH", contract: !!a.flight!.contract, state: a.flight!.state, hp: a.hp,
-        position: { ...a.body.translation() }, velocity: { ...a.body.linvel() }, rotors: a.flight!.rotors, target: a.ai!.target })) };
+        position: { ...a.body.translation() }, velocity: { ...a.body.linvel() }, goal: { ...a.flight!.goal },
+        transit: a.flight!.transit ? { stage: a.flight!.transit.stage, goal: { ...a.flight!.transit.goal } } : null,
+        rotors: a.flight!.rotors, target: a.ai!.target })) };
   }
 }

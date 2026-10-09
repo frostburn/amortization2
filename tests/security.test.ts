@@ -4,6 +4,7 @@ import { STEP, RIFLE } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { WATCH } from "../src/game/security";
 import { HumanReplayRecorder, playRecordedSession } from "../src/game/replay";
+import { HANDLING_DRONE_ENTRIES, HANDLING_SHELTERS } from "../src/game/handling";
 
 const noImpulse = { x: 0, y: 0, z: 0 };
 const advance = (sim: Simulation, seconds: number) => {
@@ -114,6 +115,75 @@ describe("civilian security response", () => {
     expect(drones.some(a => a.flight!.state === "pursuing")).toBe(true);
     expect(shots).toBeGreaterThan(0);
     expect(drones.every(a => a.weapons.length === 1 && a.weapon === "pistol" && !a.braced)).toBe(true);
+  }, 15000);
+
+  test("descent rejects a roof corner between the old center and cardinal probes", () => {
+    const corner = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(.1, 6, .1).setTranslation(.94, 6, .94));
+    sim.world.step(); const entry = { x: 0, y: sim.security!.ceiling, z: 0 };
+    for (const [x, z] of [[0, 0], [-WATCH.radius, 0], [WATCH.radius, 0], [0, -WATCH.radius], [0, WATCH.radius]])
+      expect(sim.ray({ x, y: entry.y + 2, z }, { x, y: 2.5, z }, undefined, c => c.handle === corner.handle)).toBeNull();
+    expect(sim.security!.launch(entry, 0)).toBeUndefined();
+    sim.world.removeCollider(corner, true); sim.world.step();
+    expect(sim.security!.launch(entry, 0)).toBeDefined();
+  });
+
+  test("cutaway roofs reject indoor arrivals; all Handling entries have outdoor hull clearance", () => {
+    sim.reset("handling"); sim.mission!.deploy(); sim.world.step();
+    expect(sim.security!.launch({ x: 19, y: 12, z: -7 }, 0, true)).toBeUndefined();
+    expect(sim.security!.launch({ x: 30, y: 12, z: 7 }, 0, true)).toBeUndefined();
+    for (const [i, p] of HANDLING_DRONE_ENTRIES.entries())
+      expect(sim.security!.launch({ ...p, y: 12 }, i, true)).toBeDefined();
+  });
+
+  test("drones gather at separate outdoor exit banks, hold for indoor targets, then pursue an emerging squad", () => {
+    sim.reset("handling"); sim.mission!.deploy();
+    const area = HANDLING_SHELTERS[0];
+    for (const [i, a] of sim.squad.entries()) a.body.setTranslation({ x: 24 + i % 2 * 2, y: .98, z: i < 2 ? -3 : 3 }, true);
+    sim.world.step();
+    const drones = HANDLING_DRONE_ENTRIES.map((p, i) => sim.security!.launch({ ...p, y: 12 }, i, true)!);
+    for (let i = 0; i < 14 / STEP; i++) {
+      sim.step(); sim.events.length = 0;
+      for (const drone of drones) {
+        const p = drone.body.translation();
+        if (Math.abs(p.x - area.x) < area.w / 2 + WATCH.radius && Math.abs(p.z - area.z) < area.d / 2 + WATCH.radius)
+          expect(p.y - WATCH.halfHeight).toBeGreaterThanOrEqual(area.h);
+      }
+    }
+    expect(drones.every(a => a.flight!.state === "holding" && a.body.translation().x < area.x - area.w / 2 - WATCH.radius)).toBe(true);
+    expect(drones.every(a => Math.hypot(a.body.linvel().x, a.body.linvel().z) < .3)).toBe(true);
+    for (const [i, a] of drones.entries()) for (const b of drones.slice(i + 1))
+      expect(Math.hypot(a.body.translation().x - b.body.translation().x, a.body.translation().z - b.body.translation().z)).toBeGreaterThan(3);
+    expect(sim.mission!.enemyShots).toBe(0);
+    for (const [i, a] of sim.squad.entries()) {
+      a.body.setTranslation({ x: i % 2 * 2, y: .98, z: i < 2 ? -3 : 3 }, true); a.body.setLinvel(noImpulse, true);
+    }
+    advance(sim, 5);
+    expect(drones.every(a => a.flight!.state === "pursuing")).toBe(true);
+    expect(sim.mission!.enemyShots).toBeGreaterThan(0);
+  }, 15000);
+
+  test("a drone above a cutaway roof cannot shoot through it and completes a staged outdoor descent", () => {
+    sim.reset("handling"); sim.mission!.deploy();
+    const area = HANDLING_SHELTERS[0], target = sim.squad[0];
+    for (const [i, a] of sim.squad.entries()) a.body.setTranslation({ x: 24 + i % 2 * 3, y: .98, z: i < 2 ? 0 : 3 }, true);
+    const drone = sim.security!.launch({ x: 5, y: 12, z: 8 }, 0, true)!;
+    drone.body.setTranslation({ x: 24, y: 8, z: 0 }, true); drone.flight!.state = "pursuing";
+    sim.world.step();
+    const aim = { ...target.body.translation(), y: target.body.translation().y + .25 };
+    expect(sim.fireRay(drone, sim.muzzle(drone, aim), aim)?.collider.handle).toBe(target.collider.handle);
+    sim.security!.update(); expect(drone.ai!.visible).toBe(false); expect(drone.ai!.fire).toBe(false);
+    const stages = new Set<string>();
+    for (let i = 0; i < 18 / STEP; i++) {
+      sim.step(); sim.events.length = 0;
+      if (drone.flight!.transit) stages.add(drone.flight!.transit.stage);
+      const p = drone.body.translation();
+      if (Math.abs(p.x - area.x) < area.w / 2 + WATCH.radius && Math.abs(p.z - area.z) < area.d / 2 + WATCH.radius)
+        expect(p.y - WATCH.halfHeight).toBeGreaterThanOrEqual(area.h);
+    }
+    expect(stages).toEqual(new Set(["climb", "cross", "descend"]));
+    expect(drone.flight!.transit).toBeUndefined();
+    expect(drone.body.translation().x).toBeCloseTo(area.exits[0].x, 1);
+    expect(Math.abs(drone.body.translation().y - drone.flight!.hover)).toBeLessThan(.15);
   }, 15000);
 
   test("bullet pressure staggers flying hulls; destroyed drones lose lift and become temporary wrecks", () => {

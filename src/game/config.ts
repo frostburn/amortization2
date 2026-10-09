@@ -1,5 +1,7 @@
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; z: number };
+/** Roof remains closed to aircraft even when rendered as a cutaway. */
+export type RoofedArea = Vec2 & { w: number; d: number; h: number; y?: number; exits: Vec2[] };
 export type BoxSpec = {
   x: number;
   z: number;

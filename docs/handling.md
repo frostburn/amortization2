@@ -80,7 +80,15 @@ rotors and arrival chirps use the existing mix.
 These are authored enemies, independent of civilian complaints and stand-down.
 Their orange hulls match enemy squads; civilian-response WATCH drones retain
 their grey hulls and amber inspection stripes.
-They descend through checked clear columns, fly the existing WATCH AI, and use
+The hall's cutaway roof remains closed to aircraft. Reinforcements descend
+only in outdoor columns checked with their whole rotor hull. For indoor squad
+targets, they gather at separate holding banks outside the service door rather
+than hovering over the chest or entering through the omitted roof. Emerging
+robots draw normal pursuit; open doorways still allow visible pistol fire.
+Transit over obstacles climbs above the roofline, crosses at altitude, then
+descends vertically after another clearance check. Cutaway roofs also block
+drone shots from above.
+They fly the existing WATCH AI and use
 real pistol shots, magazines, reloads, stagger and wreck physics. Tutorial
 variants have 44 integrity (two pistol hits) and a 1.6 s attack interval. Active
 drone count and delayed wreck retirement bound the encounter's population.
@@ -112,7 +120,10 @@ selection, pending/queued movement, escort pacing, dropped and re-collected
 loads, carrier firing restrictions, shock/casualty release, physical gate
 exclusion, ordered objectives, wave timing, real combat, extraction, restart
 and deterministic replay. A complete four-pistol route uses real movement and
-fire without objective teleports or guard deletion. Chromium checks native
+fire without objective teleports or guard deletion. Air regressions cover
+rotor-width roof corners, rejected interior spawns, separate exit holding banks,
+roof-safe climb/cross/descent, blocked shots through omitted roofs and pursuit
+after the squad emerges. Chromium checks native
 cargo clicks, hand/selection/barred cursors, Ctrl firing, interruption of held
 fire over cargo, disabled squad selection, H/RMB/toolbar interactions, auxiliary
 labels, mission selection and loaded replay rendering at desktop and laptop sizes.

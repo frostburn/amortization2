@@ -1,5 +1,5 @@
 import { buildingSolid, type CityDistrict } from "./city";
-import type { BoxSpec } from "./config";
+import type { BoxSpec, RoofedArea } from "./config";
 
 export const HANDLING_SITES = {
   box: { x: -19, z: 2.5 }, delivery: { x: 4, z: 0, radius: 2.4 },
@@ -7,11 +7,14 @@ export const HANDLING_SITES = {
 };
 export const HANDLING_GATE: BoxSpec = { x: 9, z: 0, w: 0.5, d: 8, h: 3.8, style: "wall" };
 export const HANDLING_GUARDS = [{ x: 18, z: -6 }, { x: 21, z: 6 }, { x: 31, z: -5 }];
-export const HANDLING_DRONE_ENTRIES = [{ x: -7, z: -15 }, { x: -4, z: 15 }, { x: 19, z: -7 }, { x: 30, z: 7 }];
+export const HANDLING_DRONE_ENTRIES = [{ x: -7, z: -15 }, { x: -4, z: 15 }, { x: 5, z: -8 }, { x: 5, z: 8 }];
 
-/** Walkable, roofless service hall. Its wide door admits a two-chassis load. */
+/** Walkable cutaway service hall. Its wide door admits a two-chassis load. */
 export type ServiceHallSpec = { x: number; z: number; w: number; d: number; h: number; door: number };
 export const SERVICE_HALL_SPEC: ServiceHallSpec = { x: 22, z: 0, w: 26, d: 24, h: 3.8, door: 8 };
+export const HANDLING_SHELTERS: RoofedArea[] = [{ ...SERVICE_HALL_SPEC,
+  w: SERVICE_HALL_SPEC.w + 0.5, d: SERVICE_HALL_SPEC.d + 0.5, h: SERVICE_HALL_SPEC.h + 0.4,
+  exits: [{ x: SERVICE_HALL_SPEC.x - SERVICE_HALL_SPEC.w / 2 - 3.6, z: SERVICE_HALL_SPEC.z }] }];
 /** Shared wall kit for open, walkable facility interiors at any district position. */
 export function serviceHallWalls(s: ServiceHallSpec): BoxSpec[] {
   const section = (s.d - s.door) / 2;

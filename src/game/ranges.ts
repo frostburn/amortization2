@@ -6,6 +6,7 @@ import {
   TARGET_SPAWNS,
   type BoxSpec,
   type RangeBounds,
+  type RoofedArea,
 } from "./config";
 
 import { CITY_DISTRICT, buildingSolid, waterSolids, type CityDistrict } from "./city";
@@ -13,7 +14,7 @@ import { MARINE_PORT, portSolids } from "./port";
 import { RECEIVING_FIXTURES, RECEIVING_YARD } from "./receiving";
 import { CROSSING_DISTRICT, CROSSING_FIXTURES } from "./crossing";
 
-import { HANDLING_DISTRICT, HANDLING_FIXTURES } from "./handling";
+import { HANDLING_DISTRICT, HANDLING_FIXTURES, HANDLING_SHELTERS } from "./handling";
 
 export type RangeId = "receiving" | "crossing" | "handling" | "proving" | "long" | "arena" | "city" | "port";
 export const ARENA_ENTRIES = [
@@ -27,6 +28,7 @@ type RangeDefinition = {
   name: string;
   contract?: boolean;
   city?: CityDistrict;
+  shelters?: RoofedArea[];
   bounds: RangeBounds;
   barriers: BoxSpec[];
   platforms: BoxSpec[];
@@ -38,7 +40,7 @@ type RangeDefinition = {
 export const RANGES: Record<RangeId, RangeDefinition> = {
   handling: {
     name: "03 · HANDLING", contract: true, city: HANDLING_DISTRICT, bounds: HANDLING_DISTRICT.bounds,
-    barriers: HANDLING_FIXTURES, platforms: [],
+    barriers: HANDLING_FIXTURES, platforms: [], shelters: HANDLING_SHELTERS,
     players: [{ x: -25.1, z: 1.1 }, { x: -25.1, z: -1.1 }, { x: -22.9, z: -1.1 }, { x: -22.9, z: 1.1 }],
     targets: [], props: [],
   },
