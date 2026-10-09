@@ -1,4 +1,4 @@
-import { PISTOL, STEP, distance2, type BoxSpec } from "./config";
+import { PISTOL, STEP, distance2, type BoxSpec, type RoofedArea } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
@@ -40,6 +40,15 @@ export abstract class Mission {
   failureReason?: string;
   /** Runtime solids such as a locked entrance; never mutate shared range data. */
   obstacles: BoxSpec[] = [];
+  /** Physical overhead solids, excluded only from camera picking while cut away. */
+  readonly roofs: { area: RoofedArea; collider: number }[] = [];
+  get cutawayRoofs() {
+    return this.roofs.filter(({ area }) => this.sim.squad.some(a => {
+      const p = a.body.translation();
+      return !a.dead && Math.abs(p.x - area.x) < area.w / 2 - 0.5 &&
+        Math.abs(p.z - area.z) < area.d / 2 - 0.5 && p.y < area.h;
+    }));
+  }
   phase: MissionPhase = "briefing";
   releaseProgress = 0;
   returnProgress = 0;

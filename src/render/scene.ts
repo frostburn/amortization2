@@ -1284,7 +1284,9 @@ export class RangeScene {
       return null;
     const origin = this.raycaster.ray.origin,
       dir = this.raycaster.ray.direction;
-    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far));
+    const cutaway = new Set(this.sim.mission?.cutawayRoofs.map(roof => roof.collider));
+    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,
+      cutaway.size ? collider => !cutaway.has(collider.handle) : undefined);
     const actor =
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
@@ -1685,6 +1687,8 @@ export class RangeScene {
       marker.material.opacity = pending && this.sim.arena!.entries.includes(id)
         ? 0.45 + Math.sin(elapsed * 6) * 0.25 : 0.12;
     }
+    const cutawayRoofs = new Set(this.sim.mission?.cutawayRoofs.map(roof => roof.collider));
+    const closedRoofs = this.sim.mission?.roofs.filter(roof => !cutawayRoofs.has(roof.collider)) ?? [];
     for (const a of this.sim.actors) {
       if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;
@@ -1768,6 +1772,7 @@ export class RangeScene {
       v.ring.scale.setScalar(a.flight ? 1.7 : stagger > 0 ? 1 + stagger * 0.2 : a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
       v.health.visible =
         !a.dead &&
+        !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2) &&
         (a.kind === "enemy" || (a.hp < a.maxHp &&
         (this.sim.time - a.hitTime < 4 || a.kind === "player")));
       v.health.position.set(

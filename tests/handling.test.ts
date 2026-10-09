@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { PISTOL, STEP, distance2 } from "../src/game/config";
 import { HandlingMission } from "../src/game/handling-mission";
-import { HANDLING_SITES } from "../src/game/handling";
+import { HANDLING_GUARDS, HANDLING_SITES } from "../src/game/handling";
 import { HumanReplayRecorder, playRecordedSession, readHumanReplay } from "../src/game/replay";
 import { Simulation } from "../src/game/simulation";
 import { pointerAction } from "../src/game/interaction";
@@ -63,6 +63,51 @@ describe("Handling contract and squad hauling", () => {
     mission().box.prop.body.setTranslation({ ...HANDLING_SITES.delivery, y: 0.3 }, true);
     ticks(1);
     expect(mission().phase).toBe("delivery"); expect(mission().cargoReleased).toBe(false);
+  });
+
+  test("exterior walls stop pistol cheese after the gate opens; the loading entrance permits fire", () => {
+    deliverBox();
+    for (const [i, guard] of mission().enemies.entries()) {
+      guard.body.setTranslation({ ...HANDLING_GUARDS[i], y: 0.98 }, true);
+      guard.body.setLinvel(zero, true); guard.ai!.nextThink = Infinity;
+    }
+    sim.select(1); const a = sim.primary, guards = mission().enemies;
+    expect(guards).toHaveLength(3);
+    sim.setBrace(true); a.braceTime = 1;
+    for (const [position, guard] of [
+      [{ x: 21, z: 16 }, guards[1]], // Former low near wall.
+      [{ x: 39, z: -5 }, guards[2]],
+      [{ x: 18, z: -16 }, guards[0]],
+      [{ x: 5, z: -6 }, guards[0]],
+    ] as const) {
+      a.body.setTranslation({ ...position, y: 0.98 }, true); a.body.setLinvel(zero, true); sim.world.step();
+      sim.aim = { ...guard.body.translation(), y: 1.25 };
+      expect(distance2(position, guard.body.translation())).toBeLessThan(PISTOL.range);
+      const hp = guards.map(g => g.hp);
+      const shots = sim.shots;
+      for (let i = 0; i < 8; i++) { a.pistol.shotWait = 0; a.pistol.reload = 0; a.pistol.ammo = PISTOL.magazine; sim.shoot(a); }
+      expect(sim.shots - shots).toBe(8);
+      expect(guards.map(g => g.hp)).toEqual(hp);
+    }
+    const guard = guards[0]; guard.body.setTranslation({ x: 18, y: 0.98, z: 0 }, true);
+    a.body.setTranslation({ x: 7, y: 0.98, z: 0 }, true); a.body.setLinvel(zero, true); sim.world.step();
+    sim.aim = { x: 18, y: 1.25, z: 0 }; a.pistol.shotWait = 0; a.pistol.reload = 0; a.pistol.ammo = PISTOL.magazine;
+    const hp = guard.hp; sim.shoot(a); expect(guard.hp).toBeLessThan(hp);
+  });
+
+  test("roof cutaways change camera picking only; overhead shots stay blocked and reset restores closure", () => {
+    const roof = mission().roofs[0]; sim.world.step();
+    expect(mission().cutawayRoofs).toHaveLength(0);
+    const a = sim.primary; a.body.setTranslation({ x: 22, y: 0.98, z: 0 }, true); sim.world.step();
+    expect(mission().cutawayRoofs).toEqual([roof]);
+    const from = { x: 22, y: 10, z: 0 }, to = { x: 22, y: 0.98, z: 0 };
+    expect(sim.ray(from, to)?.collider.handle).toBe(roof.collider);
+    const hidden = new Set(mission().cutawayRoofs.map(r => r.collider));
+    expect(sim.ray(from, to, undefined, c => !hidden.has(c.handle))?.collider.handle).toBe(a.collider.handle);
+    expect(sim.ray(from, to)?.collider.handle).toBe(roof.collider);
+    a.body.setTranslation({ x: 5, y: 0.98, z: 0 }, true);
+    expect(mission().cutawayRoofs).toHaveLength(0);
+    sim.reset(); expect(mission().roofs).toHaveLength(1); expect(mission().cutawayRoofs).toHaveLength(0);
   });
 
   test("H assigns one physical hauler; it walks to the box, lifts it, and cannot fire or cover", () => {

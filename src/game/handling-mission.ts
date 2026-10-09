@@ -1,7 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PISTOL, STEP, distance2 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
-import { HANDLING_DRONE_ENTRIES, HANDLING_GATE, HANDLING_GUARDS, HANDLING_SITES } from "./handling";
+import { HANDLING_DRONE_ENTRIES, HANDLING_GATE, HANDLING_GUARDS, HANDLING_SHELTERS, HANDLING_SITES, SERVICE_HALL_ROOF } from "./handling";
 import { SquadHauling, type SquadLoad } from "./hauling";
 import { Mission, type MissionDefinition } from "./missions";
 import type { Simulation } from "./simulation";
@@ -38,6 +38,11 @@ export class HandlingMission extends Mission {
     const b = HANDLING_GATE;
     this.gate = sim.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(b.x, b.h / 2, b.z));
     sim.world.createCollider(RAPIER.ColliderDesc.cuboid(b.w / 2, b.h / 2, b.d / 2), this.gate);
+    // Overhead collision must not fill the walkable floor in the ground grid.
+    const roof = SERVICE_HALL_ROOF;
+    const collider = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(roof.w / 2, roof.h / 2, roof.d / 2)
+      .setTranslation(roof.x, roof.y! + roof.h / 2, roof.z));
+    this.roofs.push({ area: HANDLING_SHELTERS[0], collider: collider.handle });
     HANDLING_GUARDS.forEach((p, i) => {
       const a = sim.addEnemy("assault", p);
       a.hp = a.maxHp = 110;

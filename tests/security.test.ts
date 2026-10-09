@@ -170,7 +170,7 @@ describe("civilian security response", () => {
     drone.body.setTranslation({ x: 24, y: 8, z: 0 }, true); drone.flight!.state = "pursuing";
     sim.world.step();
     const aim = { ...target.body.translation(), y: target.body.translation().y + .25 };
-    expect(sim.fireRay(drone, sim.muzzle(drone, aim), aim)?.collider.handle).toBe(target.collider.handle);
+    expect(sim.fireRay(drone, sim.muzzle(drone, aim), aim)?.collider.handle).toBe(sim.mission!.roofs[0].collider);
     sim.security!.update(); expect(drone.ai!.visible).toBe(false); expect(drone.ai!.fire).toBe(false);
     const stages = new Set<string>();
     for (let i = 0; i < 18 / STEP; i++) {

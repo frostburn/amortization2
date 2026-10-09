@@ -9,13 +9,16 @@ export const HANDLING_GATE: BoxSpec = { x: 9, z: 0, w: 0.5, d: 8, h: 3.8, style:
 export const HANDLING_GUARDS = [{ x: 18, z: -6 }, { x: 21, z: 6 }, { x: 31, z: -5 }];
 export const HANDLING_DRONE_ENTRIES = [{ x: -7, z: -15 }, { x: -4, z: 15 }, { x: 5, z: -8 }, { x: 5, z: 8 }];
 
-/** Walkable cutaway service hall. Its wide door admits a two-chassis load. */
+/** Enclosed service hall. Its wide loading door admits a two-chassis load. */
 export type ServiceHallSpec = { x: number; z: number; w: number; d: number; h: number; door: number };
 export const SERVICE_HALL_SPEC: ServiceHallSpec = { x: 22, z: 0, w: 26, d: 24, h: 3.8, door: 8 };
-export const HANDLING_SHELTERS: RoofedArea[] = [{ ...SERVICE_HALL_SPEC,
-  w: SERVICE_HALL_SPEC.w + 0.5, d: SERVICE_HALL_SPEC.d + 0.5, h: SERVICE_HALL_SPEC.h + 0.4,
+export function serviceHallRoof(s: ServiceHallSpec): BoxSpec {
+  return { x: s.x, z: s.z, w: s.w + 0.5, d: s.d + 0.5, y: s.h, h: 0.4, style: "wall" };
+}
+export const SERVICE_HALL_ROOF = serviceHallRoof(SERVICE_HALL_SPEC);
+export const HANDLING_SHELTERS: RoofedArea[] = [{ ...SERVICE_HALL_ROOF, y: 0, h: SERVICE_HALL_ROOF.y! + SERVICE_HALL_ROOF.h,
   exits: [{ x: SERVICE_HALL_SPEC.x - SERVICE_HALL_SPEC.w / 2 - 3.6, z: SERVICE_HALL_SPEC.z }] }];
-/** Shared wall kit for open, walkable facility interiors at any district position. */
+/** Full-height perimeter; camera cutaways never change these combat solids. */
 export function serviceHallWalls(s: ServiceHallSpec): BoxSpec[] {
   const section = (s.d - s.door) / 2;
   return [
@@ -23,7 +26,7 @@ export function serviceHallWalls(s: ServiceHallSpec): BoxSpec[] {
       w: 0.5, d: section, h: s.h, style: "wall" as const })),
     { x: s.x + s.w / 2, z: s.z, w: 0.5, d: s.d, h: s.h, style: "wall" },
     { x: s.x, z: s.z - s.d / 2, w: s.w + 0.5, d: 0.5, h: s.h, style: "wall" },
-    { x: s.x, z: s.z + s.d / 2, w: s.w + 0.5, d: 0.5, h: 1.3, style: "barrier" },
+    { x: s.x, z: s.z + s.d / 2, w: s.w + 0.5, d: 0.5, h: s.h, style: "wall" },
   ];
 }
 export const SERVICE_HALL: BoxSpec[] = [

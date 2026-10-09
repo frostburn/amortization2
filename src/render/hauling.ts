@@ -4,6 +4,7 @@ import type { Prop, Simulation } from "../game/simulation";
 import { VEHICLES } from "../game/traffic";
 import { vehicleBody } from "./traffic";
 import { batchRigid, block, surface, tube } from "./primitives";
+import { serviceHall } from "./service-hall";
 
 /** Cargo models reuse the physical dimensions; handles advertise one/two hands. */
 export function squadCargo(prop: Prop) {
@@ -35,18 +36,11 @@ export class HandlingView {
   private delivery = ring(HANDLING_SITES.delivery, 0xdbac5b);
   private exit = ring(HANDLING_SITES.exit, 0xa3e6d0);
   private grips: THREE.Group[] = [];
+  private hall = serviceHall(SERVICE_HALL_SPEC);
   constructor(sim: Simulation) {
-    const kit = new THREE.Group(), wall = surface(0x8d9390), steel = surface(0x405658, 0.5), paint = surface(0xbaa36d);
+    const kit = new THREE.Group(), steel = surface(0x405658, 0.5), paint = surface(0xbaa36d);
     for (const b of SERVICE_HALL) {
-      block(kit, b.w, b.h, b.d, b.x, b.h / 2, b.z, b.style === "crate" ? steel : wall);
-      if (b.style === "wall") block(kit, b.w + 0.04, 0.13, b.d + 0.04, b.x, b.h - 0.065, b.z, steel);
-    }
-    // Open trusses and down-cut near wall make the occupied interior readable.
-    const hall = SERVICE_HALL_SPEC, beamHeight = hall.h + 0.2;
-    for (const x of [hall.x - hall.w / 2, hall.x, hall.x + hall.w / 2]) {
-      block(kit, 0.18, 0.18, hall.d, x, beamHeight, hall.z, steel);
-      for (const side of [-1, 1]) block(kit, 0.25, beamHeight + 0.1, 0.25, x, (beamHeight + 0.1) / 2,
-        hall.z + side * hall.d / 2, steel);
+      if (b.style === "crate") block(kit, b.w, b.h, b.d, b.x, b.h / 2, b.z, steel);
     }
     const b = HANDLING_GATE;
     for (let z = -3.8; z < 4; z += 0.4) block(this.gate, b.w + 0.02, b.h, 0.36, b.x, b.h / 2, z, steel);
@@ -66,7 +60,7 @@ export class HandlingView {
       tire.rotation.z = Math.PI / 2;
     }
     batchRigid(kit); batchRigid(this.gate);
-    this.root.add(kit, this.gate, van.root, this.delivery, this.exit);
+    this.root.add(this.hall.root, kit, this.gate, van.root, this.delivery, this.exit);
     for (const load of sim.hauling!.loads) {
       const group = new THREE.Group();
       for (let i = 0; i < load.hands; i++) {
@@ -77,6 +71,8 @@ export class HandlingView {
     }
   }
   update(sim: Simulation, reducedMotion: boolean) {
+    // Removing a visual roof never removes its physical collider.
+    this.hall.roof.visible = !sim.mission!.cutawayRoofs.length;
     this.gate.visible = !sim.mission!.cargoReleased;
     this.lamp.color.setHex(sim.mission!.cargoReleased ? 0xa3e6d0 : 0xdbac5b);
     this.delivery.visible = sim.mission!.phase === "delivery";

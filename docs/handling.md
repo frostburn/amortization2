@@ -83,7 +83,7 @@ their grey hulls and amber inspection stripes.
 The hall's cutaway roof remains closed to aircraft. Reinforcements descend
 only in outdoor columns checked with their whole rotor hull. For indoor squad
 targets, they gather at separate holding banks outside the service door rather
-than hovering over the chest or entering through the omitted roof. Emerging
+than hovering over the chest or entering through the camera cutaway. Emerging
 robots draw normal pursuit; open doorways still allow visible pistol fire.
 Transit over obstacles climbs above the roofline, crosses at altitude, then
 descends vertically after another clearance check. Cutaway roofs also block
@@ -96,13 +96,19 @@ Civilian CARTs continue nearby; harming them can still summon ordinary security.
 
 ## District and failure
 
-The playable service yard is 87 × 54 m, with a cutaway, walkable service hall,
+The playable service yard is 87 × 54 m, with an enclosed, walkable service hall,
 delivery plinth, van, background workshop/depot, shared paving, street lamps and
 two CARTs. The reusable cargo controller, cargo models and flight controller
-are independent of mission objectives. The hall uses shared wall dimensions
-for rendering, collision and navigation. Its gate is a runtime obstacle removed
+are independent of mission objectives. The reusable hall prefab uses shared
+dimensions for its full-height panel walls, loading portal and supported metal
+roof. All four exterior walls block pistol fire; the open loading door is the
+firing and hauling route. The roof lifts visually while a living squad member
+is inside and returns once everyone leaves. Camera picking passes through the
+lifted roof so guards and cargo remain usable. The solid roof always blocks
+shots and falling hulls, and its overhead collider never fills the ground
+navigation grid. Its gate is a runtime obstacle removed
 from both physics and route planning after acceptance; shared range data stays
-immutable. No opaque roof hides the fight.
+immutable. Camera visibility does not shorten or remove combat solids.
 
 Ground grip pips, cargo silhouettes, amber carrier rings, holstered weapons and
 carrying poses work with auxiliary labels off. Call signs remain visible and
@@ -122,8 +128,10 @@ exclusion, ordered objectives, wave timing, real combat, extraction, restart
 and deterministic replay. A complete four-pistol route uses real movement and
 fire without objective teleports or guard deletion. Air regressions cover
 rotor-width roof corners, rejected interior spawns, separate exit holding banks,
-roof-safe climb/cross/descent, blocked shots through omitted roofs and pursuit
-after the squad emerges. Chromium checks native
+roof-safe climb/cross/descent, blocked shots through cutaway roofs and pursuit
+after the squad emerges. Real pistol tests cover every exterior wall and the
+open loading entrance; camera-picking tests keep roof collision intact during
+cutaways and reset. Chromium checks native
 cargo clicks, hand/selection/barred cursors, Ctrl firing, interruption of held
 fire over cargo, disabled squad selection, H/RMB/toolbar interactions, auxiliary
 labels, mission selection and loaded replay rendering at desktop and laptop sizes.
