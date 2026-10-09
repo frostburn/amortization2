@@ -452,7 +452,7 @@ export class RangeScene {
       this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
       if (this.sim.mission) {
-        this.missionView = new MissionView(this.sim);
+        this.missionView = new MissionView(this.sim, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.missionView.root);
       }
       return;
@@ -1284,9 +1284,9 @@ export class RangeScene {
       return null;
     const origin = this.raycaster.ray.origin,
       dir = this.raycaster.ray.direction;
-    const cutaway = new Set(this.sim.mission?.cutawayRoofs.map(roof => roof.collider));
+    const cutaway = this.sim.mission?.cutawayColliders;
     const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,
-      cutaway.size ? collider => !cutaway.has(collider.handle) : undefined);
+      cutaway?.size ? collider => !cutaway.has(collider.handle) : undefined);
     const actor =
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);

@@ -3,10 +3,12 @@ import { serviceHallRoof, serviceHallWalls, type ServiceHallSpec } from "../game
 import { batchRigid, block, surface, tube } from "./primitives";
 
 /** Industrial wall panels, a loading portal and a separately removable roof. */
-export function serviceHall(s: ServiceHallSpec) {
+export function serviceHall(s: ServiceHallSpec, coverage = true) {
   const root = new THREE.Group(), walls = new THREE.Group(), roof = new THREE.Group();
   const panel = surface(0x8d9390, 0.25), frame = surface(0x405658, 0.5), concrete = surface(0x696d68);
   const roofing = surface(0x637573, 0.45), roofPanel = surface(0x6b7b78, 0.45);
+  const wallMaterials = [panel, frame, concrete];
+  wallMaterials.forEach(mat => { mat.alphaToCoverage = coverage; });
   for (const b of serviceHallWalls(s)) {
     block(walls, b.w, b.h, b.d, b.x, b.h / 2, b.z, panel);
     block(walls, b.w + 0.04, 0.4, b.d + 0.04, b.x, 0.2, b.z, concrete);
@@ -39,5 +41,12 @@ export function serviceHall(s: ServiceHallSpec) {
   batchRigid(walls); batchRigid(roof);
   for (const mesh of roof.children) if (mesh instanceof THREE.Mesh && mesh.material === roofPanel) mesh.castShadow = false;
   root.add(walls, roof);
-  return { root, roof };
+  return { root, roof, setCutaway(revealed: boolean) {
+    roof.visible = !revealed;
+    for (const mat of wallMaterials) {
+      const transparent = revealed && !coverage;
+      if (mat.transparent !== transparent) { mat.transparent = transparent; mat.needsUpdate = true; }
+      mat.depthWrite = !transparent; mat.opacity = revealed ? 0.32 : 1;
+    }
+  } };
 }

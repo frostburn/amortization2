@@ -97,15 +97,25 @@ describe("Handling contract and squad hauling", () => {
 
   test("roof cutaways change camera picking only; overhead shots stay blocked and reset restores closure", () => {
     const roof = mission().roofs[0]; sim.world.step();
+    expect(roof.walls).toHaveLength(5);
     expect(mission().cutawayRoofs).toHaveLength(0);
-    const a = sim.primary; a.body.setTranslation({ x: 22, y: 0.98, z: 0 }, true); sim.world.step();
+    const a = sim.primary;
+    a.body.setTranslation({ x: -2, y: 0.98, z: 0 }, true);
+    expect(mission().cutawayRoofs).toEqual([roof]); // Visible before the receiving pad, while the gate is locked.
+    expect(mission().cargoReleased).toBe(false);
+    a.body.setTranslation({ x: 22, y: 0.98, z: 0 }, true); sim.world.step();
     expect(mission().cutawayRoofs).toEqual([roof]);
     const from = { x: 22, y: 10, z: 0 }, to = { x: 22, y: 0.98, z: 0 };
     expect(sim.ray(from, to)?.collider.handle).toBe(roof.collider);
-    const hidden = new Set(mission().cutawayRoofs.map(r => r.collider));
+    const hidden = mission().cutawayColliders;
     expect(sim.ray(from, to, undefined, c => !hidden.has(c.handle))?.collider.handle).toBe(a.collider.handle);
     expect(sim.ray(from, to)?.collider.handle).toBe(roof.collider);
+    const side = { x: 40, y: 1.25, z: 0 };
+    expect(roof.walls).toContain(sim.ray(side, to)?.collider.handle);
+    expect(sim.ray(side, to, undefined, c => !hidden.has(c.handle))?.collider.handle).toBe(a.collider.handle);
     a.body.setTranslation({ x: 5, y: 0.98, z: 0 }, true);
+    expect(mission().cutawayRoofs).toEqual([roof]); // Still visible on the other shore of the doorway.
+    a.body.setTranslation({ x: -10, y: 0.98, z: 0 }, true);
     expect(mission().cutawayRoofs).toHaveLength(0);
     sim.reset(); expect(mission().roofs).toHaveLength(1); expect(mission().cutawayRoofs).toHaveLength(0);
   });

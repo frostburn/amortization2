@@ -1,7 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PISTOL, STEP, distance2 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
-import { HANDLING_DRONE_ENTRIES, HANDLING_GATE, HANDLING_GUARDS, HANDLING_SHELTERS, HANDLING_SITES, SERVICE_HALL_ROOF } from "./handling";
+import { HANDLING_DRONE_ENTRIES, HANDLING_GATE, HANDLING_GUARDS, HANDLING_SHELTERS, HANDLING_SITES, SERVICE_HALL_ROOF, SERVICE_HALL_SPEC, serviceHallWalls } from "./handling";
 import { SquadHauling, type SquadLoad } from "./hauling";
 import { Mission, type MissionDefinition } from "./missions";
 import type { Simulation } from "./simulation";
@@ -42,7 +42,13 @@ export class HandlingMission extends Mission {
     const roof = SERVICE_HALL_ROOF;
     const collider = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(roof.w / 2, roof.h / 2, roof.d / 2)
       .setTranslation(roof.x, roof.y! + roof.h / 2, roof.z));
-    this.roofs.push({ area: HANDLING_SHELTERS[0], collider: collider.handle });
+    const wallSpecs = serviceHallWalls(SERVICE_HALL_SPEC), walls: number[] = [];
+    sim.world.forEachCollider(c => {
+      const p = c.translation();
+      if (wallSpecs.some(w => Math.abs(p.x - w.x) < 0.001 && Math.abs(p.z - w.z) < 0.001 && Math.abs(p.y - w.h / 2) < 0.001))
+        walls.push(c.handle);
+    });
+    this.roofs.push({ area: HANDLING_SHELTERS[0], collider: collider.handle, walls, revealDistance: 12 });
     HANDLING_GUARDS.forEach((p, i) => {
       const a = sim.addEnemy("assault", p);
       a.hp = a.maxHp = 110;

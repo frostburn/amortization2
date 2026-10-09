@@ -36,8 +36,9 @@ export class HandlingView {
   private delivery = ring(HANDLING_SITES.delivery, 0xdbac5b);
   private exit = ring(HANDLING_SITES.exit, 0xa3e6d0);
   private grips: THREE.Group[] = [];
-  private hall = serviceHall(SERVICE_HALL_SPEC);
-  constructor(sim: Simulation) {
+  private hall: ReturnType<typeof serviceHall>;
+  constructor(sim: Simulation, coverage = true) {
+    this.hall = serviceHall(SERVICE_HALL_SPEC, coverage);
     const kit = new THREE.Group(), steel = surface(0x405658, 0.5), paint = surface(0xbaa36d);
     for (const b of SERVICE_HALL) {
       if (b.style === "crate") block(kit, b.w, b.h, b.d, b.x, b.h / 2, b.z, steel);
@@ -72,7 +73,7 @@ export class HandlingView {
   }
   update(sim: Simulation, reducedMotion: boolean) {
     // Removing a visual roof never removes its physical collider.
-    this.hall.roof.visible = !sim.mission!.cutawayRoofs.length;
+    this.hall.setCutaway(!!sim.mission!.cutawayRoofs.length);
     this.gate.visible = !sim.mission!.cargoReleased;
     this.lamp.color.setHex(sim.mission!.cargoReleased ? 0xa3e6d0 : 0xdbac5b);
     this.delivery.visible = sim.mission!.phase === "delivery";

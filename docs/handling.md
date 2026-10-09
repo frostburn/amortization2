@@ -102,9 +102,13 @@ two CARTs. The reusable cargo controller, cargo models and flight controller
 are independent of mission objectives. The reusable hall prefab uses shared
 dimensions for its full-height panel walls, loading portal and supported metal
 roof. All four exterior walls block pistol fire; the open loading door is the
-firing and hauling route. The roof lifts visually while a living squad member
-is inside and returns once everyone leaves. Camera picking passes through the
-lifted roof so guards and cargo remain usable. The solid roof always blocks
+firing and hauling route. Within 12 metres of the hall footprint, any living
+squad member reveals the interior: the roof lifts and perimeter walls fade to
+32% opacity. This starts before the receiving pad and keeps the approach fight
+readable. The building becomes opaque again once everyone retreats beyond that
+distance. Camera picking passes through the lifted roof and faded walls so
+guards and cargo remain usable. The locked entrance remains visible and solid.
+The solid roof always blocks
 shots and falling hulls, and its overhead collider never fills the ground
 navigation grid. Its gate is a runtime obstacle removed
 from both physics and route planning after acceptance; shared range data stays
