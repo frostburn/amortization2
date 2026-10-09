@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import * as THREE from "three";
-import { makeHuman } from "../src/render/humans";
+import { HUMAN_WALK_PERIOD, makeHuman } from "../src/render/humans";
 import { CAST, makeModelRoomCast } from "../src/render/model-room-cast";
 
 function topology(geometry: THREE.BufferGeometry, part: string) {
@@ -115,12 +115,82 @@ describe("faceless civilian prefab", () => {
         }
         for (const side of ["left", "right"]) {
           const ankle = human.skeleton.bones.find(b => b.name === `${side} ankle`)!;
-          // Local to the planted boot: ray through its top edge must hit cloth first.
-          const from = new THREE.Vector3(0, .116, -.4).applyMatrix4(ankle.matrixWorld);
-          const direction = new THREE.Vector3(0, 0, 1).transformDirection(ankle.matrixWorld);
+          // The flexible shaft follows the shin, so inspect it along that axis.
+          const shin = ankle.parent!;
+          const up = new THREE.Vector3(0, 1, 0).transformDirection(shin.matrixWorld);
+          const direction = new THREE.Vector3(0, 0, 1).transformDirection(shin.matrixWorld);
+          const from = ankle.getWorldPosition(new THREE.Vector3()).addScaledVector(up, .116).addScaledVector(direction, -.4);
           expect(colorAt(from, direction), `${pose}: ${side} cuff`).toBe(0x42494b);
         }
       }
+    } finally { human.dispose(); }
+  });
+  test("forward walking has ground support, forward swing, anatomical knees and straight calves", () => {
+    const human = makeHuman(), mesh = human.mesh, base = mesh.geometry.getAttribute("position"), index = mesh.geometry.index!;
+    const soles = [new Set<number>(), new Set<number>()];
+    for (const group of mesh.geometry.groups.filter(g => g.materialIndex === 6)) for (let i = group.start; i < group.start + group.count; i++) {
+      const v = index.getX(i); soles[base.getX(v) < 0 ? 0 : 1].add(v);
+    }
+    const sides = ["left", "right"].map((side, i) => ({
+      hip: human.skeleton.bones.find(b => b.name === `${side} hip`)!,
+      knee: human.skeleton.bones.find(b => b.name === `${side} knee`)!,
+      ankle: human.skeleton.bones.find(b => b.name === `${side} ankle`)!,
+      calf: Array.from({ length: base.count }, (_, v) => v).filter(v => Math.abs(base.getY(v) - .29) < 1e-5 && (base.getX(v) < 0) === (i === 0)),
+    }));
+    const point = new THREE.Vector3(), segment = new THREE.Vector3(), center = new THREE.Vector3();
+    const leftZ = (u: number) => { human.pose("walking", u * HUMAN_WALK_PERIOD); return sides[0].ankle.getWorldPosition(point).z; };
+    try {
+      expect(leftZ(.40)).toBeLessThan(leftZ(.15) - .1); // planted foot passes backwards beneath the advancing body
+      expect(leftZ(.90)).toBeGreaterThan(leftZ(.70) + .25); // lifted foot returns forwards
+      for (let frame = 0; frame < 80; frame++) {
+        human.pose("walking", HUMAN_WALK_PERIOD * frame / 80);
+        const floor = soles.map(vertices => Math.min(...[...vertices].map(v => mesh.getVertexPosition(v, point).y)));
+        expect(Math.min(...floor)).toBeGreaterThan(-.001); expect(Math.min(...floor)).toBeLessThan(.001);
+        for (const leg of sides) {
+          const hip = leg.hip.getWorldPosition(new THREE.Vector3()), knee = leg.knee.getWorldPosition(new THREE.Vector3()), ankle = leg.ankle.getWorldPosition(new THREE.Vector3());
+          const linearZ = THREE.MathUtils.lerp(hip.z, ankle.z, (hip.y - knee.y) / (hip.y - ankle.y));
+          expect(knee.z).toBeGreaterThanOrEqual(linearZ - 1e-6);
+          const thigh = knee.clone().sub(hip), shin = ankle.clone().sub(knee);
+          expect(thigh.angleTo(shin)).toBeLessThan(1.15);
+          center.set(0, 0, 0); for (const v of leg.calf) center.add(mesh.getVertexPosition(v, point)); center.divideScalar(leg.calf.length);
+          segment.copy(ankle).sub(knee); const t = center.clone().sub(knee).dot(segment) / segment.lengthSq();
+          expect(center.distanceTo(point.copy(knee).addScaledVector(segment, t))).toBeLessThan(.008);
+        }
+      }
+      human.pose("walking", 0); const first = sides[0].ankle.getWorldPosition(new THREE.Vector3());
+      human.pose("walking", HUMAN_WALK_PERIOD); expect(sides[0].ankle.getWorldPosition(point).distanceTo(first)).toBeLessThan(1e-6);
+    } finally { human.dispose(); }
+  });
+  test("the shirt hem gives way to thighs without letting trousers pierce its front panels", () => {
+    const human = makeHuman(), geometry = human.mesh.geometry, base = geometry.getAttribute("position"), index = geometry.index!;
+    const panels: number[][] = [], trousers: number[][] = [];
+    for (const group of geometry.groups) for (let i = group.start; i < group.start + group.count; i += 3) {
+      const face = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
+      if (group.materialIndex === 2) trousers.push(face);
+      else if ((group.materialIndex === 0 || group.materialIndex === 1)
+        && face.every(v => base.getY(v) <= 1.015 && Math.abs(base.getX(v)) < .205)
+        && face.reduce((sum, v) => sum + base.getZ(v), 0) / 3 > .045) panels.push(face);
+    }
+    const hip = human.skeleton.bones.find(b => b.name === "hips")!;
+    const hem = Array.from({ length: base.count }, (_, i) => i).find(i => Math.abs(base.getY(i) - .828) < 1e-5 && base.getX(i) < -.08 && base.getX(i) > -.12 && base.getZ(i) > .10)!;
+    const resting = human.mesh.getVertexPosition(hem, new THREE.Vector3()).sub(hip.getWorldPosition(new THREE.Vector3()));
+    const ray = new THREE.Ray(), point = new THREE.Vector3(), center = new THREE.Vector3();
+    try {
+      human.pose("crouching"); const lifted = human.mesh.getVertexPosition(hem, new THREE.Vector3()).sub(hip.getWorldPosition(new THREE.Vector3()));
+      expect(lifted.y - resting.y).toBeGreaterThan(.10); expect(lifted.z - resting.z).toBeGreaterThan(.05);
+      for (const [pose, time] of [["crouching", 0], ...Array.from({ length: 12 }, (_, i) => ["walking", HUMAN_WALK_PERIOD * i / 12] as const)] as const) {
+        human.pose(pose, time);
+        const vertices = Array.from({ length: base.count }, (_, i) => human.mesh.getVertexPosition(i, new THREE.Vector3()));
+        for (const face of panels) {
+          center.copy(vertices[face[0]]).add(vertices[face[1]]).add(vertices[face[2]]).divideScalar(3);
+          ray.origin.copy(center); ray.origin.z += 1; ray.direction.set(0, 0, -1);
+          for (const pant of trousers) {
+            const hit = ray.intersectTriangle(vertices[pant[0]], vertices[pant[1]], vertices[pant[2]], true, point);
+            if (hit) expect(center.z - hit.z, `${pose}: cloth ${center.toArray()} vs trousers ${hit.toArray()}`).toBeGreaterThan(.002);
+          }
+        }
+      }
+      human.pose("standing"); expect(human.mesh.morphTargetInfluences).toEqual([0, 0]);
     } finally { human.dispose(); }
   });
   test("comparison fixtures keep native model scales, complete fleets and grounded geometry", async () => {

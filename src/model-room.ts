@@ -122,7 +122,7 @@ function dispose() {
 
 // Read-only inspection for browser QA; interaction still goes through the visible controls.
 declare global { interface Window { amortization2ModelRoom: { inspect(): unknown } } }
-window.amortization2ModelRoom = { inspect: () => ({ ready, pose: humanPose, playing, view: activeView, focusingHuman, selected: [...selected],
+window.amortization2ModelRoom = { inspect: () => ({ ready, pose: humanPose, poseTime, hemLift: human.mesh.morphTargetInfluences?.slice(), playing, view: activeView, focusingHuman, selected: [...selected],
   camera: { position: camera.position.toArray(), target: controls?.target.toArray(), zoom: camera.zoom, halfHeight, aspect: width / height },
   models: cast?.models.map(m => ({ id: m.id, visible: m.root.visible, scale: m.root.scale.toArray(), position: m.root.position.toArray(),
     bounds: { min: m.bounds.min.toArray(), max: m.bounds.max.toArray() } })),

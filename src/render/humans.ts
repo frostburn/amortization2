@@ -3,6 +3,7 @@ import { surface } from "./primitives";
 import { HumanSurface, circle, type CrossSection, type Ring, type Weights } from "./human-surface";
 
 export type HumanPose = "standing" | "walking" | "crouching";
+export const HUMAN_WALK_PERIOD = 1 / .85;
 const down = new THREE.Vector3(0, -1, 0), front = new THREE.Vector3(0, 0, 1);
 const blend = (a: number, b: number, t: number): Weights => [[a, 1 - t], [b, t]];
 const smooth = (value: number, low: number, high: number) => THREE.MathUtils.smoothstep(value, low, high);
@@ -12,6 +13,53 @@ const headSections: CrossSection[] = [
   [1.525, .070, .075, .005], [1.565, .086, .090, -.006], [1.625, .090, .102, -.018],
   [1.680, .086, .095, -.021], [1.720, .066, .079, -.020], [1.739, .022, .030, -.018],
 ];
+
+function walkingFoot(cycle: number) {
+  const u = cycle - Math.floor(cycle), stance = .62, forward = .19, back = -.23;
+  let z: number, lift = 0, pitch: number;
+  if (u < stance) {
+    const t = u / stance;
+    z = THREE.MathUtils.lerp(forward, back, t);
+    pitch = -.16 * (1 - smooth(t, 0, .22)) + .24 * smooth(t, .66, 1);
+  } else {
+    const t = (u - stance) / (1 - stance), t2 = t * t, t3 = t2 * t;
+    // Match the planted foot's backward velocity at toe-off and heel strike.
+    // Between those contacts the lifted foot returns FORWARD, towards +Z.
+    const velocity = (back - forward) * (1 - stance) / stance;
+    z = (2 * t3 - 3 * t2 + 1) * back + (t3 - 2 * t2 + t) * velocity
+      + (-2 * t3 + 3 * t2) * forward + (t3 - t2) * velocity;
+    lift = .045 * (16 * t2 * (1 - t) ** 2);
+    pitch = THREE.MathUtils.lerp(.24, -.16, smooth(t, 0, .45));
+  }
+  // Roll around the contacting heel/toe rather than tilting through the floor.
+  const support = .105 * Math.cos(pitch) + (pitch > 0 ? .181 : -.095) * Math.sin(pitch);
+  return { z, y: support + lift, pitch };
+}
+
+function addHemTargets(geometry: THREE.BufferGeometry, panel: number[]) {
+  const base = geometry.getAttribute("position"), normals = geometry.getAttribute("normal");
+  const positions: THREE.BufferAttribute[] = [], normalTargets: THREE.BufferAttribute[] = [];
+  for (const side of [-1, 1]) {
+    const delta = new Float32Array(base.count * 3), displaced = new Float32Array(base.array);
+    for (const i of panel) {
+      const x = base.getX(i), y = base.getY(i), z = base.getZ(i);
+      const lateral = smooth(x, -.055, .055);
+      const ease = (1 - smooth(y, .828, 1.06)) * smooth(z, -.08, .08) * (side < 0 ? 1 - lateral : lateral);
+      delta[i * 3 + 1] = .125 * ease; delta[i * 3 + 2] = .075 * ease;
+      displaced[i * 3 + 1] += delta[i * 3 + 1]; displaced[i * 3 + 2] += delta[i * 3 + 2];
+    }
+    const target = geometry.clone(); target.setAttribute("position", new THREE.BufferAttribute(displaced, 3)); target.computeVertexNormals();
+    const targetNormals = target.getAttribute("normal"), normalDelta = new Float32Array(base.count * 3);
+    for (let i = 0; i < normalDelta.length; i++) normalDelta[i] = targetNormals.array[i] - normals.array[i];
+    target.dispose();
+    const position = new THREE.BufferAttribute(delta, 3); position.name = side < 0 ? "left hem" : "right hem";
+    positions.push(position); normalTargets.push(new THREE.BufferAttribute(normalDelta, 3));
+  }
+  // Small pose correctives keep the continuous shirt clear of raised thighs.
+  // They act before skeletal skinning, without moving the sleeves or collar.
+  geometry.morphTargetsRelative = true;
+  geometry.morphAttributes.position = positions; geometry.morphAttributes.normal = normalTargets;
+}
 
 /** One indexed skin, with connected jacket/sleeves, trousers/legs, hands/thumbs
  * and enclosed boots. A shared 16-bone skeleton deforms the garment vertices. */
@@ -47,14 +95,15 @@ export function makeHuman() {
   const seam = .019;
   const bodyAngles = [...circle(24), seam, Math.PI * 2 - seam].sort((a, b) => a - b);
   const bodySections: CrossSection[] = [
-    [.828, .195, .157, -.012], [.854, .193, .153, -.012], [.970, .192, .151, -.012],
+    [.828, .195, .157, -.012], [.854, .193, .153, -.012], [.890, .192, .152, -.012],
+    [.925, .191, .150, -.012], [.970, .192, .151, -.012],
     [1.110, .194, .142, -.009], [1.220, .207, .135, -.011], [1.270, .212, .130, -.012],
     [1.305, .219, .126, -.014], [1.355, .219, .118, -.016], [1.405, .187, .101, -.018],
     [1.428, .130, .082, -.018], [1.452, .078, .064, -.018], [1.478, .066, .056, -.018],
     [1.474, .057, .048, -.018], [1.457, .055, .046, -.018],
     [1.473, .052, .047, -.018], [1.487, .052, .048, -.018],
   ];
-  const holeLow = 5, holeHigh = 8;
+  const holeLow = 7, holeHigh = 10, collarStart = 11;
   const holes = arms.map(arm => {
     const angle = arm.side > 0 ? Math.PI / 2 : Math.PI * 1.5;
     return { first: bodyAngles.findIndex(a => Math.abs(a - (angle - Math.PI / 4)) < 1e-6),
@@ -62,7 +111,7 @@ export function makeHuman() {
   });
   builder.begin("jacket");
   const rows = bodySections.map((section, row) => builder.ellipse(section, bodyAngles, torsoWeights, 0, (p, angle) => {
-    if (row >= 9) p.y -= Math.max(0, Math.cos(angle)) ** 3 * (row >= 14 ? .009 : .048);
+    if (row >= collarStart) p.y -= Math.max(0, Math.cos(angle)) ** 3 * (row >= collarStart + 5 ? .009 : .048);
     else {
       // A small amount of hanging ease; the hem and pocket are part of the surface.
       p.z += Math.cos(angle) * .002 * Math.sin(p.y * 42 + Math.sin(angle) * 3);
@@ -71,10 +120,10 @@ export function makeHuman() {
   }));
   for (let row = 0; row < rows.length - 1; row++) {
     builder.join(rows[row], rows[row + 1], i => {
-      if (row >= 13) return mat.lining;
-      if (row === 11 || row === 12) return mat.trim;
+      if (row >= collarStart + 4) return mat.lining;
+      if (row === collarStart + 2 || row === collarStart + 3) return mat.trim;
       const angle = bodyAngles[i];
-      if (row < 9 && (angle < seam || angle >= Math.PI * 2 - seam)) return mat.trim;
+      if (row < collarStart && (angle < seam || angle >= Math.PI * 2 - seam)) return mat.trim;
       return mat.coat;
     }, false, i => row >= holeLow && row < holeHigh && holes.some(h => i >= h.first && i < h.last));
   }
@@ -105,11 +154,9 @@ export function makeHuman() {
   builder.begin("trousers");
   const legAngles = circle(12), shared: Record<string, number> = {};
   const legWeights = (leg: typeof legs[number], p: THREE.Vector3): Weights => {
-    const upper = smooth(.90 - p.y, 0, .14), lower = smooth(.55 - p.y, 0, .135), ankle = smooth(.40 - p.y, 0, .17);
-    // The cuff follows the planted boot, with a soft transition up the shin.
-    // Otherwise a bent knee pulls the trouser opening through the boot shaft.
-    return [[hipId, 1 - upper], [id(leg.upper), upper * (1 - lower)],
-      [id(leg.lower), upper * lower * (1 - ankle)], [id(leg.foot), upper * lower * ankle]];
+    const upper = smooth(.90 - p.y, 0, .14), lower = smooth(.52 - p.y, 0, .10);
+    // Keep the calf on the tibia. Blending it onto the foot bows the lower leg.
+    return [[hipId, 1 - upper], [id(leg.upper), upper * (1 - lower)], [id(leg.lower), upper * lower]];
   };
   const starts = legs.map(leg => legAngles.map((angle, i) => {
     const inner = leg.side < 0 ? i >= 2 && i <= 4 : i >= 8 && i <= 10;
@@ -170,17 +217,19 @@ export function makeHuman() {
 
   for (const leg of legs) {
     builder.begin(leg.side < 0 ? "left boot" : "right boot");
-    const footId = id(leg.foot), angles = circle(20), transform = leg.foot.matrixWorld;
+    const footId = id(leg.foot), lowerId = id(leg.lower), angles = circle(20), transform = leg.foot.matrixWorld;
+    const inverseFoot = transform.clone().invert();
+    const bootWeights = (p: THREE.Vector3) => blend(footId, lowerId, smooth(p.clone().applyMatrix4(inverseFoot).y, .012, .095));
     const sections: CrossSection[] = [[-.105, .057, .138, .043], [-.098, .062, .143, .043], [-.071, .064, .144, .043],
       [-.059, .065, .143, .043], [-.033, .063, .137, .043], [-.006, .059, .124, .036],
       [.022, .052, .086, .013], [.059, .049, .058, -.008], [.109, .048, .052, -.012], [.119, .047, .051, -.012]];
-    const rows = sections.map(s => builder.ellipse(s, angles, () => [[footId, 1]], 0, (p, angle) => {
+    const rows = sections.map(s => builder.ellipse(s, angles, bootWeights, 0, (p, angle) => {
       // A broad closed toe box and straighter sole sides, rather than a thin foot pad.
       if (p.y < -.02) p.x = Math.sign(Math.sin(angle)) * Math.abs(Math.sin(angle)) ** .72 * s[1];
     }, transform));
     for (let row = 0; row < rows.length - 1; row++) builder.join(rows[row], rows[row + 1], row < 3 ? mat.sole : mat.leather);
     builder.cap(rows[0], new THREE.Vector3(0, -.105, .043).applyMatrix4(transform), [[footId, 1]], mat.sole, true);
-    builder.cap(rows.at(-1)!, new THREE.Vector3(0, .119, -.012).applyMatrix4(transform), [[footId, 1]], mat.leather);
+    builder.cap(rows.at(-1)!, new THREE.Vector3(0, .119, -.012).applyMatrix4(transform), [[lowerId, 1]], mat.leather);
   }
 
   builder.begin("head");
@@ -210,7 +259,8 @@ export function makeHuman() {
   for (let row = 0; row < hairRows.length - 1; row++) builder.join(hairRows[row], hairRows[row + 1], mat.hair);
   builder.cap(hairRows.at(-1)!, new THREE.Vector3(0, 1.744, -.018), [[headId, 1]], mat.hair);
 
-  const geometry = builder.finish(), materials = [surface(0x536d7d, 0, .95), surface(0x455b69, 0, .97),
+  const geometry = builder.finish(); addHemTargets(geometry, [...rows.flat(), ...hem]);
+  const materials = [surface(0x536d7d, 0, .95), surface(0x455b69, 0, .97),
     surface(0x42494b, 0, .97), surface(0xb68d72, 0, .92), surface(0x39342f),
     surface(0x55463a, 0, .9), surface(0x292c2b), surface(0xaaa99a)];
   const mesh = new THREE.SkinnedMesh(geometry, materials), skeleton = new THREE.Skeleton(bones);
@@ -220,13 +270,13 @@ export function makeHuman() {
   let currentPose: HumanPose = "standing";
   const pose = (next: HumanPose, time = 0) => {
     currentPose = next;
-    const walking = next === "walking", crouching = next === "crouching", phase = time * Math.PI * 2 * .85;
-    const hipY = crouching ? .62 : walking ? .91 + Math.cos(phase * 2) * .012 : .94, hipZ = crouching ? -.14 : 0;
-    hips.position.set(0, hipY, hipZ); spine.rotation.x = crouching ? .12 : walking ? .022 : 0;
-    chest.rotation.x = crouching ? .11 : walking ? .02 : 0; head.rotation.x = crouching ? -.12 : 0;
+    const walking = next === "walking", crouching = next === "crouching", cycle = time / HUMAN_WALK_PERIOD, phase = cycle * Math.PI * 2;
+    const hipY = crouching ? .62 : walking ? .929 + Math.cos(phase * 2 - .8 * Math.PI) * .006 : .94, hipZ = crouching ? -.14 : 0;
+    hips.position.set(0, hipY, hipZ); spine.rotation.x = crouching ? .12 : walking ? .025 : 0;
+    chest.rotation.x = crouching ? .11 : walking ? .02 : 0; head.rotation.x = crouching ? -.12 : walking ? -.045 : 0;
     for (const [i, leg] of legs.entries()) {
-      const stride = walking ? Math.cos(phase + i * Math.PI) : 0, lift = walking ? Math.max(0, Math.sin(phase + i * Math.PI)) : 0;
-      hip.set(leg.side * .095, hipY - .06, hipZ); ankle.set(leg.side * (crouching ? .13 : .095), .105 + lift * .075, crouching ? .12 : stride * .17);
+      const step = walking ? walkingFoot(cycle + i * .5) : { z: crouching ? .12 : 0, y: .105, pitch: 0 };
+      hip.set(leg.side * .095, hipY - .06, hipZ); ankle.set(leg.side * (crouching ? .13 : .095), step.y, step.z);
       direction.copy(ankle).sub(hip); const distance = direction.length(); direction.normalize();
       const along = (.41 ** 2 - .365 ** 2 + distance ** 2) / (2 * distance), height = Math.sqrt(Math.max(0, .41 ** 2 - along ** 2));
       bend.copy(front).addScaledVector(direction, -front.dot(direction)).normalize();
@@ -234,11 +284,13 @@ export function makeHuman() {
       leg.upper.quaternion.setFromUnitVectors(down, direction.copy(knee).sub(hip).normalize());
       lowerRotation.setFromUnitVectors(down, direction.copy(ankle).sub(knee).normalize());
       leg.lower.quaternion.copy(leg.upper.quaternion).invert().multiply(lowerRotation);
-      planted.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -lift * .12);
+      planted.setFromAxisAngle(new THREE.Vector3(1, 0, 0), step.pitch);
       leg.foot.quaternion.copy(inverse.copy(lowerRotation).invert()).multiply(planted);
+      const flexion = Math.atan2(knee.z - hip.z, hip.y - knee.y);
+      mesh.morphTargetInfluences![i] = smooth(flexion, .10, 1.20);
     }
     for (const [i, arm] of arms.entries()) {
-      const swing = walking ? Math.cos(phase + i * Math.PI) * .28 : 0;
+      const swing = walking ? Math.cos(phase + i * Math.PI) * .24 : 0;
       arm.upper.rotation.set(crouching ? -.70 : swing, 0, arm.side * .13);
       arm.lower.rotation.x = crouching ? -.43 : -.10 - Math.max(0, -swing) * .45;
       arm.hand.rotation.x = crouching ? -.08 : .025;
