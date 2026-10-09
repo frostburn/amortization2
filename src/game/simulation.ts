@@ -489,6 +489,7 @@ export class Simulation {
   }
 
   select(id: number, additive = false) {
+    if (id !== 5 && !this.squad.some(a => a.id === id && !a.dead)) return;
     this.onInput?.({ type: "select", id, additive });
     if (id === 5)
       this.selected = new Set(
@@ -712,7 +713,7 @@ export class Simulation {
     actor.path = queue ? [...actor.path, ...path] : path;
   }
 
-  haulCargo() { return this.hauling?.command() ?? null; }
+  haulCargo(id?: number) { return this.hauling?.command(id) ?? null; }
 
   reloadSelected() {
     this.onInput?.({ type: "reload" });
@@ -1047,6 +1048,7 @@ export class Simulation {
     if (a.hp <= 0) {
       if (a.kind === "player" && a.model === "sniper") this.endSniping();
       a.dead = true;
+      this.selected.delete(a.id);
       a.stagger = a.staggerDuration = a.staggerGrace = 0;
       a.deathTime = this.time;
       if (a.kind === "enemy" && this.arena) this.arena.kills++;
@@ -1415,11 +1417,15 @@ export class Simulation {
       velocity = a.body.linvel();
     const speed = Math.hypot(preferred.x, preferred.z);
     const remaining = distance2(p, a.path[0]);
+    const collecting = this.hauling?.loadFor(a)?.state === "approaching";
     const neighbours = this.actors
       .filter(
         (other) =>
           other !== a &&
           (!other.dead || !!other.model) &&
+          // During collection, wrecks yield through real hull contacts rather
+          // than steering away forever from a grip occupied by a fallen hand.
+          !(collecting && other.dead) &&
           (!other.flight || Math.abs(other.body.translation().y - p.y) < 1.3) &&
           distance2(p, other.body.translation()) < 5,
       )

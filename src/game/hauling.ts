@@ -56,18 +56,29 @@ export class SquadHauling {
       x: center.x - 2.8, z: center.z + (i % 2 ? -3.2 : 3.2) + Math.floor(i / 2) * 1.4,
     } }))];
   }
-  command(): string | null {
-    if (this.sim.mission?.stopped) return null;
+  intent(id?: number): { load?: SquadLoad; action: "collect" | "drop" | "blocked"; message?: string } {
     const selected = this.sim.active;
     const current = this.loads.find(l => l.carriers.some(a => selected.includes(a)));
-    if (current) {
-      this.sim.onInput?.({ type: "haul" }); this.drop(current); return null;
-    }
-    const load = this.available();
-    if (!load) return "No cargo available to collect.";
-    if (load.carriers.length) return "Cargo already assigned. Select a carrier and press H to put it down first.";
+    const load = id === undefined ? current ?? this.available() : this.loads.find(l => l.prop.id === id);
+    if (this.sim.mission?.stopped) return { action: "blocked" };
+    if (!load) return { action: "blocked", message: "No cargo available to collect." };
+    if (load === current) return { load, action: "drop" };
+    if (!load.unlocked) return { load, action: "blocked", message: "Clear the guards before collecting this cargo." };
+    if (load.delivered) return { load, action: "blocked", message: "Cargo already delivered." };
+    if (load.carriers.length) return { load, action: "blocked", message: "Cargo already assigned. Select a carrier and press H to put it down first." };
     const candidates = selected.filter(a => !a.haul && !this.sim.isDisrupted(a));
-    if (candidates.length < load.hands) return load.hands === 2 ? "Select two robots to lift the chest." : "Select a robot to collect the box.";
+    if (candidates.length < load.hands) return { load, action: "blocked",
+      message: load.hands === 2 ? "Select two robots to lift the chest." : "Select a robot to collect the box." };
+    return { load, action: "collect" };
+  }
+  command(id?: number): string | null {
+    const intent = this.intent(id), load = intent.load;
+    if (intent.action === "blocked" || !load) return intent.message ?? null;
+    if (intent.action === "drop") {
+      this.sim.onInput?.({ type: "haul", ...(id === undefined ? {} : { cargo: id }) });
+      this.drop(load); return null;
+    }
+    const candidates = this.sim.active.filter(a => !a.haul && !this.sim.isDisrupted(a));
     const p = load.prop.body.translation();
     candidates.sort((a, b) => distance2(a.body.translation(), p) - distance2(b.body.translation(), p) || a.id - b.id);
     const hands = candidates.slice(0, load.hands), original = load.orientation;
@@ -78,12 +89,12 @@ export class SquadHauling {
       return hands.every((_, slot) => {
         const o = this.offset(load, slot), grip = { x: p.x + o.x, z: p.z + o.z };
         return segmentClear(grip, grip, solids, 0.5) && this.sim.actors.every(a =>
-          hands.includes(a) || a.flight || distance2(grip, a.body.translation()) > (a.dead ? 1.5 : 0.8));
+          hands.includes(a) || a.flight || a.dead || distance2(grip, a.body.translation()) > 0.8);
       });
     });
     load.orientation = orientation ?? original;
     if (orientation === undefined) return "Clear space around the cargo before collecting it.";
-    this.sim.onInput?.({ type: "haul" });
+    this.sim.onInput?.({ type: "haul", ...(id === undefined ? {} : { cargo: id }) });
     load.carriers = hands; load.state = "approaching"; load.lastRoute = -Infinity;
     for (const a of load.carriers) {
       a.haul = load.prop.id; a.escort = undefined; a.cover = undefined; a.braced = false; a.braceTime = 0; a.firing = false;

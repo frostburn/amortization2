@@ -4,6 +4,7 @@ import { HandlingMission } from "../src/game/handling-mission";
 import { HANDLING_SITES } from "../src/game/handling";
 import { HumanReplayRecorder, playRecordedSession, readHumanReplay } from "../src/game/replay";
 import { Simulation } from "../src/game/simulation";
+import { pointerAction } from "../src/game/interaction";
 
 const zero = { x: 0, y: 0, z: 0 };
 describe("Handling contract and squad hauling", () => {
@@ -85,6 +86,39 @@ describe("Handling contract and squad hauling", () => {
     until(() => mission().cargoReleased, 25, true);
     expect(mission().box.delivered).toBe(true); expect(sim.mission!.obstacles).toHaveLength(0);
     expect(sim.ray({ x: 7, y: 2.8, z: 0 }, { x: 12, y: 2.8, z: 0 })).toBeNull();
+  });
+
+  test("cargo clicks collect or drop the hit load; locked cargo never selects another load", () => {
+    const { box, chest } = mission();
+    expect(pointerAction(sim, { cargo: box.prop.id })).toEqual({ type: "haul", cargo: box.prop.id, verb: "collect" });
+    expect(pointerAction(sim, { cargo: chest.prop.id }).type).toBe("blocked");
+    expect(sim.haulCargo(chest.prop.id)).toMatch(/guards/);
+    expect(box.state).toBe("resting");
+    sim.haulCargo(box.prop.id); until(() => box.state === "carried", 8);
+    expect(pointerAction(sim, { cargo: box.prop.id })).toEqual({ type: "haul", cargo: box.prop.id, verb: "drop" });
+    expect(pointerAction(sim, { cargo: box.prop.id }, { forceFire: true }).type).toBe("fire");
+    expect(pointerAction(sim, { cargo: box.prop.id }, { covering: true }).type).toBe("cover");
+    expect(pointerAction(sim, { cargo: box.prop.id }, { selecting: true }).type).toBe("group");
+    const hauler = box.carriers[0]; sim.select(sim.squad.find(a => a !== hauler)!.id);
+    expect(pointerAction(sim, { cargo: box.prop.id }).type).toBe("blocked");
+    sim.select(hauler.id); sim.haulCargo(box.prop.id);
+    expect(box.state).toBe("resting"); expect(box.joints).toHaveLength(0);
+  });
+
+  test("pickup movement physically pushes a wreck occupying the grip", () => {
+    const box = mission().box, p = box.prop.body.translation();
+    const wreck = sim.addEnemy("assault", { x: p.x, z: p.z - 1 });
+    sim.damage(wreck, wreck.hp, zero, wreck.body.translation(), "pistol");
+    wreck.body.setRotation({ x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 }, true);
+    wreck.body.setTranslation({ x: p.x, y: 0.38, z: p.z - 1 }, true);
+    ticks(0.5);
+    const before = { ...wreck.body.translation() };
+    sim.select(4); expect(sim.haulCargo(box.prop.id)).toBeNull();
+    expect(box.orientation).toBe(0);
+    until(() => box.state === "carried", 15, true);
+    expect(distance2(wreck.body.translation(), before)).toBeGreaterThan(0.3);
+    expect(wreck.collider.isEnabled()).toBe(true);
+    expect(wreck.body.isDynamic()).toBe(true);
   });
 
   test("putting down or taking a severe hit releases a physical box which can be collected again", () => {
@@ -194,7 +228,7 @@ describe("Handling contract and squad hauling", () => {
     expect(mission().chest.state).toBe("resting"); expect(mission().chest.joints).toHaveLength(0);
     sim.select(5); expect(sim.haulCargo()).toBeNull();
     until(() => mission().chest.state === "carried", 20);
-    expect(mission().chest.orientation).toBeCloseTo(Math.PI / 2);
+    expect(mission().chest.carriers.every(a => !a.dead)).toBe(true);
     for (const a of sim.squad.filter(a => !a.dead).slice(0, 2)) sim.damage(a, a.hp, zero, a.body.translation(), "pistol");
     sim.step(); expect(mission().phase).toBe("failed"); expect(mission().failureReason).toMatch(/Not enough chassis/);
   });
@@ -203,11 +237,11 @@ describe("Handling contract and squad hauling", () => {
     sim.reset(); const recorder = new HumanReplayRecorder("handling-test"); recorder.begin(sim);
     sim.onInput = action => recorder.action(sim, action);
     // Native deployment is recorded by main, like every existing contract.
-    recorder.action(sim, { type: "deploy" }); sim.mission!.deploy(); sim.haulCargo();
+    recorder.action(sim, { type: "deploy" }); sim.mission!.deploy(); sim.haulCargo(mission().box.prop.id);
     sim.move({ x: -13, z: 2.5 }); sim.move({ x: -9, z: 0 }, true);
     for (let i = 0; i < 10 / STEP; i++) { recorder.beforeStep(sim); sim.step(); recorder.afterStep(sim); }
     const replay = readHumanReplay(recorder.export(sim));
-    expect(replay.sessions[0].inputs.some(i => i.data.type === "haul")).toBe(true);
+    expect(replay.sessions[0].inputs.some(i => i.data.type === "haul" && i.data.cargo === mission().box.prop.id)).toBe(true);
     expect(mission().waves).toBe(1);
     const fresh = await Simulation.create("handling");
     try { expect(playRecordedSession(fresh, replay.sessions[0])).toEqual(replay.sessions[0].final); }

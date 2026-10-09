@@ -901,7 +901,7 @@ export class RangeScene {
     let barrels: THREE.Group | undefined;
     let rotors: THREE.Group[] | undefined, beacon: THREE.Mesh | undefined;
     if (sniper) model.scale.x = 0.74;
-    if (a.flight) ({ rotors, beacon } = makeWatch(model, torso));
+    if (a.flight) ({ rotors, beacon } = makeWatch(model, torso, a.flight.contract));
     else if (a.model || a.kind === "heavy") {
       for (const x of [-0.24, 0.24]) {
         const leg = new THREE.Group();
@@ -1269,7 +1269,7 @@ export class RangeScene {
     clientX: number,
     clientY: number,
     grenade = false,
-  ): { aim: Vec3; ground: Vec3; actor?: number } | null {
+  ): { aim: Vec3; ground: Vec3; actor?: number; cargo?: number } | null {
     if (this.sim.sniping) return null;
     const rect = this.canvas.getBoundingClientRect();
     this.raycaster.setFromCamera(
@@ -1322,7 +1322,8 @@ export class RangeScene {
       if (aim.y < raised.y && this.sim.active.some(a => a.braced &&
         this.sim.followsOrder(a, this.sim.weapon) && this.sim.clearsLowCover(a, aim, raised))) aim = raised;
     }
-    return { aim, ground, actor: actor?.id };
+    const cargo = hit && this.sim.hauling?.loads.find(l => l.prop.body.handle === hit.collider.parent()?.handle);
+    return { aim, ground, actor: actor?.id, cargo: cargo?.prop.id };
   }
   project(position: Vec3) {
     const p = new THREE.Vector3(position.x, position.y, position.z).project(

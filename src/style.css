@@ -198,6 +198,11 @@ dialog.mission-menu { width: 640px; max-width: min(640px, 92vw); }
   cursor: crosshair;
   touch-action: none;
 }
+#range[data-cursor="select"] { cursor: pointer; }
+#range[data-cursor="group"] { cursor: default; }
+#range[data-cursor="collect"] { cursor: grab; }
+#range[data-cursor="drop"] { cursor: grabbing; }
+#range[data-cursor="blocked"] { cursor: not-allowed; }
 .panel {
   position: absolute;
   top: 18px;

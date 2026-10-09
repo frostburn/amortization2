@@ -11,7 +11,7 @@ export const HANDLING_CONTRACT = {
   summary: "A routine return gets you through Gannet's receiving gate. Recover the cooperative's tool chest before its inventory drones reclaim it.",
   briefing: [
     { speaker: "morrow", message: "Gannet still has the cooperative's calibration tools. Their gate accepts returns even while the account is frozen. Carry the return box onto the yellow pad, then deal with the guards inside. Bring the tool chest back to our van." },
-    { speaker: "rook", message: "Select a robot and press H to collect the box. Right-click moves the load; H puts it down. The chest needs two selected chassis, and neither can fire while hauling. Leave the other two covering with C, or control their pistols yourself. Inventory drones come for moving stock. Put the load down if you need everyone fighting." },
+    { speaker: "rook", message: "Select a robot and click the box, or press H, to collect it. Right-click moves the load; H puts it down. The chest needs two selected chassis, and neither can fire while hauling. Leave the other two covering with C, or control their pistols yourself. Inventory drones come for moving stock. Put the load down if you need everyone fighting." },
   ],
   objectives: ["Carry the return box onto the receiving pad", "Eliminate the facility guards", "Haul the tool chest to the van with two robots", "Recover the surviving squad"],
   releaseSeconds: 0.7, returnSeconds: 1,
