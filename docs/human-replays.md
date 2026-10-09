@@ -74,3 +74,7 @@ Capture is bounded to **20 minutes of simulated play, 32 attempts/floors, or
 debrief show that recording stopped and exports mark the partial capture. Export
 and reload the page for another recording. The reader rejects unsupported
 versions, unordered commands and captures exceeding these bounds.
+
+Handling captures the H cargo command alongside movement and selection. Playback
+recreates physical grips, gate acceptance, guard clearance, drone arrivals and
+cargo extraction from the same fixed simulation ticks.

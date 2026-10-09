@@ -12,6 +12,7 @@ export type ReplayAction =
   | { type: "scope"; enabled: boolean }
   | { type: "grenade"; point: Vec2; actor: number }
   | { type: "reload" | "release" | "deploy" | "ceasefire" }
+  | { type: "haul"; cargo?: number }
   | { type: "control"; aim: Vec3; trigger: boolean };
 type Timed<T> = { tick: number; wallMs: number; data: T };
 export type ReplayView = { camera: object; scope: object; paused: boolean; width: number; height: number };
@@ -26,7 +27,7 @@ export function replaySnapshot(sim: Simulation) {
     actors: sim.actors.map(a => ({ id: a.id, kind: a.kind, model: a.flight ? "WATCH" : a.model, hp: a.hp,
       position: position(a.body.translation()), yaw: rounded(a.yaw), weapon: a.weapon,
       ammo: sim.ammunition(a).ammo, reload: rounded(sim.ammunition(a).reload),
-      braced: a.braced, firing: a.firing, stagger: rounded(a.stagger),
+      braced: a.braced, hauling: a.haul ?? null, firing: a.firing, stagger: rounded(a.stagger),
       goal: a.moveTarget ? { ...a.moveTarget } : null,
       ai: a.ai ? { state: a.ai.state, target: a.ai.target } : null })),
     civilians: sim.city ? [...sim.city.carts, ...sim.city.kites, ...sim.city.porters, ...sim.city.vehicles]
@@ -157,6 +158,7 @@ export function applyReplayAction(sim: Simulation, input: ReplayAction) {
     case "move": sim.move(input.point, input.queued); break;
     case "cover": sim.coverSector(input.point); break;
     case "ceasefire": sim.ceasefire(); break;
+    case "haul": sim.haulCargo(input.cargo); break;
     case "weapon": sim.chooseWeapon(input.weapon); break;
     case "brace": sim.setBrace(input.enabled); break;
     case "scope": if (sim.sniping !== input.enabled) sim.toggleSniping(); break;
@@ -184,6 +186,7 @@ function validAction(value: unknown): value is ReplayAction {
     case "brace": case "scope": return typeof a.enabled === "boolean";
     case "grenade": return id(a.actor) && a.actor !== 5 && point(a.point, ["x", "z"]);
     case "control": return point(a.aim, ["x", "y", "z"]) && typeof a.trigger === "boolean";
+    case "haul": return a.cargo === undefined || Number.isSafeInteger(a.cargo) && (a.cargo as number) >= 0;
     case "reload": case "release": case "deploy": case "ceasefire": return true;
     default: return false;
   }

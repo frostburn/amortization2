@@ -1,11 +1,11 @@
-import { PISTOL, STEP, distance2 } from "./config";
+import { PISTOL, STEP, distance2, type BoxSpec, type RoofedArea } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
 export type Contact = "morrow" | "vale" | "rook";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "complete" | "failed";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];
@@ -38,6 +38,20 @@ export abstract class Mission {
   bridge?: SingleLoadBridge;
   alarmAt?: number;
   failureReason?: string;
+  /** Runtime solids such as a locked entrance; never mutate shared range data. */
+  obstacles: BoxSpec[] = [];
+  /** Roofs and their walls stay physical during camera cutaways. */
+  readonly roofs: { area: RoofedArea; collider: number; walls?: number[]; revealDistance?: number }[] = [];
+  get cutawayRoofs() {
+    return this.roofs.filter(({ area, revealDistance }) => this.sim.squad.some(a => {
+      const p = a.body.translation();
+      const dx = Math.abs(p.x - area.x) - area.w / 2, dz = Math.abs(p.z - area.z) - area.d / 2;
+      const near = revealDistance === undefined ? dx < -0.5 && dz < -0.5
+        : Math.hypot(Math.max(0, dx), Math.max(0, dz)) <= revealDistance;
+      return !a.dead && near && p.y < (area.y ?? 0) + area.h;
+    }));
+  }
+  get cutawayColliders() { return new Set(this.cutawayRoofs.flatMap(roof => [roof.collider, ...(roof.walls ?? [])])); }
   phase: MissionPhase = "briefing";
   releaseProgress = 0;
   returnProgress = 0;

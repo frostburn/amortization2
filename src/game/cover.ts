@@ -29,10 +29,12 @@ function coverBrain(sim: Simulation, a: Actor, aim: Vec3): CoverBrain {
 /** A direction, rather than a marked victim: stays useful as enemies enter it. */
 export function orderCoverFire(sim: Simulation, point: Vec2) {
   for (const a of sim.active) {
+    if (a.haul) continue;
     const p = a.body.translation(), length = distance2(p, point);
     if (length < 0.5) continue;
     a.cover = { ...coverBrain(sim, a, { ...point, y: p.y + 0.25 }), mode: "sector",
       direction: { x: (point.x - p.x) / length, z: (point.z - p.z) / length } };
+    a.escort = undefined;
     a.path = [];
     a.moveTarget = undefined;
     sim.mission?.bridge?.cancel(a);
@@ -45,7 +47,7 @@ export function orderCoverFire(sim: Simulation, point: Vec2) {
 /** Temporary support, without changing selection, stance or movement orders. */
 export function startCoverFire(sim: Simulation, operator: Actor) {
   for (const a of sim.squad) {
-    if (a === operator || a.dead || a.cover?.mode === "sector") continue;
+    if (a === operator || a.dead || a.haul || a.cover?.mode === "sector") continue;
     const p = a.body.translation();
     a.cover = coverBrain(sim, a, { x: p.x + Math.sin(a.yaw) * 20, y: p.y + 0.42, z: p.z + Math.cos(a.yaw) * 20 });
     a.firing = false;

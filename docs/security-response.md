@@ -36,10 +36,16 @@ wrecks for twelve seconds, then are retired to bound bodies and visuals during
 long sandbox sessions. Live overhead aircraft do not become ground-pathfinding
 obstacles; a fallen wreck does participate in local ground avoidance.
 
-Arrival columns check static collision, including building and ship shells.
-Repositioning sweeps WATCH's full cylindrical hull, including rotor clearance,
-along local air goals and climbs above intervening roofs during pursuit and
-withdrawal, without calling squad A*. No position teleports are used for flight or withdrawal. After
+Arrival columns sweep the full cylindrical rotor hull against static collision,
+including building and ship shells; thin corners cannot slip between ray probes.
+Range `shelters` supply roofed volumes and outdoor exit banks for cutaway
+interiors. Those interiors remain closed to aircraft. Drones targeting robots
+inside hold at free banks outside the door, then resume pursuit on emergence.
+Shots cannot pass downward through a roof omitted by the renderer.
+Repositioning also sweeps the whole hull. Obstructed routes climb above the
+roofline, cross at altitude, then descend through a rechecked outdoor column;
+they do not cut a diagonal descent through the roof edge. No squad A* calls or
+position teleports are used for flight or withdrawal. After
 26 seconds without further attacks on civilians or WATCH, survivors stop firing
 and climb out. New interference can recall them; reset restores a quiet district.
 Receiving continues to count only its four authored guards for the cargo
@@ -56,5 +62,5 @@ and finite-thrust flight. WATCH uses the existing armed actor damage, pistol,
 stagger, friendly-fire and cover-fire systems. `src/render/security.ts` is the
 reusable guarded-drone prefab, rendered through ordinary actor interpolation.
 `window.amortization2.inspect().security` reports response level, dispatch timing,
-flight state, health, positions and targets. Development replays reproduce the
+flight state, health, positions, goals, transit stage and targets. Development replays reproduce the
 same response from recorded player commands.

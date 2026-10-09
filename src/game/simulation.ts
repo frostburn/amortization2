@@ -34,6 +34,8 @@ import { ArenaCombat } from "./arena";
 import type { EnemyBrain } from "./enemies";
 import { ReceivingMission, type Mission, type Contact } from "./missions";
 import { CrossingMission } from "./crossing-mission";
+import { HandlingMission } from "./handling-mission";
+import type { SquadHauling } from "./hauling";
 import type { ReplayAction } from "./replay";
 import { manualFire, orderCoverFire, startCoverFire, stopCoverFire, updateCoverFire, type CoverBrain } from "./cover";
 
@@ -48,6 +50,9 @@ export interface Actor {
   ai?: EnemyBrain;
   flight?: SecurityFlight;
   cover?: CoverBrain;
+  /** Cargo work assignment, including the walk to the grip. */
+  haul?: number;
+  escort?: number;
   deathTime?: number;
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
@@ -85,7 +90,7 @@ export interface Prop {
   w: number;
   h: number;
   d: number;
-  style?: "tote";
+  style?: "tote" | "parcel" | "chest";
   previous: Vec3;
   previousRotation: { x: number; y: number; z: number; w: number };
 }
@@ -115,6 +120,7 @@ export type GameEvent =
   | { type: "security"; phase: "dispatch" | "arrival" | "standdown"; position: Vec3; level: number }
   | { type: "bridge"; phase: "alarm" | "collapse"; position: Vec3 }
   | { type: "glass"; position: Vec3; normal: Vec3 }
+  | { type: "cargo"; phase: "lift" | "drop" | "accept"; position: Vec3; heavy: boolean }
   | {
       type: "throw" | "bounce" | "reload" | "empty" | "down";
       position: Vec3;
@@ -146,6 +152,7 @@ export class Simulation {
   fourthModel: RobotModel;
   arena?: ArenaCombat;
   mission?: Mission;
+  hauling?: SquadHauling;
   city?: CityLife;
   security?: SecurityResponse;
   time = 0;
@@ -181,6 +188,7 @@ export class Simulation {
     this.range = range;
     this.fourthModel = fourthModel;
     this.mission = undefined;
+    this.hauling = undefined;
     this.security = undefined;
     this.navigation = new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
@@ -269,7 +277,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : undefined;
+    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : undefined;
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
@@ -481,6 +489,7 @@ export class Simulation {
   }
 
   select(id: number, additive = false) {
+    if (id !== 5 && !this.squad.some(a => a.id === id && !a.dead)) return;
     this.onInput?.({ type: "select", id, additive });
     if (id === 5)
       this.selected = new Set(
@@ -582,10 +591,11 @@ export class Simulation {
       ...this.dynamicNavigationBoxes(includeTargets),
     ];
   }
-  private dynamicNavigationBoxes(includeTargets = true) {
+  private dynamicNavigationBoxes(includeTargets = true, actor?: Actor) {
     return [
       ...(this.city?.vehicles ?? []).filter(c => !c.hp || c.state === "stranded").map(vehicleFootprint),
-      ...this.props.map((p) => ({
+      ...(this.mission?.obstacles ?? []),
+      ...this.props.filter(p => !actor || p.id !== actor.haul || this.hauling?.loadFor(actor)?.state === "approaching").map((p) => ({
         x: p.body.translation().x,
         z: p.body.translation().z,
         w: p.w,
@@ -607,6 +617,8 @@ export class Simulation {
   moveDestinations(point: Vec2): MoveDestination[] {
     const active = this.active;
     if (!active.length) return [];
+    const hauling = this.hauling?.destinations(point);
+    if (hauling) return hauling;
     const BOUNDS = this.layout.bounds;
     const half = FORMATION_SPACING / 2;
     const triangleRadius = FORMATION_SPACING / Math.sqrt(3);
@@ -678,8 +690,14 @@ export class Simulation {
     if (this.mission?.stopped) return;
     this.onInput?.({ type: "move", point: { ...point }, queued: queue });
     this.endSniping();
+    for (const load of this.hauling?.loads ?? []) {
+      if (!load.carriers.some(a => this.selected.has(a.id))) continue;
+      this.hauling!.move(load, point, queue);
+    }
     for (const target of this.moveDestinations(point)) {
       const actor = this.actors.find((a) => a.id === target.actor)!;
+      if (actor.haul) continue;
+      actor.escort = this.hauling?.loads.find(l => l.carriers.some(a => this.selected.has(a.id)))?.prop.id;
       actor.cover = undefined;
       actor.braced = false;
       actor.braceTime = 0;
@@ -688,12 +706,14 @@ export class Simulation {
   }
   navigate(actor: Actor, point: Vec2, queue = false, bridgePass = false) {
     const start = queue ? this.mission?.bridge?.queuedGoal(actor) ?? actor.path.at(-1) ?? actor.body.translation() : actor.body.translation();
-    const path = this.navigation.findPath(start, point, this.dynamicNavigationBoxes());
+    const path = this.navigation.findPath(start, point, this.dynamicNavigationBoxes(true, actor));
     if (!bridgePass && this.mission?.bridge?.route(actor, path, queue)) return;
     actor.replanAt = this.time;
     actor.moveTarget = path.at(-1);
     actor.path = queue ? [...actor.path, ...path] : path;
   }
+
+  haulCargo(id?: number) { return this.hauling?.command(id) ?? null; }
 
   reloadSelected() {
     this.onInput?.({ type: "reload" });
@@ -843,7 +863,7 @@ export class Simulation {
   shoot(a: Actor, weapon: Firearm = a.weapon) {
     if (this.mission?.stopped) return;
     const state = this.ammunition(a, weapon);
-    if (a.dead || this.isDisrupted(a) || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0 || (weapon === "minigun" && a.spin < 1)) return;
+    if (a.dead || a.haul || this.isDisrupted(a) || state.ammo <= 0 || state.reload > 0 || state.shotWait > 0 || (weapon === "minigun" && a.spin < 1)) return;
     const covering = a.kind === "player" && !!a.cover && !manualFire(this, a);
     const automaticOrder = (this.weapon === "gun" || this.weapon === "minigun") &&
       (weapon === "gun" || weapon === "minigun");
@@ -1028,6 +1048,7 @@ export class Simulation {
     if (a.hp <= 0) {
       if (a.kind === "player" && a.model === "sniper") this.endSniping();
       a.dead = true;
+      this.selected.delete(a.id);
       a.stagger = a.staggerDuration = a.staggerGrace = 0;
       a.deathTime = this.time;
       if (a.kind === "enemy" && this.arena) this.arena.kills++;
@@ -1213,6 +1234,7 @@ export class Simulation {
     if (this.mission?.stopped) return;
     this.time += STEP;
     this.arena?.update();
+    this.hauling?.update();
     this.mission?.updateCombat();
     this.security?.update();
     updateCoverFire(this);
@@ -1265,7 +1287,7 @@ export class Simulation {
           (a.kind === "enemy"
             ? !!a.ai?.fire
             : selected && this.trigger && this.weapon !== "grenade" && this.followsOrder(a, this.weapon) || !!a.cover?.fire) &&
-          state.reload === 0 && !this.isDisrupted(a);
+          state.reload === 0 && !a.haul && !this.isDisrupted(a);
         a.spooling = a.weapon === "minigun" && fire && state.ammo > 0;
         if (a.weapon === "minigun") {
           const previousSpin = a.spin;
@@ -1280,7 +1302,8 @@ export class Simulation {
         if (fire && state.ammo === 0) this.reloadActor(a);
         if (a.flight) this.security?.fly(a);
         else this.drive(a);
-        if (selected || a.cover || (a.kind === "enemy" && a.ai?.target)) {
+        const gripping = a.haul && this.hauling?.loadFor(a)?.state !== "approaching";
+        if (!gripping && (selected || a.cover || (a.kind === "enemy" && a.ai?.target))) {
           const p = a.body.translation();
           const aim = this.actorAim(a);
           const desired = Math.atan2(aim.x - p.x, aim.z - p.z);
@@ -1289,7 +1312,7 @@ export class Simulation {
             Math.cos(desired - a.yaw),
           );
           a.yaw += clamp(diff, -STEP * 9, STEP * 9);
-        } else if (a.path[0]) {
+        } else if (!gripping && a.path[0]) {
           a.yaw = Math.atan2(
             a.path[0].x - a.body.translation().x,
             a.path[0].z - a.body.translation().z,
@@ -1342,12 +1365,13 @@ export class Simulation {
   }
 
   private drive(a: Actor) {
+    if (this.hauling?.drive(a)) return;
     const p = a.body.translation(),
       v = a.body.linvel();
     // Recover the assigned corner if another hull or an impact displaces an arrival.
     const recoveryGoal = this.mission?.bridge?.waitingGoal(a) ?? a.moveTarget;
     if (!a.path.length && recoveryGoal && distance2(p, recoveryGoal) > 0.15 && this.time >= (a.replanAt ?? 0)) {
-      a.path = this.navigation.findPath(p, recoveryGoal, this.dynamicNavigationBoxes());
+      a.path = this.navigation.findPath(p, recoveryGoal, this.dynamicNavigationBoxes(true, a));
       // Failed recovery must not repeat an unreachable search every physics tick.
       a.replanAt = this.time + (a.path.length ? 0 : 0.5);
     }
@@ -1367,7 +1391,7 @@ export class Simulation {
     if (a.path.length && !a.braced && !this.isDisrupted(a)) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
-      const speed = Math.min(a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2, distance * 5);
+      const speed = Math.min(this.hauling?.escortSpeed(a, target) ?? (a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2), distance * 5);
       const forwardX = (target.x - p.x) / distance,
         forwardZ = (target.z - p.z) / distance;
       dx = forwardX * speed;
@@ -1393,11 +1417,15 @@ export class Simulation {
       velocity = a.body.linvel();
     const speed = Math.hypot(preferred.x, preferred.z);
     const remaining = distance2(p, a.path[0]);
+    const collecting = this.hauling?.loadFor(a)?.state === "approaching";
     const neighbours = this.actors
       .filter(
         (other) =>
           other !== a &&
           (!other.dead || !!other.model) &&
+          // During collection, wrecks yield through real hull contacts rather
+          // than steering away forever from a grip occupied by a fallen hand.
+          !(collecting && other.dead) &&
           (!other.flight || Math.abs(other.body.translation().y - p.y) < 1.3) &&
           distance2(p, other.body.translation()) < 5,
       )
@@ -1528,6 +1556,7 @@ export class Simulation {
       fourthModel: this.fourthModel,
       arena: this.arena?.inspect() ?? null,
       mission: this.mission?.inspect() ?? null,
+      hauling: this.hauling?.inspect() ?? null,
       city: this.city?.inspect() ?? null,
       security: this.security?.inspect() ?? null,
       aim: vcopy(this.aim),
@@ -1559,6 +1588,8 @@ export class Simulation {
         kind: a.kind,
         model: a.flight ? "WATCH" : a.model,
         weapon: a.weapon,
+        hauling: a.haul ?? null,
+        escort: a.escort ?? null,
         weapons: [...a.weapons],
         pistol: { ...a.pistol, shotWait: Math.max(0, a.pistol.shotWait) },
         ai: a.ai ? { squad: a.ai.squad, state: a.ai.state, target: a.ai.target, gate: a.ai.gate, aim: { ...a.ai.aim } } : null,

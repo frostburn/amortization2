@@ -31,6 +31,10 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 **02 · Crossing** continues with the fixed four-pistol squad. A canal footbridge carries one robot at a time. Select covering robots, press **C**, then click a direction: they hold, brace, watch that sector and fire at visible hostiles. **X** ceases fire; moving replaces their cover order. Selection changes preserve it. Three far-bank guards overwhelm an unsupported crossing. The last robot entering the bridge trips an alarm and calls three west-bank pursuers; reverse the far-bank cover, then bring every survivor to the van. Group movement queues on dry bank slots and reforms on arrival. Physical overload can collapse the bridge. See [Crossing and covering orders](docs/crossing.md).
 
+## Handling
+
+**03 · Handling** teaches hauling with the fixed pistol squad. Select robots and press **H** (or the box icon) to collect cargo; RMB moves the team, and H puts it down. Deliver a one-robot return box to open the guarded service hall, eliminate its three guards, then recover a heavy tool chest with two robots. Carriers cannot shoot, so keep the other pistols defending. Inventory drones arrive while cargo is carried; setting it down pauses new waves. The entire surviving squad must return to the van. See [Handling and physical cargo](docs/handling.md).
+
 ## Proving Ground
 
 - **Ballistics:** clear six orange plate targets with the machine gun or minigun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.
@@ -88,6 +92,8 @@ WATCH security responds to actual player damage to civilian robots and vehicles 
 | Shift + 1–4 / Shift + click | Add or remove a robot from selection                                           |
 | 5 / ALL                     | Select the living squad                                                        |
 | Q / E / G                   | Automatic weapons or pistol (cycles with NEEDLE) / sniper rifle / assault grenade                                           |
+| C, then LMB / X             | Hold and cover a sector / ceasefire                                             |
+| H / box icon                | Collect or put down cargo in Handling; select two robots for the chest           |
 | R                           | Reload the selected firearm for eligible robots                                                         |
 | Space with the rifle        | Toggle braced first-person sniping                                             |
 | Hold Space with automatic weapons/pistol | Brace; release to resume a pending move                                        |
@@ -116,6 +122,8 @@ TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and 
 
 - [Range design and implementation](docs/proving-ground.md)
 - [Receiving — first playable contract](docs/first-mission.md)
+- [Crossing — covering orders](docs/crossing.md)
+- [Handling — two-robot cargo and drone defence](docs/handling.md)
 - [Isometric camera and kinetic combat](docs/combat-feel.md)
 - [Sniper model, scope, and long range](docs/sniper-range.md)
 - [Arena waves and enemy combat](docs/arena.md)
@@ -127,6 +135,6 @@ TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and 
 
 In the browser console, `window.amortization2.inspect()` returns current state, `project({ x, y, z })` maps a world point to the screen, and `exportReport()` returns a JSON bug report. These are current-state inspection helpers. In Vite development mode, **Controls & settings → Export human replay** (also available in the mission debrief) downloads commands and observed combat for the current attempt. **Export all attempts** includes earlier retries from the page session. Use **View replay** to watch it in development with pause, seeking, speed and attempt controls; bundled histories open on the latest attempt. Inspect it with `npm run inspect:replay -- /path/to/replay.json`. See [human replays](docs/human-replays.md) for capture limits and version matching.
 
-This is a combat test range, not yet a campaign: missions, progression, multiplayer, controller support, and mobile controls remain future work. The arena refines live combat; the city district establishes reusable mission scenery and civilian activity. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
+Three tutorial contracts now accompany the combat sandboxes. Campaign progression, multiplayer, controller support and mobile controls remain future work. The arena refines live combat; the city district establishes reusable mission scenery and civilian activity. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
 
 Code is [MIT licensed](LICENSE). Asset licensing is documented separately in the credits.

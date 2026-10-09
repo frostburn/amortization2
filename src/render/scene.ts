@@ -21,6 +21,7 @@ import type {
 } from "../game/simulation";
 import { CityView } from "./city";
 import { MissionView } from "./mission";
+import { squadCargo } from "./hauling";
 import { CoverOrderView } from "./cover";
 import { CartFleet } from "./carts";
 import { makeWatch } from "./security";
@@ -157,6 +158,8 @@ type ActorVisual = {
   bipod?: THREE.Group;
   primaryGun?: THREE.Group;
   pistol?: THREE.Group;
+  arms?: THREE.Group;
+  carryArms?: THREE.Group;
   barrels?: THREE.Group;
   rotors?: THREE.Group[];
   beacon?: THREE.Mesh;
@@ -449,7 +452,7 @@ export class RangeScene {
       this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
       if (this.sim.mission) {
-        this.missionView = new MissionView(this.sim);
+        this.missionView = new MissionView(this.sim, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.missionView.root);
       }
       return;
@@ -894,10 +897,11 @@ export class RangeScene {
     const bodyMat = friend ? sniper ? sniperShell : minigunner ? minigunShell : shell : orange;
     let bipod: THREE.Group | undefined;
     let primaryGun: THREE.Group | undefined, pistol: THREE.Group | undefined;
+    let arms: THREE.Group | undefined, carryArms: THREE.Group | undefined;
     let barrels: THREE.Group | undefined;
     let rotors: THREE.Group[] | undefined, beacon: THREE.Mesh | undefined;
     if (sniper) model.scale.x = 0.74;
-    if (a.flight) ({ rotors, beacon } = makeWatch(model, torso));
+    if (a.flight) ({ rotors, beacon } = makeWatch(model, torso, a.flight.contract));
     else if (a.model || a.kind === "heavy") {
       for (const x of [-0.24, 0.24]) {
         const leg = new THREE.Group();
@@ -925,9 +929,10 @@ export class RangeScene {
       }
       box(torso, 0.42, 0.3, 0.35, 0, 0.7, 0.02, bodyMat);
       box(torso, 0.34, 0.065, 0.03, 0, 0.73, 0.207, friend ? glow : pale);
+      arms = new THREE.Group(); torso.add(arms);
       for (const sign of [-1, 1]) {
         const shoulder = box(
-          torso,
+          arms,
           0.27,
           0.25,
           0.4,
@@ -937,8 +942,20 @@ export class RangeScene {
           bodyMat,
         );
         shoulder.rotation.z = sign * 0.16;
-        box(torso, 0.18, 0.35, 0.2, sign * 0.53, 0.14, 0.12, dark);
-        box(torso, 0.2, 0.19, 0.35, sign * 0.48, 0.02, 0.32, bodyMat);
+        box(arms, 0.18, 0.35, 0.2, sign * 0.53, 0.14, 0.12, dark);
+        box(arms, 0.2, 0.19, 0.35, sign * 0.48, 0.02, 0.32, bodyMat);
+      }
+      this.batchRigidPart(arms);
+      if (friend) {
+        carryArms = new THREE.Group(); torso.add(carryArms);
+        for (const side of [-1, 1]) {
+          box(carryArms, 0.22, 0.26, 0.3, side * 0.5, 0.32, 0, bodyMat);
+          const upper = box(carryArms, 0.17, 0.38, 0.18, side * 0.5, 0.12, 0.13, dark);
+          upper.rotation.x = -0.65;
+          box(carryArms, 0.18, 0.16, 0.44, side * 0.42, -0.07, 0.43, bodyMat);
+          box(carryArms, 0.18, 0.14, 0.15, side * 0.36, -0.07, 0.7, metal);
+        }
+        this.batchRigidPart(carryArms); carryArms.visible = false;
       }
       if (a.model) {
         primaryGun = new THREE.Group();
@@ -1074,7 +1091,7 @@ export class RangeScene {
     this.dynamic.add(health);
     health.visible = false;
     this.dynamic.add(root);
-    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, barrels, rotors, beacon, dead: false };
+    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, arms, carryArms, barrels, rotors, beacon, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -1156,7 +1173,7 @@ export class RangeScene {
     }
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
-      const group = p.style === "tote" ? makeTote() : this.makeCrate(p.w, p.h, p.d);
+      const group = p.style === "tote" ? makeTote() : p.style === "parcel" || p.style === "chest" ? squadCargo(p) : this.makeCrate(p.w, p.h, p.d);
       this.batchRigidPart(group);
       this.dynamic.add(group);
       this.props.set(p.id, group);
@@ -1252,7 +1269,7 @@ export class RangeScene {
     clientX: number,
     clientY: number,
     grenade = false,
-  ): { aim: Vec3; ground: Vec3; actor?: number } | null {
+  ): { aim: Vec3; ground: Vec3; actor?: number; cargo?: number } | null {
     if (this.sim.sniping) return null;
     const rect = this.canvas.getBoundingClientRect();
     this.raycaster.setFromCamera(
@@ -1267,7 +1284,9 @@ export class RangeScene {
       return null;
     const origin = this.raycaster.ray.origin,
       dir = this.raycaster.ray.direction;
-    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far));
+    const cutaway = this.sim.mission?.cutawayColliders;
+    const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,
+      cutaway?.size ? collider => !cutaway.has(collider.handle) : undefined);
     const actor =
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
@@ -1305,7 +1324,8 @@ export class RangeScene {
       if (aim.y < raised.y && this.sim.active.some(a => a.braced &&
         this.sim.followsOrder(a, this.sim.weapon) && this.sim.clearsLowCover(a, aim, raised))) aim = raised;
     }
-    return { aim, ground, actor: actor?.id };
+    const cargo = hit && this.sim.hauling?.loads.find(l => l.prop.body.handle === hit.collider.parent()?.handle);
+    return { aim, ground, actor: actor?.id, cargo: cargo?.prop.id };
   }
   project(position: Vec3) {
     const p = new THREE.Vector3(position.x, position.y, position.z).project(
@@ -1362,12 +1382,14 @@ export class RangeScene {
 
   private updateDestinations(delta: number) {
     const active = this.sim.active;
+    const carriers = this.sim.hauling?.loads.flatMap(l => l.carriers.some(a => this.sim.selected.has(a.id)) ? l.carriers : []) ?? [];
+    const members = [...new Set([...active, ...carriers])];
     const targets =
       this.destinationPreview ??
-      active.flatMap((a) =>
+      members.flatMap((a) =>
         a.moveTarget ? [{ actor: a.id, position: a.moveTarget }] : [],
       );
-    if (this.destinationPreview || active.some((a) => a.path.length))
+    if (this.destinationPreview || members.some((a) => a.path.length || this.sim.hauling?.loadFor(a)?.path.length))
       this.destinationAge = 0;
     else this.destinationAge += delta;
     this.destinations.visible = targets.length > 0 && this.destinationAge < 1.5;
@@ -1437,7 +1459,7 @@ export class RangeScene {
       let count = 0;
       for (const operator of this.sim.active) {
         if (
-          !this.sim.followsOrder(operator, this.sim.weapon)
+          operator.haul || !this.sim.followsOrder(operator, this.sim.weapon)
         )
           continue;
         const { from, to } = this.sim.aimTrace(operator);
@@ -1665,6 +1687,8 @@ export class RangeScene {
       marker.material.opacity = pending && this.sim.arena!.entries.includes(id)
         ? 0.45 + Math.sin(elapsed * 6) * 0.25 : 0.12;
     }
+    const cutawayRoofs = new Set(this.sim.mission?.cutawayRoofs.map(roof => roof.collider));
+    const closedRoofs = this.sim.mission?.roofs.filter(roof => !cutawayRoofs.has(roof.collider)) ?? [];
     for (const a of this.sim.actors) {
       if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;
@@ -1695,9 +1719,10 @@ export class RangeScene {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
       });
       const aim = this.sim.actorAim(a);
-      const aimingFirearm = a.model === "sniper" || !!a.cover || a.kind === "enemy" || (
+      const carrying = !!a.haul && this.sim.hauling?.loadFor(a)?.state !== "approaching";
+      const aimingFirearm = !carrying && (a.model === "sniper" || !!a.cover || a.kind === "enemy" || (
         this.sim.selected.has(a.id) && this.sim.weapon !== "grenade" && this.sim.followsOrder(a, this.sim.weapon)
-      );
+      ));
       // The supported upper body follows the reticle while the feet remain planted.
       v.torso.rotation.order = "YXZ";
       v.torso.rotation.y = a.braced && aimingFirearm && !a.dead
@@ -1713,8 +1738,10 @@ export class RangeScene {
           : a.braced
             ? -0.12
             : -a.recoil * 0.13;
-      if (v.primaryGun) v.primaryGun.visible = a.weapon !== "pistol";
-      if (v.pistol) v.pistol.visible = a.weapon === "pistol";
+      if (v.primaryGun) v.primaryGun.visible = !carrying && a.weapon !== "pistol";
+      if (v.pistol) v.pistol.visible = !carrying && a.weapon === "pistol";
+      if (v.arms) v.arms.visible = !carrying;
+      if (v.carryArms) v.carryArms.visible = carrying;
       if (v.bipod) v.bipod.visible = a.braced && a.weapon === "rifle" && !a.dead;
       if (v.barrels && !a.dead) v.barrels.rotation.z += delta * a.spin * Math.PI * 10;
       v.flash.position.z = a.flight ? .65 : FIREARMS[a.weapon].muzzle;
@@ -1740,11 +1767,12 @@ export class RangeScene {
         !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)));
       v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
-        stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced ? AMBER : MINT,
+        stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced || a.haul ? AMBER : MINT,
       );
       v.ring.scale.setScalar(a.flight ? 1.7 : stagger > 0 ? 1 + stagger * 0.2 : a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
       v.health.visible =
         !a.dead &&
+        !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2) &&
         (a.kind === "enemy" || (a.hp < a.maxHp &&
         (this.sim.time - a.hitTime < 4 || a.kind === "player")));
       v.health.position.set(

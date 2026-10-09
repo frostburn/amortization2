@@ -14,6 +14,7 @@ import type { RangeId } from "./game/ranges";
 import { RangeAudio } from "./audio/audio";
 import type { HumanReplayRecorder, ReplayExportScope } from "./game/replay";
 import type { ReplayViewer } from "./replay-viewer";
+import { pointerAction, type PointerAction, type PointerHit } from "./game/interaction";
 
 const { canvas, dialog, resultDialog } = mountUI();
 const audio = new RangeAudio();
@@ -59,6 +60,8 @@ async function start() {
     nextPausedRender = 0;
   let pointer = { x: 0, y: 0, inside: false },
     ground: Vec3 = { x: -14, y: 0, z: -7 };
+  let pointerModifiers = { forceFire: false, selecting: false };
+  let interaction: PointerAction = { type: "fire" };
   let middleDrag: { x: number; y: number } | null = null;
   let sniperPointer: { x: number; y: number } | null = null;
   let capturePending = false,
@@ -188,7 +191,7 @@ async function start() {
       ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
       : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
     canvas.setAttribute("aria-label", sim.mission
-      ? `${sim.mission.definition.title} mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
+      ? `${sim.mission.definition.title} mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. ${sim.hauling ? "H collects or puts down cargo; two robots are needed for the chest. " : ""}Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
       : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
   }
   function dismissComms() {
@@ -358,7 +361,7 @@ async function start() {
   document.getElementById("reset")!.addEventListener("click", reset);
   document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
   document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
-  document.getElementById("mission-next")!.addEventListener("click", () => switchRange("crossing"));
+  document.getElementById("mission-next")!.addEventListener("click", () => switchRange(sim.range === "receiving" ? "crossing" : "handling"));
   document.getElementById("mission-debug")!.addEventListener("click", () => {
     switchRange("proving");
     pause("Proving ground");
@@ -392,6 +395,14 @@ async function start() {
     sim.select(5);
     canvas.focus();
   });
+  function haulCargo(cargo?: number) {
+    if (viewer?.active || paused) return;
+    cancelDrags(); armCover(false); sim.release();
+    const message = sim.haulCargo(cargo);
+    if (message) toast(message, true);
+    updateUI(sim, audio); canvas.focus();
+  }
+  document.getElementById("haul-order")!.addEventListener("click", () => haulCargo());
   coverButton.addEventListener("click", () => {
     if (viewer?.active || paused) return;
     const armed = !covering;
@@ -427,6 +438,11 @@ async function start() {
     },
     { passive: false },
   );
+  function updateInteraction(hit: PointerHit | null) {
+    interaction = pointerAction(sim, hit, { ...pointerModifiers, covering });
+    canvas.dataset.cursor = interaction.type === "haul" ? interaction.verb : interaction.type;
+    if (interaction.type !== "fire") sim.trigger = false;
+  }
   const aimAtPointer = (groundOnly = false) => {
     if (sim.sniping) {
       scene.scope.aim(sim);
@@ -441,6 +457,7 @@ async function start() {
       ground = result.ground;
       sim.aim = result.aim;
     }
+    updateInteraction(result);
     return result;
   };
   function cancelDrags() {
@@ -498,6 +515,7 @@ async function start() {
     else if (!sightCaptured && wasCaptured) exitSniping();
   });
   function updatePointer(e: MouseEvent) {
+    pointerModifiers = { forceFire: e.ctrlKey, selecting: e.shiftKey };
     const rect = canvas.getBoundingClientRect();
     pointer = {
       x: clamp(e.clientX, rect.left, rect.right),
@@ -635,6 +653,13 @@ async function start() {
           actor: picked?.actor,
           dragged: false,
         };
+      } else if (interaction.type === "haul") {
+        haulCargo(interaction.cargo);
+      } else if (interaction.type === "select" && picked?.actor) {
+        sim.select(picked.actor);
+      } else if (interaction.type === "blocked") {
+        sim.trigger = false;
+        if (interaction.message) toast(interaction.message, true);
       } else if (sim.weapon === "grenade") {
         if (sim.throwGrenade(ground))
           toast("Grenade away. Keep clear of the blast.");
@@ -644,9 +669,7 @@ async function start() {
             true,
           );
         updateUI(sim, audio);
-      } else if (picked?.actor && picked.actor <= 4 && !e.ctrlKey)
-        sim.select(picked.actor, e.shiftKey);
-      else sim.trigger = true;
+      } else sim.trigger = true;
     }
   });
   window.addEventListener("mouseup", (e) => {
@@ -701,6 +724,7 @@ async function start() {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement;
   window.addEventListener("keydown", (e) => {
+    pointerModifiers = { forceFire: e.ctrlKey, selecting: e.shiftKey };
     if (viewer?.active) {
       if (e.code === "Escape") { e.preventDefault(); viewer.close(); }
       // Native buttons and form controls retain their keyboard behavior.
@@ -735,6 +759,7 @@ async function start() {
         "KeyR",
         "KeyF",
         "KeyC",
+        "KeyH",
         "KeyX",
         "Digit1",
         "Digit2",
@@ -754,7 +779,8 @@ async function start() {
       exitSniping();
       sim.release();
       armCover(armed);
-    } else if (e.code === "KeyX") { armCover(false); sim.ceasefire(); }
+    } else if (e.code === "KeyH") haulCargo();
+    else if (e.code === "KeyX") { armCover(false); sim.ceasefire(); }
     else if (e.code === "KeyG") chooseWeapon("grenade");
     else if (e.code === "KeyQ") chooseWeapon(sim.nextCloseWeapon);
     else if (e.code === "KeyE") chooseWeapon("rifle");
@@ -777,6 +803,7 @@ async function start() {
     } else if (e.code === "KeyF" && !sim.sniping) scene.center();
   });
   window.addEventListener("keyup", (e) => {
+    pointerModifiers = { forceFire: e.ctrlKey, selecting: e.shiftKey };
     if (viewer?.active) return;
     keys.delete(e.code);
     if (e.code === "Space" && sim.weapon !== "rifle") sim.setBrace(false);
@@ -888,8 +915,9 @@ async function start() {
         if (keys.has("KeyD")) scene.pan(panSpeed, 0);
         if (keys.has("KeyW")) scene.pan(0, -panSpeed);
         if (keys.has("KeyS")) scene.pan(0, panSpeed);
-        if (pointer.inside && (sim.weapon !== "rifle" || moveDrag))
-          aimAtPointer(!!moveDrag || covering);
+        if (pointer.inside && (sim.weapon !== "rifle" || moveDrag || selectionDrag || covering))
+          aimAtPointer(!!moveDrag || !!selectionDrag || covering);
+        else if (pointer.inside) updateInteraction(scene.pick(pointer.x, pointer.y));
         if (covering) scene.previewCover(pointer.inside ? ground : null);
         updateMove();
       } else {
@@ -923,7 +951,7 @@ async function start() {
         steps++;
       }
       if (steps === 6) accumulator = Math.min(accumulator, STEP);
-      scene.updateAim(ground, !sim.sniping && pointer.inside && !selectionDrag && !covering);
+      scene.updateAim(ground, !sim.sniping && pointer.inside && interaction.type === "fire" && !selectionDrag && !covering);
     } else scene.updateAim(ground, false);
     audio.setListener(scene.listenerPosition, scene.listenerRight);
     replay?.frame(sim, { camera: scene.inspectCamera(), scope: scene.scope.inspect(), paused,

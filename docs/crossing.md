@@ -8,7 +8,8 @@ Receiving. Squad configuration and heavier weapons remain in Practice / debug.
 
 Select **02 · Crossing** in Deployment, or **Next contract · Crossing** after
 Receiving. The briefing freezes the encounter; Deploy squad starts it. Restart,
-replay export and development replay playback support both contracts.
+replay export and development replay playback support all contracts. Completion
+opens **Next contract · Handling**, the hauling lesson.
 
 ## Covering orders
 

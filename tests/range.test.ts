@@ -22,6 +22,19 @@ describe("proving ground simulation", () => {
     for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
   };
 
+  test("dead squad members leave selection and cannot be selected individually, additively or as a group", () => {
+    sim.select(5);
+    const down = sim.squad[1]; sim.damage(down, down.hp, { x: 0, y: 0, z: 0 }, down.body.translation(), "rifle");
+    expect(sim.selected.has(down.id)).toBe(false);
+    const selected = [...sim.selected];
+    for (const additive of [false, true]) { sim.select(down.id, additive); expect([...sim.selected]).toEqual(selected); }
+    sim.selectGroup([down.id]); expect([...sim.selected]).toEqual(selected);
+    sim.selectGroup([down.id, 3]); expect([...sim.selected]).toEqual([3]);
+    sim.select(5); expect([...sim.selected]).toEqual([1, 3, 4]);
+    sim.select(1); sim.damage(sim.primary, sim.primary.hp, { x: 0, y: 0, z: 0 }, sim.primary.body.translation(), "rifle");
+    expect(sim.selected.size).toBe(0); sim.select(5); expect([...sim.selected]).toEqual([3, 4]);
+  });
+
   test("the full squad settles onto the four corners of its square move order", () => {
     sim.select(5);
     sim.move({ x: 0, z: 8 });
