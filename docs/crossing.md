@@ -78,6 +78,9 @@ reservation, holds other robots in separated dry-bank lanes, and releases the
 reservation once the crosser clears the landing. Steering retains the current
 reservation; queued follow-up waypoints survive admission. The navigation grid
 is reused, with no per-frame bridge A* search and no body teleporting.
+The mission and HUD recognize dry-bank positions separately from that transit
+clearance. Covering near the shore counts as across even inside the larger
+queue-release margin, so it cannot suppress the final crossing's pursuit alarm.
 
 Actual hulls, wrecks and loose cargo on the deck contribute their physical mass.
 An overload lasting 0.65 s buckles it and removes the deck collider. The load

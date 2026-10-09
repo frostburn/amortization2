@@ -5,6 +5,8 @@ import { Simulation } from "../src/game/simulation";
 import { segmentClear } from "../src/game/navigation";
 
 const zero = { x: 0, y: 0, z: 0 };
+// Dry-bank covering positions from the human replay that skipped the alarm.
+const farCover = [{ x: 7.961, z: -4.964 }, { x: 7.985, z: -7.166 }, { x: 8.363, z: -2.231 }];
 const ticks = (sim: Simulation, seconds: number) => {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
 };
@@ -145,6 +147,44 @@ describe("Crossing contract", () => {
     expect(sim.mission!.enemies.every(a => a.ai!.gate === "WEST BANK" && a.weapon === "pistol" && !a.braced)).toBe(true);
     expect(sim.mission!.phase).not.toBe("complete");
   }, 15000);
+
+  test("near-shore cover inside the queue clearance still allows the last entry alarm and withdrawal", () => {
+    sim.mission!.deploy(); clearGuards();
+    const supporting = [sim.squad[0], sim.squad[1], sim.squad[3]];
+    supporting.forEach((a, i) => a.body.setTranslation({ x: 11 + i * 2, y: .98, z: -3 }, true));
+    sim.step(); // They have already crossed, then reposition nearer the shore.
+    supporting.forEach((a, i) => a.body.setTranslation({ ...farCover[i], y: .98 }, true));
+    sim.selectGroup([1, 2, 4]); sim.coverSector({ x: -15, z: 0 }); sim.step();
+    expect(supporting.every(a => !sim.mission!.bridge!.onDeck(a.body.translation()))).toBe(true);
+    expect(supporting.every(a => sim.mission!.bridge!.side(a.body.translation()) === 0)).toBe(true);
+    sim.select(3); sim.move({ x: 8.05, z: 0 });
+    expect(sim.mission!.alarmAt).toBeUndefined();
+    waitFor(() => sim.mission!.alarmAt !== undefined, 8);
+    expect(sim.mission!.bridge!.onDeck(sim.primary.body.translation())).toBe(true);
+    const alarm = sim.mission!.alarmAt;
+    ticks(sim, 1); expect(sim.mission!.inspect().pursuers).toBe(3);
+    clearGuards(); // Isolate shore recognition from the separately-tested pursuit fight.
+    waitFor(() => sim.mission!.phase === "withdraw", 8);
+    expect(sim.squad.every(a => a.body.translation().x < CROSSING_BRIDGE.clearance)).toBe(true);
+    expect(sim.mission!.inspect().crossed).toHaveLength(4);
+    sim.move({ x: -14, z: 0 });
+    waitFor(() => sim.mission!.bridge!.onDeck(sim.primary.body.translation()), 8);
+    expect(sim.mission!.alarmAt).toBe(alarm);
+    expect(sim.events.filter(e => e.type === "bridge" && e.phase === "alarm")).toHaveLength(1);
+    expect(sim.mission!.inspect().pursuers).toBe(3);
+  }, 20000);
+
+  test("near-shore survivors are not stranded by a disabled final crosser on the deck", () => {
+    sim.mission!.deploy(); clearGuards();
+    sim.squad.slice(0, 3).forEach((a, i) => a.body.setTranslation({ ...farCover[i], y: .98 }, true));
+    const casualty = sim.squad[3]; casualty.body.setTranslation({ x: 0, y: .98, z: 0 }, true);
+    sim.damage(casualty, casualty.hp, zero, casualty.body.translation(), "pistol");
+    ticks(sim, 3);
+    expect(sim.mission!.phase).toBe("withdraw");
+    expect(sim.mission!.failureReason).toBeUndefined();
+    expect(sim.mission!.bridge!.collapsed).toBe(false);
+    expect(sim.mission!.bridge!.onDeck(casualty.body.translation())).toBe(true);
+  });
 
   test("failing to turn cover back exposes the final crossing to real pursuit fire", () => {
     sim.mission!.deploy(); clearGuards();

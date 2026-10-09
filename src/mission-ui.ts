@@ -61,7 +61,7 @@ export function updateMissionUI(sim: Simulation) {
   const marker = mission.marker;
   const near = marker ? living.filter(a => Math.hypot(a.body.translation().x - marker.x,
     a.body.translation().z - marker.z) < marker.radius).length : 0;
-  const across = mission.bridge ? living.filter(a => mission.bridge!.side(a.body.translation()) === 1).length : 0;
+  const across = mission.bridge ? living.filter(a => mission.bridge!.shore(a.body.translation()) === 1).length : 0;
   setText("mission-detail", mission.phase === "crossing" ? `${across} / ${living.length} across${mission.alarmAt !== undefined ? " · West-bank pursuit" : " · One chassis at a time"}`
     : mission.phase === "withdraw" ? `${near} / ${living.length} at the van`
     : mission.phase === "dispatch" ? near ? "Dispatcher accepting release…" : "Bring one robot onto the yellow pad"

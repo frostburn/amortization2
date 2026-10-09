@@ -1,5 +1,5 @@
 import RAPIER from "@dimforge/rapier3d-compat";
-import { STEP, distance2, type Vec2 } from "./config";
+import { STEP, distance2, type Vec2, type Vec3 } from "./config";
 import type { Actor, Simulation } from "./simulation";
 
 export type BridgeSpec = Vec2 & { length: number; width: number; bank: number; clearance: number;
@@ -24,6 +24,11 @@ export class SingleLoadBridge {
       Math.abs(p.z - this.spec.z) < this.spec.width / 2 + 0.3 && p.y > -0.2 && p.y < 2.2;
   }
   side(p: Vec2) { return p.x > this.spec.x + this.spec.clearance ? 1 : p.x < this.spec.x - this.spec.clearance ? -1 : 0; }
+  /** Actual shore, excluding the deck; queue release uses a larger margin. */
+  shore(p: Vec3) {
+    if (this.onDeck(p)) return 0;
+    return p.x > this.spec.x + this.spec.bank ? 1 : p.x < this.spec.x - this.spec.bank ? -1 : 0;
+  }
   cancel(actor: Actor) {
     this.transits.delete(actor.id);
     if (this.admitted === actor.id && !this.onDeck(actor.body.translation())) this.admitted = null;

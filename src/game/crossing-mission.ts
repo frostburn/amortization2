@@ -83,25 +83,25 @@ export class CrossingMission extends Mission {
     for (const a of living) {
       const p = a.body.translation();
       if (p.y < -0.4) this.sim.damage(a, a.hp, { x: 0, y: 0, z: 0 }, p);
-      else if (this.bridge!.side(p) === 1) this.crossed.add(a.id);
+      else if (this.bridge!.shore(p) === 1) this.crossed.add(a.id);
     }
     const survivors = living.filter(a => !a.dead);
     if (!survivors.length) { this.failureReason = "Squad lost at the canal"; this.finish("failed"); return; }
-    if (this.bridge!.collapsed && survivors.some(a => this.bridge!.side(a.body.translation()) !== 1)) {
+    if (this.bridge!.collapsed && survivors.some(a => this.bridge!.shore(a.body.translation()) !== 1)) {
       this.failureReason = "The overloaded bridge collapsed";
       this.finish("failed"); return;
     }
     const strandedWreck = this.sim.squad.some(a => a.dead && this.bridge!.onDeck(a.body.translation()) &&
       this.sim.time - (a.deathTime ?? this.sim.time) > 2 &&
       Math.hypot(a.body.linvel().x, a.body.linvel().y, a.body.linvel().z) < 0.3);
-    if (strandedWreck && survivors.some(a => this.bridge!.side(a.body.translation()) !== 1)) {
+    if (strandedWreck && survivors.some(a => this.bridge!.shore(a.body.translation()) !== 1)) {
       this.failureReason = "A disabled chassis is blocking the bridge";
       this.finish("failed"); return;
     }
     // Physical entry by the last surviving near-bank chassis, rather than a
     // queued click or the death of a teammate. Retreat never retriggers it.
     if (this.alarmAt === undefined) {
-      const remaining = survivors.filter(a => this.bridge!.side(a.body.translation()) !== 1);
+      const remaining = survivors.filter(a => this.bridge!.shore(a.body.translation()) !== 1);
       if (remaining.length === 1 && this.bridge!.onDeck(remaining[0].body.translation()) &&
           !this.bridge!.onDeck(remaining[0].previous) && remaining[0].body.translation().x > remaining[0].previous.x) {
         this.alarmAt = this.sim.time;
@@ -109,7 +109,7 @@ export class CrossingMission extends Mission {
         this.sim.events.push({ type: "comms", speaker: "vale", message: "Access alarm. Machines coming down the west bank. Turn your covering robots back toward the bridge." });
       }
     }
-    if (this.phase === "crossing" && survivors.every(a => this.bridge!.side(a.body.translation()) === 1)) {
+    if (this.phase === "crossing" && survivors.every(a => this.bridge!.shore(a.body.translation()) === 1)) {
       this.phase = "withdraw";
       this.sim.events.push({ type: "comms", speaker: "morrow", message: "Everyone across. Cover the withdrawal and bring the squad to the van." });
     }
