@@ -8,9 +8,11 @@ The first human is an ordinary **maintenance worker**, designed from original pr
 
 Faces are deliberately blank, skin-toned surfaces. Hair, ears, a neck and uncovered hands identify a person without eyes, a mouth, a visor or facial animation. The blank face belongs to the visual language of the game; it is not a mask in the fiction. Conversation can continue to use the existing illustrated portraits.
 
-The worker wears a faded slate-blue jacket over a neutral undershirt, charcoal trousers and rounded brown work boots. A folded collar, one pocket, cuffs and a quiet centre seam suggest actual clothing. Soft, tapered volumes distinguish cloth and anatomy from PORTER's exposed joints and the squad's armour plates. No glowing panels, armoured shoulders, oversized boots or floating role text are needed to announce a human.
+The worker wears a faded slate-blue jacket over a neutral undershirt, charcoal trousers and enclosed brown work boots. A folded neckline, a subtle pocket, turned hems, cuffs and a quiet centre seam suggest actual clothing. The sleeves are sewn into the jacket surface, and the trousers share a crotch seam. Loose garment volumes and blended bends distinguish the person from PORTER's exposed joints and the squad's armour plates. No glowing panels, armoured shoulders, oversized boots or floating role text are needed to announce a human.
 
 At tactical distance, identity comes from silhouette, colour blocks and movement. The lighter exposed head and hands provide small contrast cues; a narrower body and relaxed arms separate the person from armed robots. The standing, walking and crouching poses allow that distinction to be checked before mission integration. The gait uses two-bone leg placement to keep the feet grounded; crouching brings the knees forward and torso over the feet.
+
+The prefab uses one indexed `SkinnedMesh` and a shared 16-bone skeleton. The jacket and sleeves, pelvis and trouser legs, and each palm and thumb have connected topology; there are no overlapping shoulder caps or separate elbow/knee balls. The collar folds out of the neckline, rather than floating above it. Clothing weights blend across the shoulders, elbows, hips and knees, while the trouser cuffs follow the boots to keep their shafts covered when crouching. Each boot has a connected sole, closed toe box and ankle upper. This is skeletal cloth deformation with built-in ease and small folds, without cloth simulation.
 
 This is one design study, rather than the final civilian wardrobe. Future variations should keep the same scale and rig, changing clothing colour, hair and practical accessories. Do not add face details simply to make the inspection close-up busier. Future missions still need human movement, reactions and objectives before the model becomes playable.
 
@@ -37,6 +39,7 @@ The human stays in the lineup. ANCHOR, ROOK and PORTER are shown by default. NEE
 ## Reuse
 
 - `src/render/humans.ts`: standalone `makeHuman()` prefab, pose updater and resource disposal. Forward is +Z; the floor is Y=0. It has no gameplay or physics dependencies.
+- `src/render/human-surface.ts`: indexed surface builder for sewn openings, curved branches, material groups and skin weights. Adjacent garment panels reuse vertices so the skeleton deforms a continuous surface.
 - `src/render/actor-model.ts`: the articulated military and WATCH geometry used by both the combat renderer and the model room. Combat's indicators and effects remain in `RangeScene`.
 - `src/render/model-room-cast.ts`: comparison metadata and frozen instances of the production civilian/traffic fleets. A private port fixture supplies their source data and frees its physics world after construction. No simulation, sound or AI runs in the viewer.
 - `src/model-room.ts`: independent orbitable Three.js page, sharing game materials and camera constants, with optional name plates and a one-metre grid.
