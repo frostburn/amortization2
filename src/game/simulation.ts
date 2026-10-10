@@ -33,7 +33,7 @@ import { NavigationGrid, segmentClear } from "./navigation";
 import { WalkTerrain, SurfaceNavigation, surfacePrism } from "./walk-surfaces";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat } from "./arena";
-import type { EnemyBrain } from "./enemies";
+import { alertEnemies, type EnemyBrain } from "./enemies";
 import { ReceivingMission, type Mission, type Contact } from "./missions";
 import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
@@ -982,6 +982,7 @@ export class Simulation {
     const glass = !!hit && !!this.city?.windows.hit(hit.collider.handle, to, hit.normal);
     const fixture = !!hit && !glass && !!this.mission?.damageFixture(hit.collider.handle, spec.damage);
     if (!glass && !fixture && target && !target.dead) {
+      if (a.kind === "player" && target.kind === "enemy") alertEnemies(this, this.walkingPoint(a));
       this.damage(
         target,
         spec.damage,

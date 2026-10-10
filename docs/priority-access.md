@@ -42,6 +42,11 @@ ramp's filled base to begin climbing.
    deployment lies beyond its notice and firing range. There is time to orient
    and move out before engaging. The guards fire single shots at a 2.2-second
    cadence, with ordinary recoil, stagger, ammunition and physical navigation.
+   A damaging player shot broadcasts its firing position to every active enemy,
+   even if it kills the victim immediately. Alerted defenders leave their posts
+   and investigate that last known position; they still need ordinary line of
+   sight and pistol range to fire. Misses do not reveal the squad, and enemies
+   do not learn subsequent movement without another hit or close contact.
    Defeating the last guard opens the east gate, spawns the green service van
    at the eastern approach and starts its drive into the yard. No equipment
    visit or access-pad interaction is required; the yellow contractor van is removed.
