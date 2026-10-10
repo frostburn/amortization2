@@ -3,7 +3,7 @@ import type { BoxSpec, Vec2 } from "./config";
 import type { WalkSurface } from "./walk-surfaces";
 
 export const PRIORITY_SITES = {
-  loading: { x: 25, z: 0, radius: 5 },
+  loading: { x: -24, z: -18, radius: 5 },
   dispatch: { x: 10, z: -19, radius: 3.2 },
   exit: { x: -49, z: 20, radius: 2.8 },
   van: { x: -50, z: 15 },

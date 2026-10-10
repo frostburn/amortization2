@@ -50,7 +50,8 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
     barriers: PRIORITY_FIXTURES, platforms: [], walkSurfaces: PRIORITY_SURFACES, walkVolumes: PRIORITY_RAILS,
     players: [[-1.1, 1.1], [-1.1, -1.1], [1.1, -1.1], [1.1, 1.1]].map(([x, z]) =>
       ({ x: PRIORITY_SITES.exit.x + x, z: PRIORITY_SITES.exit.z + z })),
-    targets: [], props: [22, 26].map(x => ({ x, z: -5.4, w: 1.15, h: 1.7, d: .9, mass: 65, style: "equipment" })),
+    targets: [], props: [-3, 1].map(dx => ({ x: PRIORITY_SITES.loading.x + dx,
+      z: PRIORITY_SITES.loading.z - 5.4, w: 1.15, h: 1.7, d: .9, mass: 65, style: "equipment" })),
   },
   concourse: {
     name: "RAISED CONCOURSE", city: CONCOURSE_DISTRICT, bounds: CONCOURSE_DISTRICT.bounds,

@@ -39,9 +39,10 @@ export class PriorityView {
       block(kit, .5, .36, .2, x, 2.7, -22.45, this.lamp);
     }
     // Wheeled flight cases and a roller bed make the loading bay recognisable.
-    block(kit, 6, .18, 1.6, 23, .45, -3.5, steel);
-    for (let x = 20.3; x < 25.9; x += .4) {
-      const roller = tube(kit, .08, 1.45, x, .6, -3.5, dark);
+    const loading = PRIORITY_SITES.loading;
+    block(kit, 6, .18, 1.6, loading.x - 2, .45, loading.z - 3.5, steel);
+    for (let dx = -4.7; dx < .9; dx += .4) {
+      const roller = tube(kit, .08, 1.45, loading.x + dx, .6, loading.z - 3.5, dark);
       roller.rotation.x = Math.PI / 2;
     }
     for (const p of [PRIORITY_SITES.loading, PRIORITY_SITES.exit]) for (const sign of [-1, 1]) {

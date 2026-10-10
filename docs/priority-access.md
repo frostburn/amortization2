@@ -44,8 +44,9 @@ ramp's filled base to begin climbing.
    cadence, with ordinary recoil, stagger, ammunition and physical navigation.
 2. **Secure the equipment.** Hold a ground-level robot beside the yellow
    contractor van for a second to reclaim its load. This can happen during the
-   perimeter fight. The van stays in the loading bay, leaving the technicians'
-   arrival lane clear. There is no removal timer or gate drive. A wrecked van
+   perimeter fight. The van stays in the loading bay beside the exchange, clear
+   of the frontage firing line and the technicians' arrival lane. There is no
+   removal timer or gate drive. A wrecked van
    still leaves the equipment recoverable at its position, with ordinary
    collateral/security consequences.
 3. **Open access.** Once the perimeter and equipment are secure, occupy the pad

@@ -24,7 +24,7 @@ describe("Priority Access", () => {
   };
   const open = async (model: "sniper" | "minigunner" | "assault" = "sniper") => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
-    place(sim.squad[0], { x: 25, z: -4 }); ticks(1.1);
+    place(sim.squad[0], { x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 }); ticks(1.1);
     place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(1.6);
     expect(mission().phase).toBe("restore");
   };
@@ -95,7 +95,7 @@ describe("Priority Access", () => {
     expect(distance2(mission().recovery.body.translation(), PRIORITY_SITES.loading)).toBeLessThan(.1);
     expect(mission().recovery.parked).toBe(true); expect(mission().recovery.arrival).toBeUndefined();
     expect(mission().gateOpen).toBe(false);
-    place(sim.squad[0], { x: mission().equipmentSite.x, z: -4 }); ticks(1.1);
+    place(sim.squad[0], { x: mission().equipmentSite.x, z: mission().equipmentSite.z - 4 }); ticks(1.1);
     expect(mission().removal).toBe("secured"); expect(mission().phase).toBe("dispatch");
     place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(1.6);
     for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {
@@ -121,7 +121,7 @@ describe("Priority Access", () => {
 
   test("a loading-bay visit does not open access through a live perimeter", async () => {
     sim = await Simulation.create("priority"); sim.mission!.deploy();
-    place(sim.squad[0], { x: 25, z: -4 }); ticks(1.1);
+    place(sim.squad[0], { x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 }); ticks(1.1);
     expect(mission().removal).toBe("secured"); expect(mission().phase).toBe("yard");
     place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(2);
     expect(mission().gateOpen).toBe(false); expect(mission().responseAt).toBeUndefined();
@@ -149,8 +149,12 @@ describe("Priority Access", () => {
     const attacker = mission().response.find(a => a.ai!.gate === "STREET RESPONSE" && a.ai!.flank > 0)!;
     disable(mission().response.filter(a => a !== attacker));
     place(attacker, { x: 48, z: 14 });
+    // Isolate the intended target; access no longer leaves a van masking the
+    // service-door robot from this attacker.
+    sim.squad.slice(0, 3).forEach((a, i) => place(a, { ...PRIORITY_SITES.exit, x: PRIORITY_SITES.exit.x + i * 2 }));
     place(sim.squad[3], { x: 20.5, z: 4.6 });
-    Object.assign(attacker.ai!, { state: "advancing", entryUntil: 0, nextThink: 0, nextRoute: 0, nextAttack: Infinity });
+    Object.assign(attacker.ai!, { state: "advancing", target: null, visible: false,
+      entryUntil: 0, nextThink: 0, nextRoute: 0, nextAttack: Infinity });
     until(() => attacker.ai!.visible, 12);
     expect(attacker.ai!.target).toBe(4);
     expect(Math.abs(sim.walkingPoint(attacker).y)).toBeLessThan(.1);
@@ -167,7 +171,7 @@ describe("Priority Access", () => {
 
   test.each(["sniper", "minigunner", "assault"] as const)("%s contract can restart service with real vehicle/crew navigation, then recover the whole squad", async model => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
-    sim.select(1); sim.move({ x: 25, z: -4 });
+    sim.select(1); sim.move({ x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 });
     until(() => mission().removal === "secured", 45);
     sim.move(PRIORITY_SITES.dispatch); until(() => mission().phase === "restore", 25);
     // Resolve the finite combat encounters to isolate access, crew routing and
