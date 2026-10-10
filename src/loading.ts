@@ -4,6 +4,8 @@ const title = document.getElementById("loading-title")!;
 const status = document.getElementById("loading-status")!;
 const progress = document.getElementById("loading-progress") as HTMLProgressElement;
 const retry = document.getElementById("loading-retry") as HTMLButtonElement;
+// Preparation owns this modal's lifetime; Escape must not expose an unfinished game.
+panel.addEventListener("cancel", event => event.preventDefault());
 retry.addEventListener("click", () => location.reload());
 
 export const loading = {
