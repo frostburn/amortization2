@@ -38,7 +38,7 @@ ramp's filled base to begin climbing.
 
 1. **Break the perimeter.** Two mobile street guards, two braced yard posts and
    two braced concourse posts cover different approaches. All six carry pistols.
-   The street patrol stays inside the yard with a ten-metre pursuit limit;
+   The street patrol starts off the public road with a ten-metre pursuit limit;
    deployment lies beyond its notice and firing range. There is time to orient
    and move out before engaging. The guards fire single shots at a 2.2-second
    cadence, with ordinary recoil, stagger, ammunition and physical navigation.
@@ -98,3 +98,6 @@ filled ramps, retained repair progress, crew loss, actual service vehicle and
 technician navigation, survivor recovery for all three squads and replay
 reconstruction. Native browser checks exercise selection, movement, weapon fire,
 scoping, restart and rendered UI at desktop and laptop sizes.
+
+The [recorded assault-squad verification run](replays/README.md) includes a
+viewable JSON export, capture provenance and playback instructions.
