@@ -29,6 +29,8 @@ describe("Priority Access", () => {
     expect(mission().phase).toBe("restore");
   };
 
+  // The first creation initializes Rapier and warms the district's layered
+  // navigation cache; shared CI runners need more than the default five seconds.
   test.each(["sniper", "minigunner", "assault"] as const)("deploys the chosen %s configuration and freezes it in briefing", async model => {
     sim = await Simulation.create("priority", model);
     expect(mission().definition.selectableSquad).toBe(true);
@@ -43,7 +45,7 @@ describe("Priority Access", () => {
     sim.reset("receiving", model);
     expect(sim.pistolsOnly).toBe(true);
     expect(sim.squad.every(a => a.weapon === "pistol" && a.model === "assault")).toBe(true);
-  });
+  }, 15_000);
 
   test("all four ramps are connected and a street order stays below the concourse", async () => {
     sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
