@@ -56,8 +56,9 @@ export const PRIORITY_COVER: BoxSpec[] = [
   { x: 52, z: 9, w: .4, d: 5, h: 2.6, style: "wall" },
 ];
 export const PRIORITY_GUARDS: { position: Vec2; brace: boolean; leash: number }[] = [
-  { position: { x: -17, z: 28 }, brace: false, leash: 20 },
-  { position: { x: -13, z: 31 }, brace: false, leash: 20 },
+  // Keep the patrol and its entire firing envelope outside deployment.
+  { position: { x: -8, z: 25 }, brace: false, leash: 10 },
+  { position: { x: -4, z: 28 }, brace: false, leash: 10 },
   { position: { x: 10, z: 5 }, brace: true, leash: 9 },
   { position: { x: 32, z: 6 }, brace: true, leash: 9 },
   { position: { x: -8, z: -12, y: 4.8 }, brace: true, leash: 12 },

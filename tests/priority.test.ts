@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { STEP, ROBOT_MODELS, distance2, type Vec2 } from "../src/game/config";
+import { PISTOL, STEP, ROBOT_MODELS, distance2, type Vec2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { PriorityMission } from "../src/game/priority-mission";
 import { PRIORITY_RESPONSE, PRIORITY_SITES } from "../src/game/priority";
@@ -46,6 +46,27 @@ describe("Priority Access", () => {
     expect(sim.pistolsOnly).toBe(true);
     expect(sim.squad.every(a => a.weapon === "pistol" && a.model === "assault")).toBe(true);
   }, 15_000);
+
+  test.each(["sniper", "minigunner", "assault"] as const)("%s deployment stays safe while the player orients", async model => {
+    sim = await Simulation.create("priority", model); sim.mission!.deploy();
+    ticks(20);
+    expect(mission().enemyShots).toBe(0);
+    expect(sim.squad.every(a => a.hp === a.maxHp)).toBe(true);
+    expect(mission().guards.every(a => a.ai!.target === null && a.ai!.state === "holding")).toBe(true);
+  });
+
+  test("pistol defenders engage an advancing squad without an opening burst or grenade", async () => {
+    sim = await Simulation.create("priority", "assault"); sim.mission!.deploy();
+    expect(mission().guards.every(a => a.weapon === "pistol" && a.weapons.length === 1 &&
+      a.pistol.ammo === PISTOL.magazine && a.ammo === 0)).toBe(true);
+    sim.select(5); sim.move({ x: -16, z: 25 }); ticks(5);
+    const shots = sim.events.filter(e => e.type === "shot" && mission().guards.some(a => a.id === e.actor));
+    expect(shots.length).toBeGreaterThan(0);
+    expect(shots.every(e => e.type === "shot" && e.weapon === "pistol")).toBe(true);
+    expect(sim.squad.some(a => a.hp < a.maxHp)).toBe(true);
+    expect(sim.squad.every(a => !a.dead)).toBe(true);
+    expect(sim.grenades).toHaveLength(0);
+  });
 
   test("all four ramps are connected and a street order stays below the concourse", async () => {
     sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
@@ -97,9 +118,12 @@ describe("Priority Access", () => {
     const at = mission().responseAt!;
     ticks(6); expect(mission().response).toHaveLength(0);
     ticks(1.2); expect(mission().response).toHaveLength(4);
+    expect(mission().response.every(a => a.weapon === "pistol" && a.weapons.length === 1 &&
+      a.pistol.ammo === PISTOL.magazine && a.ammo === 0 && a.ai!.nextGrenade === Infinity)).toBe(true);
     disable(mission().response); ticks(9.1);
     expect(mission().response).toHaveLength(2);
     expect(mission().response.every(a => a.spawn.y < 1.1 && a.ai!.rally.y === 4.8)).toBe(true);
+    expect(mission().response.every(a => a.weapon === "pistol" && a.weapons.length === 1 && a.ai!.nextGrenade === Infinity)).toBe(true);
     expect(sim.time - at).toBeGreaterThanOrEqual(PRIORITY_RESPONSE[1].delay);
     disable(mission().response); ticks(8);
     expect(sim.actors.filter(a => a.kind === "enemy")).toHaveLength(12);

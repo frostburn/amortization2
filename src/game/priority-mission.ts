@@ -1,5 +1,5 @@
 import RAPIER from "@dimforge/rapier3d-compat";
-import { STEP, distance2, type Vec2 } from "./config";
+import { PISTOL, STEP, distance2, type Vec2 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { Mission, type MissionDefinition } from "./missions";
 import { PRIORITY_GATE, PRIORITY_GUARDS, PRIORITY_RESPONSE, PRIORITY_SITES } from "./priority";
@@ -13,16 +13,16 @@ export const PRIORITY_CONTRACT = {
   briefing: [
     { speaker: "rook", message: "NEEDLE gives you reach. The two heavies turn back an advance. Four machinegunners give you two useful pairs. Q for automatic fire, E for the rifle, G for grenades. Rifle shots and grenades can hit our own team." },
     { speaker: "morrow", message: "Quill established who owns the equipment. Gannet is taking it anyway. Clear their six machines, stop the loading van, and open access for the technicians. Keep the equipment here. Get their people back inside." },
-    { speaker: "vale", message: "The patrol moves; the yard and concourse posts brace. Four ramps reach the upper route; a lane runs underneath. Get a robot beside the loading van to stop removal. If loading finishes, it waits at the east gate. Their response can use the east street and concourse ramp." },
+    { speaker: "vale", message: "They carry pistols. The street patrol stays by the yard; the yard and concourse posts brace. Four ramps reach the upper route; a lane runs underneath. Get a robot beside the loading van to stop removal. If loading finishes, it waits at the east gate. Their response can use the east street and concourse ramp." },
   ],
   objectives: ["Break the yard perimeter", "Stop the equipment removal", "Open access at the service door", "Protect the restart and defeat the response", "Recover the surviving squad"],
   releaseSeconds: 1.5, returnSeconds: 1,
 } as const satisfies MissionDefinition;
 
-const DEFENDERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: .21,
-  attackInterval: 1.4, reactionTime: .65, noticeRange: 46 };
-const RESPONSE: EnemyProfile = { brace: false, grenades: true, automaticBurst: .29,
-  attackInterval: 1.35, reactionTime: .75, noticeRange: 60 };
+const DEFENDERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: .06,
+  attackInterval: 2.2, reactionTime: 1.1, noticeRange: PISTOL.range, pistolRange: 22 };
+const RESPONSE: EnemyProfile = { brace: false, grenades: false, automaticBurst: .06,
+  attackInterval: 2.4, reactionTime: 1.1, noticeRange: 60, pistolRange: 22 };
 const REPAIR_SECONDS = 20;
 const LOADING_SECONDS = 65;
 
@@ -72,10 +72,14 @@ export class PriorityMission extends Mission {
 
   private spawn(position: Vec2, rally: Vec2, i: number, squad: number, gate: string): Actor {
     const a = this.sim.addEnemy("assault", position);
+    a.weapons = ["pistol"];
+    a.weapon = "pistol";
+    a.ammo = 0;
+    a.pistol.ammo = PISTOL.magazine;
     a.ai = { squad, gate, rally: { ...rally }, flank: i % 2 ? .55 : -.55, target: null,
       aim: { x: rally.x, y: (rally.y ?? 0) + 1.65, z: rally.z }, state: squad ? "entering" : "holding",
       nextThink: this.sim.time + i * .04, nextRoute: 0, nextAttack: this.sim.time + 1,
-      entryUntil: this.sim.time + 14, nextGrenade: squad === 1 ? this.sim.time + 9 : Infinity,
+      entryUntil: this.sim.time + 14, nextGrenade: Infinity,
       burstUntil: 0, visible: false, fire: false };
     if (squad) this.sim.navigate(a, rally);
     return a;
@@ -117,12 +121,12 @@ export class PriorityMission extends Mission {
         const rally = { ...group.rally, x: group.rally.x + n % 2 * 3, z: group.rally.z + Math.floor(n / 2) * 3 };
         const a = this.spawn(p, rally, n, i + 1, group.name);
         this.responseIds.push(a.id);
-        this.profiles.set(a.id, { ...RESPONSE, brace: group.brace, grenades: i === 0 });
+        this.profiles.set(a.id, { ...RESPONSE, brace: group.brace });
       });
       const p = group.positions[0];
       this.sim.events.push({ type: "security", phase: "arrival", position: { ...p, y: 1 }, level: 1 });
       this.sim.events.push({ type: "comms", speaker: "vale", message: i === 0
-        ? "The workshop can see four response machines coming west along the street. They have grenades."
+        ? "The workshop can see four response machines coming west along the street. Same pistol equipment as the perimeter."
         : "Two more at the north end of the east ramp. They're taking the concourse above the service lane." });
     }
     // Technicians stay behind the exchange frontage. Response squads contest

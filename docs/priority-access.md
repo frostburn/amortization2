@@ -37,8 +37,11 @@ ramp's filled base to begin climbing.
 ## Encounter sequence
 
 1. **Break the perimeter.** Two mobile street guards, two braced yard posts and
-   two braced concourse posts cover different approaches. The six use ordinary
-   machine guns, recoil, stagger, ammunition and physical navigation.
+   two braced concourse posts cover different approaches. All six carry pistols.
+   The street patrol stays inside the yard with a ten-metre pursuit limit;
+   deployment lies beyond its notice and firing range. There is time to orient
+   and move out before engaging. The guards fire single shots at a 2.2-second
+   cadence, with ordinary recoil, stagger, ammunition and physical navigation.
 2. **Stop removal.** Hold a ground-level robot beside the recovery van for a
    second. This can happen during the perimeter fight. Loading takes 65 seconds;
    if it finishes, the van drives to the closed east gate and remains recoverable.
@@ -50,7 +53,8 @@ ramp's filled base to begin climbing.
 4. **Protect the restart.** Four street attackers enter after seven seconds.
    Two concourse attackers enter at ground level after sixteen seconds and climb
    the eastern north ramp. Both arrivals have sourced radio reports and an audible
-   arrival cue. This is one finite response, with no repeated waves or refits.
+   arrival cue. Both groups carry pistols, fire at a 2.4-second cadence and have
+   no grenades. This is one finite response, with no repeated waves or refits.
 5. **Recover the squad.** After restoration and defeat of the response, every
    surviving chassis must reach the west-square van.
 
