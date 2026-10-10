@@ -69,3 +69,34 @@ capture timestamps reflect that clock. This documents one scripted route with
 precise aiming; human play remains the difficulty check. Full combat validation
 here uses the assault configuration. Sniper and twin-minigun controls and damage
 were exercised separately, and tests check safe deployment for all three squads.
+
+## Confirmed-fire alert: re-simulation of human inputs
+
+[priority-access-alert-resimulation.json](priority-access-alert-resimulation.json)
+re-applies the supplied `amortization2-replay-attempt-3-2026-10-10T17-03-17-117Z.json`
+inputs to gameplay commit
+[`9b391c4311303544f32a2ad79e7dfacf2ac3914b`](https://github.com/frostburn/amortization2/commit/9b391c4311303544f32a2ad79e7dfacf2ac3914b).
+The original used NEEDLE, completed in 95.97 seconds and recorded zero enemy shots.
+
+The new capture uses the native recorder, unchanged recorded input order/ticks,
+and original camera observations. Simulation outcomes are freshly recorded;
+no positions, health, targets or objective results were injected. It is an
+**offline re-simulation**, not a new human playthrough or adaptive agent run.
+The recorder also saves its ordinary control synchronization, so its input count
+is larger than the original. Wall-clock timestamps reflect execution time.
+
+Guards now investigate the firing position after the first machinegun hit,
+before the first rifle shot. They move away from the original aiming points.
+Those fixed inputs lose the squad at **43.05 seconds**, after **27 enemy shots**,
+with four perimeter guards remaining. This shows the passive-post exploit is
+removed; it does not establish difficulty for a player reacting to the guards.
+Weapon damage, health, pistol range and firing cadence are unchanged.
+
+Import this JSON through **Controls & settings → View replay** to inspect it.
+The following check reproduces combat counters and actor positions within 2 cm:
+
+```sh
+npm run inspect:replay -- docs/replays/priority-access-alert-resimulation.json
+```
+
+Later gameplay changes may diverge; use the documented source commit to compare.

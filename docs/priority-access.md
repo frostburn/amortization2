@@ -101,3 +101,7 @@ scoping, restart and rendered UI at desktop and laptop sizes.
 
 The [archived assault-squad verification run](replays/README.md) covers the earlier
 equipment-visit flow; its source revision and playback instructions are documented.
+
+The [confirmed-fire re-simulation](replays/README.md#confirmed-fire-alert-re-simulation-of-human-inputs)
+replays the supplied sniper attempt against the alert behavior and records the
+changed enemy response. It is a fixed-input comparison, not an adaptive difficulty run.
