@@ -4,20 +4,21 @@
 
 [priority-access-assault.json](priority-access-assault.json) is the unchanged
 current-attempt export from a complete Playwright/Chromium run of Contract 05.
-It uses the pistol-opponent balance and the patrol placement clear of civilian
-traffic in commit [`c86ee85ca6320bfb7b39101064b1e80469711e7f`](https://github.com/frostburn/amortization2/commit/c86ee85ca6320bfb7b39101064b1e80469711e7f).
-The JSON records revision `c86ee85`.
+It uses the pistol-opponent balance, stationary contractor equipment bay and
+off-street squad pickup in commit
+[`a6fc8e9b2185f93cfc33ccad2a7dd87ac833e900`](https://github.com/frostburn/amortization2/commit/a6fc8e9b2185f93cfc33ccad2a7dd87ac833e900).
+The JSON records revision `a6fc8e9`.
 
 | Result | Recorded value |
 | --- | --- |
-| Simulated duration | 128.4 seconds / 7,704 ticks |
+| Simulated duration | 130.2 seconds / 7,813 ticks |
 | Outcome | Complete; dispatch restored; equipment secured |
 | Opponents defeated | Six perimeter guards and six response attackers |
 | Squad recovered | 4 / 4 |
-| Robot health, IDs 1–4 | 160, 160, 72, 160 / 160 |
+| Robot health, IDs 1–4 | 160, 160, 116, 160 / 160 |
 | Technician health | Both 88 / 88 |
-| Combat counters | 360 shots, 162 hits, four grenade throws |
-| Capture | One attempt; 193 inputs; 263 snapshots |
+| Combat counters | 368 shots, 162 hits, three grenade throws |
+| Capture | One attempt; 229 inputs; 267 snapshots |
 
 ### Watch it
 
@@ -46,10 +47,18 @@ sectors and grenades. Target coordinates came from the public read-only
 `inspect()` and `project()` helpers. No health, positions, enemy deaths, objectives
 or mission outcomes were injected into the live game.
 
-After five seconds at deployment, the squad clears the frontage, climbs the west
-terrace to engage the concourse posts, secures the loading van and opens the
-service door. Pairs cover the street and upper approach; grenades clear the raised
-response. The technicians restore dispatch and all four robots return west.
+After five seconds at deployment, the squad clears the two patrol guards,
+advances into the yard to engage its posts, then climbs the west terrace to
+engage the concourse guards. It secures the stationary yellow van's load and
+opens the service door. Pairs cover the street and upper approach; grenades
+clear the raised response. The technicians restore dispatch and all four
+robots return to the off-street bay beside the west ramp.
+
+The green service van reaches its normal stop without the blocked-lane fallback.
+All three civilian CABs are cruising at extraction and have advanced during the
+preceding ten seconds. Both mission vans and all civilian vehicles retain full
+health; the run triggers no civilian-security dispatch. General NPC controllers
+are unchanged.
 
 Playwright's virtual clock advances the ordinary fixed simulation steps, so the
 capture timestamps reflect that clock. This documents one scripted route with
