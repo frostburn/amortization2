@@ -88,9 +88,9 @@ IDs, gate state, repair progress, contest status, response groups and technician
 positions. Human replay capture and playback record the chosen configuration
 and the resolved movement/weapon inputs through the existing format.
 
-Focused tests cover configuration restrictions, supported routes, gate fallback,
-reinforcement timing, committed enemy flanks around filled ramps, retained repair
-progress, crew loss, actual service vehicle
-and technician navigation, survivor recovery for all three squads and replay
+Focused tests cover configuration restrictions, supported routes and thin railing
+clearance, gate fallback, reinforcement timing, committed enemy flanks around
+filled ramps, retained repair progress, crew loss, actual service vehicle and
+technician navigation, survivor recovery for all three squads and replay
 reconstruction. Native browser checks exercise selection, movement, weapon fire,
 scoping, restart and rendered UI at desktop and laptop sizes.

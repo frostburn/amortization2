@@ -118,6 +118,15 @@ describe("Priority Access", () => {
     expect(Math.abs(sim.walkingPoint(attacker).y)).toBeLessThan(.1);
   });
 
+  test("a robot beside the ramp railing routes around its foot instead of catching on the corner", async () => {
+    sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
+    sim.select(1); place(sim.primary, { x: 46.37, z: 21.005 });
+    const goal = { x: 42.78, z: 22.72, y: 0 };
+    sim.move(goal);
+    until(() => !sim.primary.path.length && distance2(sim.primary.body.translation(), goal) < .2, 8);
+    expect(Math.abs(sim.walkingPoint(sim.primary).y)).toBeLessThan(.1);
+  });
+
   test.each(["sniper", "minigunner", "assault"] as const)("%s contract can restart service with real vehicle/crew navigation, then recover the whole squad", async model => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
     sim.select(1); sim.move({ x: 25, z: -4 });

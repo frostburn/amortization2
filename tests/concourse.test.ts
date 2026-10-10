@@ -57,6 +57,18 @@ describe("raised debug district", () => {
     expect(t.pick({ x: 0, y: 30, z: 16 }, { x: 0, y: -1, z: 0 }).y).toBe(0);
   });
 
+  test("thin railings block the body footprint even when its corner samples miss the wall", () => {
+    const rail = { id: "thin-rail", x: 0, z: 0, w: .18, d: 8, height: 1, thickness: 1 };
+    const bounds = { left: -10, right: 10, back: -10, front: 10 };
+    const t = new WalkTerrain([], [rail], [], bounds);
+    expect(t.canStand({ x: .4, y: 0, z: 0 })).toBe(false);
+    expect(t.canStand({ x: .7, y: 0, z: 0 })).toBe(true);
+    const raised = new WalkTerrain([{ id: "deck", x: 0, z: 0, w: 12, d: 12, height: 4.8, thickness: .4 }],
+      [{ ...rail, height: 5.8, slopeZ: .2 }], [], bounds);
+    expect(raised.canStand({ x: .4, y: 0, z: 0 })).toBe(true);
+    expect(raised.canStand({ x: .4, y: 4.8, z: 0 })).toBe(false);
+  });
+
   test("movement chooses the current floor under open decks without changing weapon picking", () => {
     const t = terrain(), bridge = t.pick({ x: 0, y: 30, z: -16 }, { x: 0, y: -1, z: 0 });
     expect(t.movementPoint(bridge, 0)).toEqual({ x: 0, y: 0, z: -16 });
