@@ -43,6 +43,8 @@ export class RangeAudio {
   private porterServos = new Map<number, CartMotor & { step: number }>();
   private transients = new Set<AudioScheduledSourceNode>();
   private pending?: Promise<void>;
+  private sampleCount = 0;
+  private loadProgress?: (loaded: number, total: number) => void;
   private noise?: AudioBuffer;
   muted = false;
   volume = 0.6;
@@ -62,8 +64,10 @@ export class RangeAudio {
     this.listenerRight = { ...right };
   }
 
-  async unlock() {
+  async unlock(onProgress?: (loaded: number, total: number) => void) {
+    if (onProgress) this.loadProgress = onProgress;
     if (this.context) {
+      this.loadProgress?.(this.buffers.size, this.sampleCount);
       await this.context.resume();
       return this.pending;
     }
@@ -82,27 +86,30 @@ export class RangeAudio {
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const samples = {
+      start: startUrl,
+      loop: loopUrl,
+      end: endUrl,
+      blast: blastUrl,
+      rifleNear: rifleNearUrl,
+      rifleFar: rifleFarUrl,
+      rifleReload: rifleReloadUrl,
+      pistol: pistolUrl,
+      minigunUp: minigunUpUrl,
+      minigunMotor: minigunMotorUrl,
+      minigunDown: minigunDownUrl,
+      minigunStart: minigunStartUrl,
+      minigunLoop: minigunLoopUrl,
+      minigunTail: minigunTailUrl,
+      impact1: impact1Url,
+      impact2: impact2Url,
+      impact3: impact3Url,
+      flyby: flybyUrl,
+    };
+    this.sampleCount = Object.keys(samples).length;
+    this.loadProgress?.(0, this.sampleCount);
     this.pending = Promise.all(
-      Object.entries({
-        start: startUrl,
-        loop: loopUrl,
-        end: endUrl,
-        blast: blastUrl,
-        rifleNear: rifleNearUrl,
-        rifleFar: rifleFarUrl,
-        rifleReload: rifleReloadUrl,
-        pistol: pistolUrl,
-        minigunUp: minigunUpUrl,
-        minigunMotor: minigunMotorUrl,
-        minigunDown: minigunDownUrl,
-        minigunStart: minigunStartUrl,
-        minigunLoop: minigunLoopUrl,
-        minigunTail: minigunTailUrl,
-        impact1: impact1Url,
-        impact2: impact2Url,
-        impact3: impact3Url,
-        flyby: flybyUrl,
-      }).map(async ([key, url]) => {
+      Object.entries(samples).map(async ([key, url]) => {
         const response = await fetch(url);
         if (!response.ok)
           throw new Error(`Audio load failed: ${response.status}`);
@@ -110,6 +117,7 @@ export class RangeAudio {
           key,
           await ctx.decodeAudioData(await response.arrayBuffer()),
         );
+        this.loadProgress?.(this.buffers.size, this.sampleCount);
       }),
     )
       .then(() => {

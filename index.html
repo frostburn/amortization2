@@ -9,10 +9,23 @@
       content="Amortization II — Futures Contract. Robot squad tactics, a pistols-only opening mission, and combat practice ranges."
     />
     <title>Amortization II — Futures Contract</title>
+    <link rel="stylesheet" href="/src/loading.css" />
+    <link rel="preload" as="image" href="./textures/concrete.webp" crossorigin="anonymous" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   </head>
   <body>
+    <dialog id="loading" open aria-labelledby="loading-title" aria-describedby="loading-status">
+      <div class="loading-card">
+        <p class="loading-brand">AMORTIZATION <span>II</span> · FUTURES CONTRACT</p>
+        <h1 id="loading-title">Preparing district</h1>
+        <p id="loading-status" role="status" aria-live="polite">Loading game files…</p>
+        <progress id="loading-progress" aria-label="Preparing the game"></progress>
+        <p class="loading-tip">Set a cover sector with <kbd>C</kbd>, then click. Your squad can cover an approach while you snipe.</p>
+        <button id="loading-retry" type="button" hidden>Reload game</button>
+        <noscript><p>Enable JavaScript to start the game.</p></noscript>
+      </div>
+    </dialog>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>
