@@ -16,7 +16,7 @@ The prefab uses one indexed `SkinnedMesh` and a shared 16-bone skeleton. The jac
 
 Two small corrective shapes lift and push the shirt hem clear of the thighs. Each front panel responds to its own hip's flexion, with a gentle fade toward the waist and side seams. Walking moves the two sides independently; crouching gathers the front of the shirt above both thighs. The connected surface and its normals deform together, while the sleeves and collar retain their skeletal skinning. This is skeletal cloth deformation with pose correctives, built-in ease and small folds, without cloth simulation.
 
-This is one design study, rather than the final civilian wardrobe. Future variations should keep the same scale and rig, changing clothing colour, hair and practical accessories. Do not add face details simply to make the inspection close-up busier. Future missions still need human movement, reactions and objectives before the model becomes playable.
+Future civilian wardrobes should keep the same scale and rig, changing clothing colour, hair and practical accessories. Ren Quill's escort uses this model in live combat, with movement, waiting, damage and extraction objectives. Additional characters can reuse those foundations without adding facial detail.
 
 ## Inspect it
 
@@ -39,6 +39,13 @@ Run `npm run dev` and open **`/model-room.html`**, or use **Controls & settings 
 The human stays in the lineup. ANCHOR, ROOK and PORTER are shown by default. NEEDLE, CART, CRATE, KITE, WATCH, CAB and VAN can also be selected. Every model retains its original dimensions; fitting the camera never rescales a character. The aircraft are grounded for dimensional comparison. The squad holds its primary weapon, with NEEDLE's pistol and deployed bipod hidden.
 
 ## Reuse
+
+Release integrates the prefab into live gameplay as Ren Quill, with a
+charcoal/teal palette, greying hair and bronze glasses attached to the head bone.
+The shared shape remains faceless. Standing/walking/crouching use the same skin
+and shirt corrections as the model room. An upright/crouched physical capsule
+matches each silhouette, and actual movement advances the walk animation.
+See [Release and human escorts](escort.md) for the mission and guide controls.
 
 - `src/render/humans.ts`: standalone `makeHuman()` prefab, pose updater and resource disposal. Forward is +Z; the floor is Y=0. It has no gameplay or physics dependencies.
 - `src/render/human-surface.ts`: indexed surface builder for sewn openings, curved branches, material groups and skin weights. Adjacent garment panels reuse vertices so the skeleton deforms a continuous surface.

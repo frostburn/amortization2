@@ -4,6 +4,7 @@ import {
   BLAST_RADIUS,
   AUTOMATIC_AIM,
   FORMATION_SPACING,
+  HUMAN,
   FIREARMS,
   GRAVITY,
   GRENADE_FUSE,
@@ -25,6 +26,7 @@ import { squadCargo } from "./hauling";
 import { CoverOrderView } from "./cover";
 import { CartFleet } from "./carts";
 import { makeActorBody } from "./actor-model";
+import { makeHuman } from "./humans";
 import { KiteFleet } from "./kites";
 import { PorterFleet, makeTote } from "./porters";
 import { TrafficFleet } from "./traffic";
@@ -163,6 +165,8 @@ type ActorVisual = {
   barrels?: THREE.Group;
   rotors?: THREE.Group[];
   beacon?: THREE.Mesh;
+  human?: ReturnType<typeof makeHuman>;
+  name?: THREE.Sprite;
   dead: boolean;
 };
 type Particle = {
@@ -885,8 +889,11 @@ export class RangeScene {
   }
 
   private makeActor(a: Actor): ActorVisual {
-    const body = makeActorBody(a, { metal, dark, silver, yellow, shell, sniperShell, minigunShell, orange, pale, glow, targetPaint });
-    const { root, torso } = body, friend = a.kind === "player", sniper = a.model === "sniper";
+    const human = a.kind === "human" ? makeHuman({ name: "Ren Quill", coat: 0x34494c, trim: 0x76a79e, hair: 0x57534d, glasses: true }) : undefined;
+    const body = human ? { root: new THREE.Group(), torso: new THREE.Group(), legs: [] }
+      : makeActorBody(a, { metal, dark, silver, yellow, shell, sniperShell, minigunShell, orange, pale, glow, targetPaint });
+    if (human) { human.root.position.y = -HUMAN.height / 2; body.torso.add(human.root); body.root.add(body.torso); }
+    const { root, torso } = body, friend = this.sim.team(a) === "player", sniper = a.model === "sniper";
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.74, 0.79, 40),
       new THREE.MeshBasicMaterial({
@@ -922,8 +929,10 @@ export class RangeScene {
     health.scale.set(1.2, 0.15, 1);
     this.dynamic.add(health);
     health.visible = false;
+    const name = human ? new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture("QUILL", "#a8e6d4", undefined, 100), transparent: true, depthTest: false })) : undefined;
+    if (name) { name.scale.set(1.7, .36, 1); this.dynamic.add(name); }
     this.dynamic.add(root);
-    return { ...body, ring, flash, health, dead: false };
+    return { ...body, human, name, ring, flash, health, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -953,6 +962,8 @@ export class RangeScene {
   }
 
   private disposeActor(visual: ActorVisual) {
+    visual.human?.dispose();
+    if (visual.name) { visual.name.material.map?.dispose(); visual.name.material.dispose(); visual.name.removeFromParent(); }
     visual.root.traverse((object) => {
       if (object instanceof THREE.Mesh && object.geometry.userData.owned) object.geometry.dispose();
     });
@@ -1137,6 +1148,8 @@ export class RangeScene {
     } else if (!grenade && hit && this.sim.city?.neutral(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.city?.windows.has(hit.collider.handle))
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    else if (!grenade && hit && this.sim.mission?.breakables.has(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle))
       // Loose cargo keeps its physical hitbox when dropped. Aim at its actual
@@ -1391,10 +1404,10 @@ export class RangeScene {
       this.trails.push({ mesh, life: 0.055 });
       this.flashes.set(e.actor, 0.048);
       this.lightFlash.position.copy(from);
-      this.lightFlash.intensity = 2;
+      this.lightFlash.intensity = e.material === "soft" ? 0 : 2;
       this.emit(
         e.to,
-        e.material === "metal" ? 9 : 5,
+        e.material === "soft" ? 0 : e.material === "metal" ? 9 : 5,
         e.material === "metal" ? 0xffc168 : 0x9e9b86,
         2.7,
         false,
@@ -1546,6 +1559,7 @@ export class RangeScene {
       const velocity = a.body.linvel(),
         speed = Math.hypot(velocity.x, velocity.z);
       const stagger = this.sim.isDisrupted(a) ? a.stagger / a.staggerDuration : 0;
+      if (v.human) v.human.pose(a.dead ? "standing" : this.sim.escort?.crouching ? "crouching" : speed > .15 ? "walking" : "standing", this.sim.escort?.walkTime ?? 0);
       const stride = a.dead || a.braced || stagger > 0 ? 0 : Math.min(0.5, speed * 0.12);
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
@@ -1596,7 +1610,8 @@ export class RangeScene {
         v.torso.rotation.z -= stagger * sideways * 0.23;
       }
       v.ring.visible =
-        !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)));
+        !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)) || (a.kind === "human" &&
+          !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2)));
       v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
         stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced || a.haul ? AMBER : MINT,
@@ -1605,7 +1620,7 @@ export class RangeScene {
       v.health.visible =
         !a.dead &&
         !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2) &&
-        (a.kind === "enemy" || (a.hp < a.maxHp &&
+        (a.kind === "enemy" || a.kind === "human" || (a.hp < a.maxHp &&
         (this.sim.time - a.hitTime < 4 || a.kind === "player")));
       v.health.position.set(
         v.root.position.x,
@@ -1613,9 +1628,10 @@ export class RangeScene {
         v.root.position.z,
       );
       v.health.scale.x = Math.max(0.1, (a.hp / a.maxHp) * 1.3);
+      if (v.name) { v.name.visible = !a.dead && v.health.visible; v.name.position.set(v.root.position.x, v.root.position.y + 1.5, v.root.position.z); }
       const flash = (this.flashes.get(a.id) ?? 0) - delta;
       this.flashes.set(a.id, flash);
-      v.flash.visible = flash > 0 && !a.dead;
+      v.flash.visible = flash > 0 && !a.dead && !v.human;
     }
     for (const p of this.sim.props) {
       const visual = this.props.get(p.id)!;

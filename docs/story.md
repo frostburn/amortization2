@@ -116,6 +116,13 @@ Vale supplies the local picture. Voss examines the first damaged machine after
 its return. Quill discovers that Gannet bought future operating rights shortly
 before the cooperative's business was interrupted.
 
+The playable tutorial sequence continues through [Crossing](crossing.md) and
+[Handling](handling.md), then [Release](escort.md). Quill visits Gannet's records
+office himself to inspect those operating rights. Its hired security locks him
+in for "account reconciliation"; the robot team breaks in and escorts him past
+an arriving response squad. His second rescue brings a person into the field
+and returns him, with the records, to his work on the cooperative's agreements.
+
 ### 2. Right of Way
 
 Meridian offers help against Gannet and submits requests of its own. The crew

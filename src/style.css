@@ -118,6 +118,11 @@ button:disabled {
 .mission-panel h2 { font-size: 15px; font-weight: 500; line-height: 1.5; margin: 0 0 8px; }
 .mission-panel p { font: 11px ui-monospace, monospace; color: var(--muted); line-height: 1.5; margin: 0; }
 .mission-panel progress { display: block; width: 100%; height: 5px; margin-top: 12px; accent-color: var(--mint); }
+#escort-status { display: flex; align-items: center; gap: 10px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--line); }
+#escort-status > div { flex: 1; font: 10px ui-monospace, monospace; }
+#escort-status b, #escort-status span { display: block; }
+#escort-status span { margin-top: 3px; color: var(--muted); }
+#escort-status progress { margin-top: 7px; }
 .mission-comms { position: absolute; bottom: 48px; left: 20px; width: min(455px, calc(100% - 40px)); display: flex; gap: 13px; padding: 13px; background: var(--panel); border-left: 2px solid var(--mint); pointer-events: auto; }
 .mission-comms img, .contact-line img { object-fit: cover; flex: none; border: 1px solid var(--line); }
 .mission-comms > div { flex: 1; }
@@ -199,6 +204,7 @@ dialog.mission-menu { width: 640px; max-width: min(640px, 92vw); }
   touch-action: none;
 }
 #range[data-cursor="select"] { cursor: pointer; }
+#range[data-cursor="escort"] { cursor: pointer; }
 #range[data-cursor="group"] { cursor: default; }
 #range[data-cursor="collect"] { cursor: grab; }
 #range[data-cursor="drop"] { cursor: grabbing; }

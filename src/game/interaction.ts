@@ -2,7 +2,7 @@ import type { Simulation } from "./simulation";
 
 export type PointerHit = { actor?: number; cargo?: number };
 export type PointerAction =
-  | { type: "fire" | "select" | "cover" | "group" }
+  | { type: "fire" | "select" | "cover" | "group" | "escort" }
   | { type: "haul"; cargo: number; verb: "collect" | "drop" }
   | { type: "blocked"; message?: string };
 
@@ -12,6 +12,7 @@ export function pointerAction(sim: Simulation, hit: PointerHit | null,
   if (modifiers.selecting) return { type: "group" };
   if (modifiers.covering) return { type: "cover" };
   if (!modifiers.forceFire) {
+    if (sim.escort && hit?.actor === sim.escort.human.id) return { type: sim.escort.human.dead ? "blocked" : "escort" };
     if (hit?.cargo !== undefined && sim.hauling) {
       const intent = sim.hauling.intent(hit.cargo);
       return intent.action === "blocked" ? { type: "blocked", message: intent.message }

@@ -11,7 +11,7 @@ export type ReplayAction =
   | { type: "brace"; enabled: boolean }
   | { type: "scope"; enabled: boolean }
   | { type: "grenade"; point: Vec2; actor: number }
-  | { type: "reload" | "release" | "deploy" | "ceasefire" }
+  | { type: "reload" | "release" | "deploy" | "ceasefire" | "escort" }
   | { type: "haul"; cargo?: number }
   | { type: "control"; aim: Vec3; trigger: boolean };
 type Timed<T> = { tick: number; wallMs: number; data: T };
@@ -166,6 +166,7 @@ export function applyReplayAction(sim: Simulation, input: ReplayAction) {
     case "reload": sim.reloadSelected(); break;
     case "release": sim.release(); break;
     case "deploy": sim.mission?.deploy(); break;
+    case "escort": sim.escortHuman(); break;
     case "control": sim.aim = { ...input.aim }; sim.trigger = input.trigger; break;
   }
 }
@@ -187,7 +188,7 @@ function validAction(value: unknown): value is ReplayAction {
     case "grenade": return id(a.actor) && a.actor !== 5 && point(a.point, ["x", "z"]);
     case "control": return point(a.aim, ["x", "y", "z"]) && typeof a.trigger === "boolean";
     case "haul": return a.cargo === undefined || Number.isSafeInteger(a.cargo) && (a.cargo as number) >= 0;
-    case "reload": case "release": case "deploy": case "ceasefire": return true;
+    case "reload": case "release": case "deploy": case "ceasefire": case "escort": return true;
     default: return false;
   }
 }

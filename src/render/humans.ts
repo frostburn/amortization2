@@ -63,8 +63,8 @@ function addHemTargets(geometry: THREE.BufferGeometry, panel: number[]) {
 
 /** One indexed skin, with connected jacket/sleeves, trousers/legs, hands/thumbs
  * and enclosed boots. A shared 16-bone skeleton deforms the garment vertices. */
-export function makeHuman() {
-  const root = new THREE.Group(); root.name = "Maintenance worker";
+export function makeHuman(appearance: { name?: string; coat?: number; trim?: number; hair?: number; glasses?: boolean } = {}) {
+  const root = new THREE.Group(); root.name = appearance.name ?? "Maintenance worker";
   const bones: THREE.Bone[] = [];
   const bone = (name: string, parent: THREE.Object3D, x: number, y: number, z = 0) => {
     const value = new THREE.Bone(); value.name = name; value.position.set(x, y, z); parent.add(value); bones.push(value); return value;
@@ -260,11 +260,21 @@ export function makeHuman() {
   builder.cap(hairRows.at(-1)!, new THREE.Vector3(0, 1.744, -.018), [[headId, 1]], mat.hair);
 
   const geometry = builder.finish(); addHemTargets(geometry, [...rows.flat(), ...hem]);
-  const materials = [surface(0x536d7d, 0, .95), surface(0x455b69, 0, .97),
-    surface(0x42494b, 0, .97), surface(0xb68d72, 0, .92), surface(0x39342f),
+  const materials = [surface(appearance.coat ?? 0x536d7d, 0, .95), surface(appearance.trim ?? 0x455b69, 0, .97),
+    surface(0x42494b, 0, .97), surface(0xb68d72, 0, .92), surface(appearance.hair ?? 0x39342f),
     surface(0x55463a, 0, .9), surface(0x292c2b), surface(0xaaa99a)];
   const mesh = new THREE.SkinnedMesh(geometry, materials), skeleton = new THREE.Skeleton(bones);
   mesh.name = "Worker skin"; mesh.castShadow = mesh.receiveShadow = true; root.add(mesh); root.updateMatrixWorld(true); mesh.bind(skeleton);
+  const accessories: THREE.Mesh[] = [];
+  if (appearance.glasses) {
+    const bronze = surface(0x9e8358, .55, .45); materials.push(bronze);
+    for (const side of [-1, 1]) {
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(.031, .0025, 4, 14), bronze);
+      rim.position.set(side * .035, .094, .099); rim.scale.y = .72; head.add(rim); accessories.push(rim);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(.015, .004, .004), bronze);
+    bridge.position.set(0, .095, .1); head.add(bridge); accessories.push(bridge);
+  }
   const hip = new THREE.Vector3(), ankle = new THREE.Vector3(), direction = new THREE.Vector3(), knee = new THREE.Vector3(), bend = new THREE.Vector3();
   const lowerRotation = new THREE.Quaternion(), planted = new THREE.Quaternion(), inverse = new THREE.Quaternion();
   let currentPose: HumanPose = "standing";
@@ -299,6 +309,6 @@ export function makeHuman() {
   };
   pose("standing");
   return { root, mesh, skeleton, pose, get currentPose() { return currentPose; }, dispose() {
-    geometry.dispose(); materials.forEach(m => m.dispose()); skeleton.dispose(); root.removeFromParent();
+    geometry.dispose(); accessories.forEach(m => m.geometry.dispose()); materials.forEach(m => m.dispose()); skeleton.dispose(); root.removeFromParent();
   } };
 }

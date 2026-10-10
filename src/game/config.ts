@@ -14,6 +14,8 @@ export type BoxSpec = {
   style: "wall" | "barrier" | "crate";
 };
 export const STEP = 1 / 60;
+/** Upright/crouched capsule envelopes for the 1.74 m human prefab. */
+export const HUMAN = { height: 1.7, crouchHeight: 1.42, radius: .3, mass: 74, hp: 88, walkSpeed: 1.45 };
 export const GRAVITY = 12;
 export const MAGAZINE = 90;
 export const GUN_RANGE = 65;

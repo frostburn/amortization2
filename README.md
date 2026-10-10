@@ -35,6 +35,10 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 **03 · Handling** teaches hauling with the fixed pistol squad. Select robots and press **H** (or the box icon) to collect cargo; RMB moves the team, and H puts it down. Deliver a one-robot return box to open the guarded service hall, eliminate its three guards, then recover a heavy tool chest with two robots. Carriers cannot shoot, so keep the other pistols defending. Inventory drones arrive while cargo is carried; setting it down pauses new waves. The entire surviving squad must return to the van. See [Handling and physical cargo](docs/handling.md).
 
+## Release
+
+**04 · Release** is a pistols-only rescue and escort. Break into Gannet's records office, clear three guards and reach **Ren Quill**. He follows a robot at walking pace; click him or press **H** to wait, resume or change guides. Cover the withdrawal when a fresh four-robot squad arrives. Quill has his own health, and both he and every surviving chassis must reach the van. Handling's debrief offers this next contract; it is also available in the deployment selector. See [Release and human escorts](docs/escort.md).
+
 ## Proving Ground
 
 - **Ballistics:** clear six orange plate targets with the machine gun or minigun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.

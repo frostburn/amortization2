@@ -4,8 +4,8 @@ import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
-export type Contact = "morrow" | "vale" | "rook";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "complete" | "failed";
+export type Contact = "morrow" | "vale" | "rook" | "quill";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];
@@ -40,6 +40,9 @@ export abstract class Mission {
   failureReason?: string;
   /** Runtime solids such as a locked entrance; never mutate shared range data. */
   obstacles: BoxSpec[] = [];
+  /** Pickable mission fixtures that accept weapon damage. */
+  readonly breakables = new Set<number>();
+  damageFixture(_handle: number, _amount: number): boolean { return false; }
   /** Roofs and their walls stay physical during camera cutaways. */
   readonly roofs: { area: RoofedArea; collider: number; walls?: number[]; revealDistance?: number }[] = [];
   get cutawayRoofs() {
@@ -88,6 +91,8 @@ export abstract class Mission {
     }
   }
 }
+
+export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort" } as const;
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
 export class ReceivingMission extends Mission {
