@@ -18,6 +18,7 @@ export type CivilianVehicle = {
   alertUntil: number; impactUntil: number; settled: number; braking: boolean;
   nextSense: number; clearance: number;
   explodedAt?: number;
+  commanded?: boolean; parked?: boolean; arrival?: Vec2;
 };
 
 /** Conservative bounds follow the body's pose and elevation, including a tipped wreck. */
@@ -111,11 +112,16 @@ export class StreetTraffic {
     this.junctions=trafficJunctions(district);
     const paths=trafficPaths(district), colors=[0xc8c6b8,0x687f87,0x98695d,0x89937d,0xb7a980,0x52636e];
     for (const [j,p] of paths.entries()) for (let n=0;n<(paths.length<4?2:1);n++) {
-      const model:VehicleModel=(j+n)%3===0?"VAN":"CAB",spec=VEHICLES[model];
+      const model:VehicleModel=(j+n)%3===0?"VAN":"CAB";
       const progress=p.total*((paths.length<4?n*0.5:0)+(0.12+(j%4)*0.17));
+      this.spawn(model, colors[(j+n)%colors.length], p, progress);
+    }
+  }
+  private spawn(model: VehicleModel, color: number, p: TrafficPath, progress: number) {
+      const spec=VEHICLES[model];
       const start=pointOnTrafficPath(p,progress),next=pointOnTrafficPath(p,progress+1).point;
       const yaw=Math.atan2(next.x-start.point.x,next.z-start.point.z);
-      const body=sim.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(start.point.x,spec.height/2+0.01,start.point.z)
+      const body=this.sim.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(start.point.x,spec.height/2+0.01,start.point.z)
         .lockRotations().setLinearDamping(0.15).setAngularDamping(3).setCcdEnabled(true));
       body.setRotation({x:0,y:Math.sin(yaw/2),z:0,w:Math.cos(yaw/2)},true);
       const hull=(rows:{z:number;width:number;bottom:number;top:number;roof?:number}[])=>RAPIER.ColliderDesc.convexHull(new Float32Array(rows.flatMap(s=>[
@@ -128,15 +134,30 @@ export class StreetTraffic {
         :hull([{z:-2.69,width:0.87,roof:0.81,bottom:0.9,top:1.98},{z:-2.4,width:0.99,roof:0.87,bottom:0.9,top:2.15},
           {z:-0.3,width:0.99,roof:0.85,bottom:0.9,top:2.15},{z:0.38,width:0.61,roof:0.51,bottom:0.96,top:2.04},
           {z:1.34,width:0.52,roof:0.44,bottom:0.96,top:1.78},{z:2.16,width:0.37,roof:0.34,bottom:0.96,top:1.04}]);
-      const lower=sim.world.createCollider(lowerShape.setMass(spec.mass*0.75).setFriction(0.05)
+      const lower=this.sim.world.createCollider(lowerShape.setMass(spec.mass*0.75).setFriction(0.05)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min),body);
-      const cabin=sim.world.createCollider(upperShape.setMass(spec.mass*0.25).setFriction(0.05),body);
-      const c:CivilianVehicle={id:4000+this.cars.length,model,color:colors[(j+n)%colors.length],path:p,segment:start.segment,progress,
+      const cabin=this.sim.world.createCollider(upperShape.setMass(spec.mass*0.25).setFriction(0.05),body);
+      const c:CivilianVehicle={id:4000+this.cars.length,model,color,path:p,segment:start.segment,progress,
         body,colliders:[lower,cabin],previous:{...body.translation()},previousRotation:{...body.rotation()},yaw,steering:0,
         hp:spec.hp,distance:0,laps:0,state:"cruise",alertUntil:0,impactUntil:0,settled:0,braking:false,nextSense:0,clearance:100};
       this.cars.push(c);c.colliders.forEach(collider=>this.handles.set(collider.handle,c));
-    }
+      return c;
   }
+  /** Parked contract vehicles share collision, explosions and tyre physics with traffic. */
+  park(model: VehicleModel, color: number, position: Vec2, yaw: number) {
+    const p=path(`service-${this.cars.length}`, [position,
+      {x:position.x+Math.sin(yaw)*8,z:position.z+Math.cos(yaw)*8}]);
+    const c=this.spawn(model,color,p,0);
+    c.commanded=true;c.parked=true;
+    return c;
+  }
+  go(c: CivilianVehicle, goal: Vec2) {
+    if(!c.hp)return;
+    const p=c.body.translation();
+    c.path=path(c.path.id,[{x:p.x,z:p.z},goal]);
+    c.progress=0;c.segment=0;c.commanded=true;c.parked=false;c.arrival={...goal};
+  }
+
   neutral(handle:number){return this.handles.get(handle);}
   disturb(from:Vec3,to:Vec3,duration:number) {
     const dx=to.x-from.x,dz=to.z-from.z,length=dx*dx+dz*dz||1;
@@ -178,7 +199,7 @@ export class StreetTraffic {
     const p=c.body.translation(),path=c.path;
     let best=Infinity,progress=c.progress,segment=c.segment;
     for(let k=all?0:-3;k<(all?path.points.length:5);k++) {
-      const i=all?k:(c.segment+k+path.points.length)%path.points.length,a=path.points[i],b=path.points[(i+1)%path.points.length];
+      const i=all?k:((c.segment+k)%path.points.length+path.points.length)%path.points.length,a=path.points[i],b=path.points[(i+1)%path.points.length];
       const dx=b.x-a.x,dz=b.z-a.z,t=clamp(((p.x-a.x)*dx+(p.z-a.z)*dz)/(path.lengths[i]**2),0,1);
       const d=distance2(p,{x:a.x+dx*t,z:a.z+dz*t});
       if(d<best){best=d;segment=i;progress=path.offsets[i]+path.lengths[i]*t;}
@@ -189,7 +210,7 @@ export class StreetTraffic {
   private firstAtJunction(j:Vec2,signalled:boolean) {
     let first:CivilianVehicle|undefined,nearest=Infinity;
     for(const c of this.cars) {
-      if(!c.hp||c.impactUntil||c.alertUntil>this.sim.time)continue;
+      if(!c.hp||c.impactUntil||c.parked||c.alertUntil>this.sim.time)continue;
       const p=c.body.translation(),fx=Math.sin(c.yaw),fz=Math.cos(c.yaw);
       const ahead=(j.x-p.x)*fx+(j.z-p.z)*fz;
       if(ahead<5.8||ahead>14||Math.abs((j.x-p.x)*fz-(j.z-p.z)*fx)>4.5)continue;
@@ -234,8 +255,10 @@ export class StreetTraffic {
         c.body.lockRotations(true,true);c.body.setAngvel({x:0,y:0,z:0},true);
         c.colliders.forEach(h=>h.setFriction(0.05));c.body.setLinearDamping(0.15);c.impactUntil=0;
       }
-      this.locate(c);
-      const target=pointOnTrafficPath(c.path,c.progress+1.7+speed*0.35).point;
+      if(c.arrival&&distance2(p,c.arrival)<.6){c.parked=true;c.arrival=undefined;}
+      if(!c.commanded)this.locate(c);
+      const target=c.commanded ? c.arrival ?? {x:p.x+Math.sin(c.yaw),z:p.z+Math.cos(c.yaw)}
+        : pointOnTrafficPath(c.path,c.progress+1.7+speed*0.35).point;
       const wanted=Math.atan2(target.x-p.x,target.z-p.z),angle=Math.atan2(Math.sin(wanted-c.yaw),Math.cos(wanted-c.yaw));
       const forward={x:Math.sin(c.yaw),z:Math.cos(c.yaw)};
       let desired=Math.min(spec.speed,Math.max(1.4,spec.speed/(1+Math.abs(angle)*7)));
@@ -267,7 +290,9 @@ export class StreetTraffic {
           if(red&&owner===c.id)this.reservations.delete(i);
         }
       }
-      if(c.alertUntil>now){desired=0;c.state="alert";}
+      if(c.arrival)desired=Math.min(desired,Math.sqrt(2*4*Math.max(0,distance2(p,c.arrival)-.25)));
+      if(c.parked){desired=0;c.state="yield";}
+      if(!c.commanded&&c.alertUntil>now){desired=0;c.state="alert";}
       c.braking=desired<speed-0.2||c.state!=="cruise";
       const turn=clamp(angle,-STEP*1.3,STEP*1.3)*Math.min(1,speed);
       c.yaw+=turn;c.steering=clamp(Math.atan(turn/STEP*spec.wheelbase/Math.max(1,speed)),-0.7,0.7);
@@ -282,6 +307,6 @@ export class StreetTraffic {
   }
   inspect(){return this.cars.map(c=>({id:c.id,model:c.model,state:c.state,hp:c.hp,distance:c.distance,laps:c.laps,
     explodedAt:c.explodedAt,
-    route:c.path.id,steering:c.steering,braking:c.braking,alertUntil:c.alertUntil,
+    route:c.path.id,parked:c.parked,steering:c.steering,braking:c.braking,alertUntil:c.alertUntil,
     position:{...c.body.translation()},rotation:{...c.body.rotation()},velocity:{...c.body.linvel()}}));}
 }

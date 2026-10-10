@@ -50,6 +50,20 @@ export function makeBuilding(spec: BuildingSpec, shared?: Map<string, THREE.Mesh
         block(root, 5.5, 0.09, 0.1, x, shelf, front + 0.145, accent);
     }
   }
+  if (spec.prefab === "exchange") {
+    // A windowless equipment building: roof condensers, intake grilles and a
+    // plain service entrance. The same prefab can host later utility contracts.
+    for (const x of [-10, 0, 10]) {
+      block(root, 5.6, 1.15, 4.2, x, h + 1, -1, frame);
+      for (const side of [-1, 1]) {
+        tube(root, 1.05, .12, x + side * 1.5, h + 1.62, -1, roof, 20);
+        for (let n = -2; n <= 2; n++) block(root, .045, .04, 1.85, x + side * 1.5 + n * .3, h + 1.7, -1, trim);
+      }
+      block(root, 5.3, 2, .18, x, 4.3, front + .14, frame);
+      for (let y = 3.45; y < 5.25; y += .2) block(root, 5.1, .05, .21, x, y, front + .21, roof);
+    }
+    block(root, 3.6, .35, .18, 0, 3.3, front + .13, accent);
+  }
   if (spec.prefab === "depot") {
     block(root, w - 0.6, 0.5, 0.2, 0, 4.85, front + 0.12, accent);
     for (const x of [-5.5, 5.5]) for (let y = 0.6; y < 4.2; y += 0.6)

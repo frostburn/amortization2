@@ -18,8 +18,9 @@ import { HANDLING_DISTRICT, HANDLING_FIXTURES, HANDLING_SHELTERS } from "./handl
 import { ESCORT_DISTRICT, ESCORT_FIXTURES, ESCORT_SHELTERS, ESCORT_SPAWNS } from "./escort";
 import { CONCOURSE_DISTRICT, CONCOURSE_FIXTURES, CONCOURSE_RAILS, CONCOURSE_SURFACES } from "./concourse";
 import type { WalkSurface } from "./walk-surfaces";
+import { PRIORITY_DISTRICT, PRIORITY_FIXTURES, PRIORITY_RAILS, PRIORITY_SITES, PRIORITY_SURFACES } from "./priority";
 
-export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
+export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "priority" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -30,6 +31,7 @@ export type TargetKind = (typeof TARGET_SPAWNS)[number]["kind"] | "precision";
 type RangeDefinition = {
   name: string;
   contract?: boolean;
+  pistolsOnly?: boolean;
   city?: CityDistrict;
   shelters?: RoofedArea[];
   walkSurfaces?: WalkSurface[];
@@ -39,10 +41,18 @@ type RangeDefinition = {
   platforms: BoxSpec[];
   players: { x: number; z: number }[];
   targets: { x: number; z: number; elevation?: number; kind: TargetKind }[];
-  props: typeof PROP_SPAWNS;
+  props: (typeof PROP_SPAWNS[number] & { style?: "equipment" })[];
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  priority: {
+    name: "05 · PRIORITY ACCESS", contract: true, city: PRIORITY_DISTRICT, bounds: PRIORITY_DISTRICT.bounds,
+    barriers: PRIORITY_FIXTURES, platforms: [], walkSurfaces: PRIORITY_SURFACES, walkVolumes: PRIORITY_RAILS,
+    players: [[-1.1, 1.1], [-1.1, -1.1], [1.1, -1.1], [1.1, 1.1]].map(([x, z]) =>
+      ({ x: PRIORITY_SITES.exit.x + x, z: PRIORITY_SITES.exit.z + z })),
+    targets: [], props: [-3, 1].map(dx => ({ x: PRIORITY_SITES.loading.x + dx,
+      z: PRIORITY_SITES.loading.z - 5.4, w: 1.15, h: 1.7, d: .9, mass: 65, style: "equipment" })),
+  },
   concourse: {
     name: "RAISED CONCOURSE", city: CONCOURSE_DISTRICT, bounds: CONCOURSE_DISTRICT.bounds,
     barriers: CONCOURSE_FIXTURES, platforms: [], walkSurfaces: CONCOURSE_SURFACES, walkVolumes: CONCOURSE_RAILS,
@@ -52,25 +62,25 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
     props: [{ x: -15, z: 10, w: .9, h: .8, d: .9, mass: 18 }],
   },
   escort: {
-    name: "04 · RELEASE", contract: true, city: ESCORT_DISTRICT, bounds: ESCORT_DISTRICT.bounds,
+    name: "04 · RELEASE", contract: true, pistolsOnly: true, city: ESCORT_DISTRICT, bounds: ESCORT_DISTRICT.bounds,
     barriers: ESCORT_FIXTURES, platforms: [], shelters: ESCORT_SHELTERS,
     players: ESCORT_SPAWNS,
     targets: [], props: [],
   },
   handling: {
-    name: "03 · HANDLING", contract: true, city: HANDLING_DISTRICT, bounds: HANDLING_DISTRICT.bounds,
+    name: "03 · HANDLING", contract: true, pistolsOnly: true, city: HANDLING_DISTRICT, bounds: HANDLING_DISTRICT.bounds,
     barriers: HANDLING_FIXTURES, platforms: [], shelters: HANDLING_SHELTERS,
     players: [{ x: -25.1, z: 1.1 }, { x: -25.1, z: -1.1 }, { x: -22.9, z: -1.1 }, { x: -22.9, z: 1.1 }],
     targets: [], props: [],
   },
   crossing: {
-    name: "02 · CROSSING", contract: true, city: CROSSING_DISTRICT, bounds: CROSSING_DISTRICT.bounds,
+    name: "02 · CROSSING", contract: true, pistolsOnly: true, city: CROSSING_DISTRICT, bounds: CROSSING_DISTRICT.bounds,
     barriers: CROSSING_FIXTURES, platforms: [],
     players: [{ x: -24.1, z: 1.1 }, { x: -24.1, z: -1.1 }, { x: -21.9, z: -1.1 }, { x: -21.9, z: 1.1 }],
     targets: [], props: [],
   },
   receiving: {
-    name: "01 · RECEIVING", contract: true, city: RECEIVING_YARD, bounds: RECEIVING_YARD.bounds,
+    name: "01 · RECEIVING", contract: true, pistolsOnly: true, city: RECEIVING_YARD, bounds: RECEIVING_YARD.bounds,
     barriers: [...portSolids(RECEIVING_YARD), ...RECEIVING_FIXTURES], platforms: [],
     players: [{ x: -23.1, z: 15.1 }, { x: -23.1, z: 12.9 }, { x: -20.9, z: 12.9 }, { x: -20.9, z: 15.1 }],
     targets: [], props: [],

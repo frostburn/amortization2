@@ -2,8 +2,8 @@
 
 Campaign proposal for **2038**, twelve years after the first game's events. The
 original campaign did not establish a calendar year; this is the sequel's working
-chronology. These notes guide future missions and scenes. The playable build is
-currently the combat, district and civilian prototype.
+chronology. These notes guide future missions and scenes. The playable build includes four tutorial contracts, the first armed operation,
+and the combat, district and civilian prototypes.
 
 ## Continuity
 
@@ -123,6 +123,13 @@ in for "account reconciliation"; the robot team breaks in through reception. Qui
 and the team escorts him along the back alley while covering an arriving
 response squad on the eastern street. His second rescue brings a person into the field
 and returns him, with the records, to his work on the cooperative's agreements.
+
+[Priority Access](priority-access.md) is the first armed operation after Release.
+Gannet's contractor occupies the independent neighbourhood exchange and prepares
+to remove dispatch equipment. The crew stops removal, reopens physical access
+and covers the owners' technicians against a street-and-concourse response.
+Deliveries resume in the district. Meridian then offers priority network access
+in exchange for control of dispatch, introducing its useful but conditional help.
 
 ### 2. Right of Way
 

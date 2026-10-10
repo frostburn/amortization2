@@ -3,12 +3,13 @@ import { CONCOURSE_FIXTURES, CONCOURSE_RAILS, CONCOURSE_SURFACES } from "../game
 import { surfaceHeight, surfacePrism, type WalkSurface } from "../game/walk-surfaces";
 import { batchRigid, block, surface } from "./primitives";
 import type { Simulation } from "../game/simulation";
+import type { BoxSpec } from "../game/config";
 
 /** Concrete terraces, sloped paving and structural spans share the authored kit. */
 export class ConcourseView {
   readonly root = new THREE.Group();
   private decks: { id: string; materials: THREE.MeshStandardMaterial[]; opacity: number }[] = [];
-  constructor(coverage = true) {
+  constructor(coverage = true, surfaces = CONCOURSE_SURFACES, rails = CONCOURSE_RAILS, fixtures: BoxSpec[] = CONCOURSE_FIXTURES) {
     const root = this.root;
     const concrete = surface(0xa5aaa1), railing = surface(0x586a6c, .25), trim = surface(0xd1c9af);
     const paving = surface(0xc0ba9f), stripe = surface(0x78928b), dark = surface(0x4f5d5c);
@@ -24,7 +25,7 @@ export class ConcourseView {
       flat.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(count * 2), 2));
       const mesh = new THREE.Mesh(flat, mat); mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh);
     };
-    for (const s of CONCOURSE_SURFACES) {
+    for (const s of surfaces) {
       const group = new THREE.Group(), materials = [concrete, paving, stripe, dark].map(mat => mat.clone());
       materials.forEach(mat => { mat.alphaToCoverage = coverage; mat.transparent = !coverage; });
       this.decks.push({ id: s.id, materials, opacity: 1 });
@@ -42,13 +43,13 @@ export class ConcourseView {
           s.z + side * (s.d / 2 - .5), materials[0]);
       batchRigid(group); root.add(group);
     }
-    for (const s of CONCOURSE_RAILS) {
+    for (const s of rails) {
       prism(root, s, railing);
       // Coping overhangs the wall; its overlapping skirt must not share the
       // wall's vertical faces (especially visible along inclined parapets).
       prism(root, { ...s, w: s.w + .04, d: s.d + .04, height: s.height + .035, thickness: .05 }, trim);
     }
-    for (const b of CONCOURSE_FIXTURES.filter(b => !b.building && !('fixture' in b) && !b.y))
+    for (const b of fixtures.filter(b => !b.building && !('fixture' in b) && !b.y))
       block(root, b.w, b.h, b.d, b.x, b.h / 2, b.z, concrete);
     // Batch the shared parapets/supports without baking separately fading decks.
     const staticParts = new THREE.Group();

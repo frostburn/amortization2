@@ -12,6 +12,8 @@ export type EnemyBrain = {
   state: "holding" | "entering" | "advancing" | "aiming" | "firing" | "suppressed" | "reloading";
   nextThink: number;
   nextRoute: number;
+  routeTarget?: Vec3;
+  alertPosition?: Vec3;
   nextAttack: number;
   entryUntil: number;
   nextGrenade: number;
@@ -31,6 +33,22 @@ export type EnemyProfile = {
   pistolRange?: number;
 };
 
+/** Radio contact reports preserve the firing position, not future player movement. */
+export function alertEnemies(sim: Simulation, position: Vec3) {
+  for (const a of sim.actors) {
+    if (a.kind !== "enemy" || a.dead || !a.ai) continue;
+    const brain = a.ai;
+    const changed = !brain.alertPosition || distance2(brain.alertPosition, position) > 3 ||
+      Math.abs(brain.alertPosition.y - position.y) > .5;
+    brain.alertPosition = { ...position };
+    if (changed) {
+      brain.nextThink = sim.time;
+      brain.nextRoute = sim.time;
+      brain.routeTarget = undefined;
+    }
+  }
+}
+
 /** Shared combat intentions; encounters own spawning, objectives and difficulty. */
 export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile: EnemyProfile) {
   const brain = a.ai!, now = sim.time;
@@ -40,6 +58,8 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
     brain.burstUntil = 0;
     return;
   }
+  // Taking fire releases passive post limits; ordinary sight and weapon range still apply.
+  const combatProfile = brain.alertPosition ? { ...profile, leash: undefined } : profile;
   const candidates = profile.noticeRange === undefined ? living : living.filter(target =>
     distance2(a.body.translation(), target.body.translation()) <= profile.noticeRange! + (a.hp < a.maxHp ? 8 : 0));
   if (!candidates.length) {
@@ -47,9 +67,22 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
     brain.visible = false;
     brain.burstUntil = 0;
     a.braced = false;
-    if (brain.state !== "holding" && distance2(a.body.translation(), brain.rally) > 0.7)
-      sim.navigate(a, brain.rally);
-    brain.state = "holding";
+    if (brain.alertPosition) {
+      // Finish entering through the authored access route before investigating.
+      if (brain.state === "entering" && distance2(a.body.translation(), brain.rally) > .7 && now < brain.entryUntil) return;
+      brain.state = "advancing";
+      a.braceTime = 0;
+      if (now >= brain.nextRoute) {
+        brain.nextRoute = now + 1.2;
+        const goal = brain.alertPosition;
+        if (distance2(sim.walkingPoint(a), goal) > .7 || Math.abs(sim.walkingPoint(a).y - goal.y) > .5)
+          sim.navigate(a, goal);
+      }
+    } else {
+      if (brain.state !== "holding" && distance2(a.body.translation(), brain.rally) > .7)
+        sim.navigate(a, brain.rally);
+      brain.state = "holding";
+    }
     return;
   }
   if (brain.state === "holding") {
@@ -127,7 +160,14 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
       brain.nextAttack = Math.max(brain.nextAttack, now + 0.55);
       if (now >= brain.nextRoute) {
         brain.nextRoute = now + 1.2;
-        sim.navigate(a, firingPosition(sim, a, target, profile));
+        const foot = sim.walkingPoint(target);
+        // Rotating the candidate ring around a stationary target can alternate
+        // between opposite sides of cover before either flank is reached.
+        const continuing = sim.terrain && a.path.length > 0 && a.moveTarget && brain.routeTarget &&
+          distance2(foot, brain.routeTarget) < 3 && Math.abs(foot.y - brain.routeTarget.y) < .5;
+        const goal = continuing ? a.moveTarget! : firingPosition(sim, a, target, combatProfile);
+        if (!continuing) brain.routeTarget = foot;
+        sim.navigate(a, goal);
       }
     }
   }
@@ -149,14 +189,15 @@ function firingPosition(sim: Simulation, a: Actor, target: Actor, profile: Enemy
   const b = sim.layout.bounds;
   const solids = [...sim.layout.barriers, ...sim.layout.platforms,
     ...sim.props.map((prop) => ({ x: prop.body.translation().x, z: prop.body.translation().z, w: prop.w, d: prop.d }))];
-  let best = profile.leash === undefined ? { x: q.x, z: q.z } : { ...a.ai!.rally }, bestScore = Infinity;
+  let best: Vec2 = profile.leash === undefined ? sim.walkingPoint(target) : { ...a.ai!.rally }, bestScore = Infinity;
   for (const offset of [0, 0.65, -0.65, 1.2, -1.2, 1.8, -1.8]) {
     const angle = bearing + a.ai!.flank + offset;
-    const goal = { x: clamp(q.x + Math.sin(angle) * radius, b.left + 1, b.right - 1),
+    const raw = { x: clamp(q.x + Math.sin(angle) * radius, b.left + 1, b.right - 1),
       z: clamp(q.z + Math.cos(angle) * radius, b.back + 1, b.front - 1) };
+    const goal: Vec2 = sim.terrain ? sim.terrain.resolve({ ...raw, y: sim.walkingPoint(a).y }) : raw;
     if (profile.leash !== undefined && distance2(goal, a.ai!.rally) > profile.leash) continue;
-    if (!segmentClear(goal, goal, solids, 0.6)) continue;
-    const hit = sim.fireRay(a, { ...goal, y: 1.4 }, { ...q, y: q.y + 0.25 });
+    if (sim.terrain ? !sim.terrain.canStand({ ...goal, y: goal.y ?? 0 }) : !segmentClear(goal, goal, solids, 0.6)) continue;
+    const hit = sim.fireRay(a, { ...goal, y: (goal.y ?? 0) + 1.4 }, { ...q, y: q.y + 0.25 });
     const visible = hit?.collider.handle === target.collider.handle;
     const score = distance2(p, goal) + Math.abs(offset) * 2 + (visible ? 0 : 18);
     if (score < bestScore) { bestScore = score; best = goal; }

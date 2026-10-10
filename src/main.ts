@@ -194,7 +194,7 @@ async function start() {
       ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
       : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
     canvas.setAttribute("aria-label", sim.mission
-      ? `${sim.mission.definition.title} mission. Four pistols. Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. ${sim.escort ? "Shoot the entrance lock to break in. Click Quill or press H to wait or follow the selected robot. Escape through the rear staff exit to the back-street van. " : sim.hauling ? "H collects or puts down cargo; two robots are needed for the chest. " : ""}Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
+      ? `${sim.mission.definition.title} mission. ${sim.pistolsOnly ? "Four pistols." : "Selectable armed squad. Q automatic fire or pistol, E rifle, G grenade. Space toggles braced sniping with the rifle."} Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. ${sim.escort ? "Shoot the entrance lock to break in. Click Quill or press H to wait or follow the selected robot. Escape through the rear staff exit to the back-street van. " : sim.hauling ? "H collects or puts down cargo; two robots are needed for the chest. " : ""}Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
       : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
   }
   function dismissComms() {
@@ -260,7 +260,7 @@ async function start() {
   }
   function chooseWeapon(weapon: Weapon) {
     if (viewer?.active) return;
-    if (sim.mission && weapon !== "pistol") return;
+    if (sim.pistolsOnly && weapon !== "pistol") return;
     if (!sim.chooseWeapon(weapon)) {
       toast(
         weapon === "rifle"
@@ -310,7 +310,7 @@ async function start() {
       );
   for (const id of ["loadout-select", "menu-loadout"])
     document.getElementById(id)!.addEventListener("change", (e) => {
-      if (sim.mission || viewer?.active) return;
+      if (viewer?.active || sim.mission && (!sim.mission.definition.selectableSquad || sim.mission.phase !== "briefing")) return;
       const model = (e.target as HTMLSelectElement).value as RobotModel;
       if (!["sniper", "minigunner", "assault"].includes(model) || model === sim.fourthModel) return;
       exitSniping();
@@ -318,13 +318,15 @@ async function start() {
       keys.clear();
       audio.stop();
       sim.reset(sim.range, model);
+      scene.resetEnvironment();
       scene.resetDynamic();
       scene.resetCamera();
       pointer.inside = false;
       accumulator = 0;
       updateUI(sim, audio);
       saveSettings();
-      toast("Squad changed. Combat floor restarted.");
+      toast(sim.mission ? "Squad prepared for deployment." : "Squad changed. Combat floor restarted.");
+      configureMenu();
       if (!paused) canvas.focus();
     });
   for (const button of document.querySelectorAll<HTMLButtonElement>(

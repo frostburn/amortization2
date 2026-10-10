@@ -141,6 +141,7 @@ dialog.mission-menu { width: 640px; max-width: min(640px, 92vw); }
 #menu-settings { margin: 18px 0; }
 #menu-settings summary { cursor: pointer; color: #9fb3a8; font-size: 12px; padding: 10px 0; }
 #menu-settings .settings { margin: 10px 0 20px; }
+#menu.mission-menu #resume { position: sticky; bottom: 10px; z-index: 1; box-shadow: 0 -12px 24px #152124; }
 .mission-result-actions { display: grid; gap: 12px; margin-top: 22px; }
 .mission-result-actions > button:last-child { padding: 12px; font: 11px ui-monospace, monospace; }
 #mission-result-detail { font: 11px ui-monospace, monospace; line-height: 1.7; color: var(--muted); }

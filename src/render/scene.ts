@@ -33,6 +33,8 @@ import { TrafficFleet } from "./traffic";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { ConcourseView } from "./concourse";
+import { PRIORITY_SUPPORTS } from "../game/priority";
+import { equipmentCase } from "./equipment";
 import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
 
 const MINT = 0x9be6cd,
@@ -167,6 +169,7 @@ type ActorVisual = {
   rotors?: THREE.Group[];
   beacon?: THREE.Mesh;
   human?: ReturnType<typeof makeHuman>;
+  humanWalkTime?: number;
   name?: THREE.Sprite;
   dead: boolean;
 };
@@ -457,8 +460,11 @@ export class RangeScene {
       floorMat.dispose();
       this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
-      if (this.sim.range === "concourse") {
-        this.concourseView = new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false);
+      if (this.sim.layout.walkSurfaces) {
+        this.concourseView = this.sim.range === "priority"
+          ? new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false,
+            this.sim.layout.walkSurfaces, this.sim.layout.walkVolumes, PRIORITY_SUPPORTS)
+          : new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.concourseView.root);
       }
       if (this.sim.mission) {
@@ -897,7 +903,7 @@ export class RangeScene {
   }
 
   private makeActor(a: Actor): ActorVisual {
-    const human = a.kind === "human" ? makeHuman({ name: "Ren Quill", coat: 0x34494c, trim: 0x76a79e, hair: 0x57534d, glasses: true }) : undefined;
+    const human = a.kind === "human" ? makeHuman(a.human ?? { name: "Ren Quill", coat: 0x34494c, trim: 0x76a79e, hair: 0x57534d, glasses: true }) : undefined;
     const body = human ? { root: new THREE.Group(), torso: new THREE.Group(), legs: [] }
       : makeActorBody(a, { metal, dark, silver, yellow, shell, sniperShell, minigunShell, orange, pale, glow, targetPaint });
     if (human) { human.root.position.y = -HUMAN.height / 2; body.torso.add(human.root); body.root.add(body.torso); }
@@ -937,7 +943,7 @@ export class RangeScene {
     health.scale.set(1.2, 0.15, 1);
     this.dynamic.add(health);
     health.visible = false;
-    const name = human ? new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture("QUILL", "#a8e6d4", undefined, 100), transparent: true, depthTest: false })) : undefined;
+    const name = human && !a.human ? new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture("QUILL", "#a8e6d4", undefined, 100), transparent: true, depthTest: false })) : undefined;
     if (name) { name.scale.set(1.7, .36, 1); this.dynamic.add(name); }
     this.dynamic.add(root);
     return { ...body, human, name, ring, flash, health, dead: false };
@@ -1024,7 +1030,7 @@ export class RangeScene {
     }
     for (const a of this.sim.actors) this.actors.set(a.id, this.makeActor(a));
     for (const p of this.sim.props) {
-      const group = p.style === "tote" ? makeTote() : p.style === "parcel" || p.style === "chest" ? squadCargo(p) : this.makeCrate(p.w, p.h, p.d);
+      const group = p.style === "equipment" ? equipmentCase(p.w, p.h, p.d) : p.style === "tote" ? makeTote() : p.style === "parcel" || p.style === "chest" ? squadCargo(p) : this.makeCrate(p.w, p.h, p.d);
       this.batchRigidPart(group);
       this.dynamic.add(group);
       this.props.set(p.id, group);
@@ -1110,8 +1116,8 @@ export class RangeScene {
   resetCamera() {
     this.cameraTarget.set(
       this.sim.range === "long" ? 54 : 0,
-      this.sim.range === "concourse" ? 3 : 0,
-      this.sim.range === "proving" ? -3 : this.sim.range === "concourse" ? -8 : 0,
+      this.sim.range === "concourse" ? 3 : this.sim.range === "priority" ? 2 : 0,
+      this.sim.range === "proving" ? -3 : this.sim.range === "concourse" ? -8 : this.sim.range === "priority" ? -3 : 0,
     );
     this.zoom = 1;
     this.resize();
@@ -1577,7 +1583,10 @@ export class RangeScene {
       const velocity = a.body.linvel(),
         speed = Math.hypot(velocity.x, velocity.z);
       const stagger = this.sim.isDisrupted(a) ? a.stagger / a.staggerDuration : 0;
-      if (v.human) v.human.pose(this.sim.escort?.pose ?? "standing", this.sim.escort?.walkTime ?? 0);
+      if (v.human) {
+        v.humanWalkTime = (v.humanWalkTime ?? 0) + (paused ? 0 : delta) * Math.min(1.4, speed / HUMAN.walkSpeed);
+        v.human.pose(this.sim.escort?.pose ?? (speed > .15 ? "walking" : "standing"), this.sim.escort?.walkTime ?? v.humanWalkTime);
+      }
       const stride = a.dead || a.braced || stagger > 0 ? 0 : Math.min(0.5, speed * 0.12);
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;

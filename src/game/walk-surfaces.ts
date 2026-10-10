@@ -84,6 +84,17 @@ export class WalkTerrain {
     if (p.x < b.left + radius || p.x > b.right - radius ||
         p.z < b.back + radius || p.z > b.front - radius ||
         this.blocked(p, this.boxes, radius) || this.blocked(p, dynamic, radius)) return false;
+    // A thin railing can lie between all five footprint samples. Check the
+    // whole footprint against its sloped volume, retaining clearance below it.
+    for (const s of this.volumes) {
+      const left = Math.max(p.x - radius, s.x - s.w / 2), right = Math.min(p.x + radius, s.x + s.w / 2);
+      const back = Math.max(p.z - radius, s.z - s.d / 2), front = Math.min(p.z + radius, s.z + s.d / 2);
+      if (left >= right - .0001 || back >= front - .0001) continue;
+      const sx = s.slopeX ?? 0, sz = s.slopeZ ?? 0;
+      const height = s.height + ((left + right) / 2 - s.x) * sx + ((back + front) / 2 - s.z) * sz;
+      const rise = (right - left) / 2 * Math.abs(sx) + (front - back) / 2 * Math.abs(sz);
+      if (p.y + 1.86 > height - rise - s.thickness + .02 && p.y < height + rise - .02) return false;
+    }
     // Footprint support across adjoining pieces keeps internal seams open,
     // but prevents pathfinding around an unguarded edge or up a retaining wall.
     for (const [dx, dz] of [[0, 0], [-radius, -radius], [radius, -radius],

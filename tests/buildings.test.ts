@@ -2,15 +2,16 @@ import { describe, expect, test } from "vitest";
 import * as THREE from "three";
 import { BUILDING_KIT, CITY_DISTRICT, buildingSolid } from "../src/game/city";
 import { makeBuilding } from "../src/render/city";
+import { PRIORITY_DISTRICT } from "../src/game/priority";
 
 describe("building facades", () => {
-  test("district buildings and awnings clear roads, neighbouring buildings and skyline sidewalks", () => {
-    const views = CITY_DISTRICT.buildings.map(spec => makeBuilding(spec));
+  test.each([CITY_DISTRICT, PRIORITY_DISTRICT])("district buildings and awnings clear roads, neighbouring buildings and skyline sidewalks", district => {
+    const views = district.buildings.map(spec => makeBuilding(spec));
     try {
       const bounds = views.map(view => new THREE.Box3().setFromObject(view.root));
       for (const [i, view] of views.entries()) {
         const hull = buildingSolid(view.spec);
-        for (const street of CITY_DISTRICT.streets) {
+        for (const street of district.streets) {
           const alongX = street.axis === "x";
           const x = alongX ? street.center : street.at, z = alongX ? street.at : street.center;
           const w = alongX ? street.length : street.width, d = alongX ? street.width : street.length;
@@ -46,14 +47,14 @@ describe("building facades", () => {
       return ray.intersectObject(building.root, true);
     };
     try {
-      const openings = prefab === "shop" ? [[5.8, 2.3], [0.25, 1.4]]
+      const openings = prefab === "exchange" ? [[0.25, 1.4]] : prefab === "shop" ? [[5.8, 2.3], [0.25, 1.4]]
         : prefab === "depot" ? [[7.4, 2.12], [4.1, 1.4]]
         : [[prefab === "pump" ? 3.65 : 7.4, 2.12], [0.25, 1.4]];
       for (const [i, [x, y]] of openings.entries()) {
         const panes = sample(x, y);
         expect(panes).toHaveLength(1);
         expect((panes[0].object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>).material.color.getHex())
-          .toBe(i === 0 && prefab !== "depot" ? 0x24343b : 0x656d6b);
+          .toBe(i === 0 && prefab !== "depot" && prefab !== "exchange" ? 0x24343b : 0x656d6b);
         expect(panes[0].point.z).toBeCloseTo(front + 0.04, 4);
       }
       const wall = sample(prefab === "pump" ? 5.15 : 9, 2.12);
