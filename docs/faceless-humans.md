@@ -10,11 +10,11 @@ Faces are deliberately blank, skin-toned surfaces. Hair, ears, a neck and uncove
 
 The worker wears a faded slate-blue jacket over a neutral undershirt, charcoal trousers and enclosed brown work boots. A folded neckline, a subtle pocket, turned hems, cuffs and a quiet centre seam suggest actual clothing. The sleeves are sewn into the jacket surface, and the trousers share a crotch seam. Loose garment volumes and blended bends distinguish the person from PORTER's exposed joints and the squad's armour plates. No glowing panels, armoured shoulders, oversized boots or floating role text are needed to announce a human.
 
-At tactical distance, identity comes from silhouette, colour blocks and movement. The lighter exposed head and hands provide small contrast cues; a narrower body and relaxed arms separate the person from armed robots. The standing, walking and crouching poses allow that distinction to be checked before mission integration. Walking uses a planted stance followed by a forward swing, with heel strike, toe-off and a small foot lift. Knees hinge forward, the calves stay aligned with the shins, and arms counter the stride. The cycle runs in place for comparison. Two-bone leg placement maintains ground contact; crouching brings the knees forward and torso over the feet.
+At tactical distance, identity comes from silhouette, colour blocks and movement. The lighter exposed head and hands provide small contrast cues; a narrower body and relaxed arms separate the person from armed robots. The standing, walking and sitting poses allow that distinction to be checked at combat scale. Walking uses a planted stance followed by a forward swing, with heel strike, toe-off and a small foot lift. Knees hinge forward, the calves stay aligned with the shins, and arms counter the stride. The cycle runs in place for comparison. Two-bone leg placement maintains ground contact. Sitting is a separate inspection pose; it is not a crouch and is not used in missions.
 
 The prefab uses one indexed `SkinnedMesh` and a shared 16-bone skeleton. The jacket and sleeves, pelvis and trouser legs, and each palm and thumb have connected topology; there are no overlapping shoulder caps or separate elbow/knee balls. The collar folds out of the neckline, rather than floating above it. Clothing weights blend across the shoulders, elbows, hips and knees. Trouser cuffs and flexible boot shafts follow the shins; the soles and toe boxes follow the feet. Each boot has a connected sole, closed toe box and ankle upper.
 
-Two small corrective shapes lift and push the shirt hem clear of the thighs. Each front panel responds to its own hip's flexion, with a gentle fade toward the waist and side seams. Walking moves the two sides independently; crouching gathers the front of the shirt above both thighs. The connected surface and its normals deform together, while the sleeves and collar retain their skeletal skinning. This is skeletal cloth deformation with pose correctives, built-in ease and small folds, without cloth simulation.
+Two small corrective shapes lift and push the shirt hem clear of the thighs. Each front panel responds to its own hip's flexion, with a gentle fade toward the waist and side seams. Walking moves the two sides independently; sitting gathers the front of the shirt above both thighs. The connected surface and its normals deform together, while the sleeves and collar retain their skeletal skinning. This is skeletal cloth deformation with pose correctives, built-in ease and small folds, without cloth simulation.
 
 Future civilian wardrobes should keep the same scale and rig, changing clothing colour, hair and practical accessories. Ren Quill's escort uses this model in live combat, with movement, waiting, damage and extraction objectives. Additional characters can reuse those foundations without adding facial detail.
 
@@ -32,7 +32,7 @@ Run `npm run dev` and open **`/model-room.html`**, or use **Controls & settings 
 | Front / Back | Compare silhouettes in elevation |
 | Isometric | Use the game's equal-axis, 120° projection |
 | Tactical scale | Use Handling's actual default camera framing |
-| Standing / Walking / Crouching | Change the human pose; the walk can be paused |
+| Standing / Walking / Sitting | Change the human pose; the walk can be paused |
 | Cast checkboxes | Add or remove squad, civilian and traffic models |
 | Name plates / Metre grid | Hide inspection overlays |
 
@@ -42,9 +42,10 @@ The human stays in the lineup. ANCHOR, ROOK and PORTER are shown by default. NEE
 
 Release integrates the prefab into live gameplay as Ren Quill, with a
 charcoal/teal palette, greying hair and bronze glasses attached to the head bone.
-The shared shape remains faceless. Standing/walking/crouching use the same skin
-and shirt corrections as the model room. An upright/crouched physical capsule
-matches each silhouette, and actual movement advances the walk animation.
+The shared shape remains faceless. Live gameplay uses standing and walking
+with the same skin and shirt corrections as the model room. Waiting and captive
+Ren stand upright; his capsule stays upright as well. Actual movement advances
+the walk animation. The Sitting pose is available only for model inspection.
 See [Release and human escorts](escort.md) for the mission and guide controls.
 
 - `src/render/humans.ts`: standalone `makeHuman()` prefab, pose updater and resource disposal. Forward is +Z; the floor is Y=0. It has no gameplay or physics dependencies.

@@ -3,7 +3,7 @@ import { WINDOW_BORDER, MULLION, openingPanes, wallPanels, type Facade, type Pan
 import { block, panel } from "./primitives";
 
 /** Framed apertures, sills and transoms; glazing is separately instanced. */
-export function makeFacade(face: Facade, wall: THREE.Material, frame: THREE.Material, door: THREE.Material) {
+export function makeFacade(face: Facade, wall: THREE.Material, frame: THREE.Material, door: THREE.Material, openPortals = false) {
   const root = new THREE.Group();
   for (const p of wallPanels(face)) panel(root, p.w, p.h, p.x, p.y, 0, wall);
   for (const o of face.openings) {
@@ -12,7 +12,7 @@ export function makeFacade(face: Facade, wall: THREE.Material, frame: THREE.Mate
       block(root, WINDOW_BORDER, o.h - WINDOW_BORDER * 2, 0.18, o.x + side * (o.w - WINDOW_BORDER) / 2, o.y, 0.045, frame);
     }
     if (o.kind !== "window") {
-      panel(root, o.w - WINDOW_BORDER * 2, o.h - WINDOW_BORDER * 2, o.x, o.y, 0.04, door);
+      if (!openPortals) panel(root, o.w - WINDOW_BORDER * 2, o.h - WINDOW_BORDER * 2, o.x, o.y, 0.04, door);
       continue;
     }
     block(root, o.w + 0.16, 0.1, 0.25, o.x, o.y - o.h / 2 - 0.03, 0.035, wall);

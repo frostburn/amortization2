@@ -764,6 +764,7 @@ export class RangeScene {
     this.sun.shadow.normalBias = this.sim.city ? 0.1 : 0.035;
     camera.updateProjectionMatrix();
     this.cityView?.captureReflections(this.renderer, this.scene);
+    this.missionView?.setReflections(this.cityView?.reflectionTexture);
   }
 
   resetEnvironment() {
@@ -1559,7 +1560,7 @@ export class RangeScene {
       const velocity = a.body.linvel(),
         speed = Math.hypot(velocity.x, velocity.z);
       const stagger = this.sim.isDisrupted(a) ? a.stagger / a.staggerDuration : 0;
-      if (v.human) v.human.pose(a.dead ? "standing" : this.sim.escort?.crouching ? "crouching" : speed > .15 ? "walking" : "standing", this.sim.escort?.walkTime ?? 0);
+      if (v.human) v.human.pose(this.sim.escort?.pose ?? "standing", this.sim.escort?.walkTime ?? 0);
       const stride = a.dead || a.braced || stagger > 0 ? 0 : Math.min(0.5, speed * 0.12);
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;

@@ -15,7 +15,7 @@ import { RECEIVING_FIXTURES, RECEIVING_YARD } from "./receiving";
 import { CROSSING_DISTRICT, CROSSING_FIXTURES } from "./crossing";
 
 import { HANDLING_DISTRICT, HANDLING_FIXTURES, HANDLING_SHELTERS } from "./handling";
-import { ESCORT_DISTRICT, ESCORT_FIXTURES, ESCORT_SHELTERS } from "./escort";
+import { ESCORT_DISTRICT, ESCORT_FIXTURES, ESCORT_SHELTERS, ESCORT_SPAWNS } from "./escort";
 
 export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "proving" | "long" | "arena" | "city" | "port";
 export const ARENA_ENTRIES = [
@@ -42,7 +42,7 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
   escort: {
     name: "04 · RELEASE", contract: true, city: ESCORT_DISTRICT, bounds: ESCORT_DISTRICT.bounds,
     barriers: ESCORT_FIXTURES, platforms: [], shelters: ESCORT_SHELTERS,
-    players: [{ x: -30.1, z: -.9 }, { x: -30.1, z: -3.1 }, { x: -27.9, z: -3.1 }, { x: -27.9, z: -.9 }],
+    players: ESCORT_SPAWNS,
     targets: [], props: [],
   },
   handling: {

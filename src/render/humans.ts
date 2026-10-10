@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { surface } from "./primitives";
 import { HumanSurface, circle, type CrossSection, type Ring, type Weights } from "./human-surface";
 
-export type HumanPose = "standing" | "walking" | "crouching";
+export type HumanPose = "standing" | "walking" | "sitting";
 export const HUMAN_WALK_PERIOD = 1 / .85;
 const down = new THREE.Vector3(0, -1, 0), front = new THREE.Vector3(0, 0, 1);
 const blend = (a: number, b: number, t: number): Weights => [[a, 1 - t], [b, t]];
@@ -280,13 +280,13 @@ export function makeHuman(appearance: { name?: string; coat?: number; trim?: num
   let currentPose: HumanPose = "standing";
   const pose = (next: HumanPose, time = 0) => {
     currentPose = next;
-    const walking = next === "walking", crouching = next === "crouching", cycle = time / HUMAN_WALK_PERIOD, phase = cycle * Math.PI * 2;
-    const hipY = crouching ? .62 : walking ? .929 + Math.cos(phase * 2 - .8 * Math.PI) * .006 : .94, hipZ = crouching ? -.14 : 0;
-    hips.position.set(0, hipY, hipZ); spine.rotation.x = crouching ? .12 : walking ? .025 : 0;
-    chest.rotation.x = crouching ? .11 : walking ? .02 : 0; head.rotation.x = crouching ? -.12 : walking ? -.045 : 0;
+    const walking = next === "walking", sitting = next === "sitting", cycle = time / HUMAN_WALK_PERIOD, phase = cycle * Math.PI * 2;
+    const hipY = sitting ? .62 : walking ? .929 + Math.cos(phase * 2 - .8 * Math.PI) * .006 : .94, hipZ = sitting ? -.14 : 0;
+    hips.position.set(0, hipY, hipZ); spine.rotation.x = sitting ? .12 : walking ? .025 : 0;
+    chest.rotation.x = sitting ? .11 : walking ? .02 : 0; head.rotation.x = sitting ? -.12 : walking ? -.045 : 0;
     for (const [i, leg] of legs.entries()) {
-      const step = walking ? walkingFoot(cycle + i * .5) : { z: crouching ? .12 : 0, y: .105, pitch: 0 };
-      hip.set(leg.side * .095, hipY - .06, hipZ); ankle.set(leg.side * (crouching ? .13 : .095), step.y, step.z);
+      const step = walking ? walkingFoot(cycle + i * .5) : { z: sitting ? .12 : 0, y: .105, pitch: 0 };
+      hip.set(leg.side * .095, hipY - .06, hipZ); ankle.set(leg.side * (sitting ? .13 : .095), step.y, step.z);
       direction.copy(ankle).sub(hip); const distance = direction.length(); direction.normalize();
       const along = (.41 ** 2 - .365 ** 2 + distance ** 2) / (2 * distance), height = Math.sqrt(Math.max(0, .41 ** 2 - along ** 2));
       bend.copy(front).addScaledVector(direction, -front.dot(direction)).normalize();
@@ -301,9 +301,9 @@ export function makeHuman(appearance: { name?: string; coat?: number; trim?: num
     }
     for (const [i, arm] of arms.entries()) {
       const swing = walking ? Math.cos(phase + i * Math.PI) * .24 : 0;
-      arm.upper.rotation.set(crouching ? -.70 : swing, 0, arm.side * .13);
-      arm.lower.rotation.x = crouching ? -.43 : -.10 - Math.max(0, -swing) * .45;
-      arm.hand.rotation.x = crouching ? -.08 : .025;
+      arm.upper.rotation.set(sitting ? -.70 : swing, 0, arm.side * .13);
+      arm.lower.rotation.x = sitting ? -.43 : -.10 - Math.max(0, -swing) * .45;
+      arm.hand.rotation.x = sitting ? -.08 : .025;
     }
     root.updateMatrixWorld(true); skeleton.update(); mesh.computeBoundingBox(); mesh.computeBoundingSphere();
   };

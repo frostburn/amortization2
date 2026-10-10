@@ -16,7 +16,7 @@ function shellCollider(world: RAPIER.World, pieces: BoxSpec[]) {
       vertices.push(p.x + x * p.w / 2, (p.y ?? 0) + (y + 1) * p.h / 2, p.z + z * p.d / 2);
     indices.push(...BOX_FACES.map(i => i + offset));
   }
-  if (pieces.length) world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), new Uint32Array(indices)).setFriction(0.8));
+  if (pieces.length) return world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices), new Uint32Array(indices)).setFriction(0.8));
 }
 
 type Pane = { spec: PaneSpec; collider: RAPIER.Collider; broken: boolean };
@@ -35,6 +35,13 @@ export class CityWindows {
       const group: Glazing = { panes: specs.map(spec => ({ spec, broken: false } as Pane)) };
       this.rebuild(group); this.panes.push(...group.panes);
     }
+  }
+  /** Walkable mission interiors share the district's glazing and impact rules. */
+  addInterior(shell: BoxSpec[], specs: PaneSpec[]) {
+    const solid = shellCollider(this.sim.world, shell);
+    const group: Glazing = { panes: specs.map(spec => ({ spec, broken: false } as Pane)) };
+    this.rebuild(group); this.panes.push(...group.panes);
+    return { shell: solid?.handle, get glass() { return group.collider?.handle; } };
   }
   private rebuild(group: Glazing) {
     if (group.collider) {

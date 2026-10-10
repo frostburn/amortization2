@@ -122,4 +122,5 @@ export class MissionView {
     this.root = this.view.root;
   }
   update(sim: Simulation, reducedMotion: boolean) { this.view.update(sim, reducedMotion); }
+  setReflections(texture?: THREE.Texture) { if (this.view instanceof EscortView) this.view.setReflections(texture); }
 }

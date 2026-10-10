@@ -1,8 +1,8 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { STEP, distance2 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
-import { ESCORT_DOOR, ESCORT_GUARDS, ESCORT_OFFICE, ESCORT_REINFORCEMENTS, ESCORT_ROOF, ESCORT_SHELTERS, ESCORT_SITES } from "./escort";
-import { serviceHallWalls } from "./handling";
+import { ESCORT_DOOR, ESCORT_GUARDS, ESCORT_REAR_DOOR, ESCORT_REINFORCEMENTS, ESCORT_ROOF, ESCORT_SHELTERS, ESCORT_SITES } from "./escort";
+import { RECORDS_PANES, RECORDS_SHELL } from "./records-office";
 import { HumanEscort } from "./human-escort";
 import { Mission, type MissionDefinition } from "./missions";
 import { segmentClear } from "./navigation";
@@ -12,8 +12,8 @@ export const ESCORT_CONTRACT = {
   id: "escort", number: "04", title: "Release", location: "Wharf Cooperative · Gannet records office",
   summary: "Ren Quill went to inspect the cooperative's agreements. Gannet has locked him in for account reconciliation. Bring him home. Again.",
   briefing: [
-    { speaker: "morrow", message: "Ren found something in Gannet's operating-rights files. They want his signature before he leaves. Break the entrance, clear the hired machines, and get him back to our van. Four pistols; we're bringing a person out of an office." },
-    { speaker: "vale", message: "Three guards inside. Shoot the shutter to force entry, then reach Ren in the back room. He'll follow the first robot to reach him. H, or a click on Ren, tells him to wait or follow the selected robot. The guide slows to his pace; leave the others covering. Gannet has another squad on this street." },
+    { speaker: "morrow", message: "Ren found something in Gannet's operating-rights files. They want his signature before he leaves. Break in through the street lobby and clear the three hired machines. Our van is waiting on the back street. Four pistols; we're bringing a person out of an office." },
+    { speaker: "vale", message: "Shoot the entrance lock. The archive is beyond reception, through the passage on the right. Ren can open the rear staff exit. Get him along that alley to the van while the others cover the east street. H, or a click on Ren, tells him to wait or follow the selected robot. Gannet's response squad is coming from the east." },
   ],
   objectives: ["Break the office entrance", "Clear the office guards", "Reach Ren Quill", "Escort Quill and the surviving squad to the van"],
   releaseSeconds: 0, returnSeconds: 1,
@@ -29,6 +29,9 @@ export class EscortMission extends Mission {
   doorHp = 154;
   readonly doorMaxHp = 154;
   private door: RAPIER.RigidBody;
+  private rearDoor: RAPIER.RigidBody;
+  private glazing: { shell?: number; readonly glass?: number };
+  rearOpen = false;
   private guardIds: number[] = [];
   private squadIds: number[] = [];
   reinforcementAt?: number;
@@ -37,21 +40,25 @@ export class EscortMission extends Mission {
   constructor(sim: Simulation) {
     super(sim);
     const b = ESCORT_DOOR;
-    this.obstacles = [{ ...b }];
+    this.obstacles = [{ ...b }, { ...ESCORT_REAR_DOOR }];
     this.door = sim.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(b.x, b.h / 2, b.z));
     const collider = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(b.w / 2, b.h / 2, b.d / 2), this.door);
     this.breakables.add(collider.handle);
+    const rear = ESCORT_REAR_DOOR;
+    this.rearDoor = sim.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(rear.x, rear.h / 2, rear.z));
+    sim.world.createCollider(RAPIER.ColliderDesc.cuboid(rear.w / 2, rear.h / 2, rear.d / 2), this.rearDoor);
+    this.glazing = sim.city!.windows.addInterior(RECORDS_SHELL, RECORDS_PANES);
     const r = ESCORT_ROOF;
     const roof = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(r.w / 2, r.h / 2, r.d / 2)
       .setTranslation(r.x, r.y! + r.h / 2, r.z));
-    const walls: number[] = [], specs = serviceHallWalls(ESCORT_OFFICE);
-    sim.world.forEachCollider(c => {
-      const p = c.translation();
-      if (specs.some(w => Math.abs(p.x - w.x) < .001 && Math.abs(p.z - w.z) < .001 && Math.abs(p.y - w.h / 2) < .001)) walls.push(c.handle);
-    });
-    this.roofs.push({ area: ESCORT_SHELTERS[0], collider: roof.handle, walls, revealDistance: 12 });
+    this.roofs.push({ area: ESCORT_SHELTERS[0], collider: roof.handle, revealDistance: 10 });
     ESCORT_GUARDS.forEach((p, i) => this.guardIds.push(this.spawn(p, p, i, 0).id));
     this.escort = sim.escort = new HumanEscort(sim, sim.addHuman(ESCORT_SITES.quill));
+  }
+  override get cutawayRoofs() {
+    // Glazing gets a new collision mesh whenever a pane breaks.
+    this.roofs[0].walls = [this.glazing.shell, this.glazing.glass].filter((h): h is number => h !== undefined);
+    return super.cutawayRoofs;
   }
   private spawn(position: { x: number; z: number }, rally: { x: number; z: number }, i: number, squad: number): Actor {
     const a = this.sim.addEnemy("assault", position);
@@ -76,7 +83,7 @@ export class EscortMission extends Mission {
     if (!this.breakables.has(handle) || this.stopped) return false;
     this.doorHp = Math.max(0, this.doorHp - amount);
     if (!this.doorHp) {
-      this.breakables.clear(); this.sim.world.removeRigidBody(this.door); this.obstacles = [];
+      this.breakables.clear(); this.sim.world.removeRigidBody(this.door); this.obstacles = [{ ...ESCORT_REAR_DOOR }];
       this.releaseProgress = 1; this.phase = "rescue";
       this.sim.events.push({ type: "comms", speaker: "vale", message: "Entrance open. Three hired machines between you and Ren." });
     }
@@ -84,12 +91,14 @@ export class EscortMission extends Mission {
   }
   updateCombat() {
     const living = this.sim.squad.filter(a => !a.dead);
-    for (const guard of this.guards) updateEnemy(this.sim, guard, this.cargoReleased ? living : [], GUARDS);
+    const alerted = this.doorHp < this.doorMaxHp || this.guards.some(a => a.hp < a.maxHp) ||
+      [...this.sim.city!.windows.broken].some(id => id.startsWith("records/"));
+    for (const guard of this.guards) updateEnemy(this.sim, guard, alerted ? living : [], GUARDS);
     if (this.reinforcementAt !== undefined && this.arrivedAt === undefined && this.sim.time >= this.reinforcementAt) {
       this.arrivedAt = this.sim.time;
       ESCORT_REINFORCEMENTS.forEach(({ entry, rally }, i) => this.squadIds.push(this.spawn(entry, rally, i, 1).id));
-      this.sim.events.push({ type: "security", phase: "arrival", position: { x: -8, y: 1, z: 24 }, level: 1 });
-      this.sim.events.push({ type: "comms", speaker: "vale", message: "Four response machines from the south street. Keep Ren behind your pistols. The van is still clear." });
+      this.sim.events.push({ type: "security", phase: "arrival", position: { ...ESCORT_SITES.response, y: 1 }, level: 1 });
+      this.sim.events.push({ type: "comms", speaker: "vale", message: "Four response machines coming west along the east street. Cover that corner. Ren's rear exit is open; take the back alley to the van." });
     }
     const targets = this.escort.rescuedAt !== undefined && !this.escort.human.dead ? [...living, this.escort.human] : living;
     for (const enemy of this.reinforcements) updateEnemy(this.sim, enemy, targets, PURSUERS);
@@ -112,8 +121,9 @@ export class EscortMission extends Mission {
         .sort((a, b) => distance2(a.body.translation(), human.body.translation()) - distance2(b.body.translation(), human.body.translation()));
       if (nearby.length) {
         this.escort.rescue(nearby[0]); this.phase = "escort";
+        this.sim.world.removeRigidBody(this.rearDoor); this.obstacles = []; this.rearOpen = true;
         this.reinforcementAt = this.sim.time + 5;
-        this.sim.events.push({ type: "comms", speaker: "quill", message: "They called it a voluntary reconciliation. I asked why the door was locked. Let's go." });
+        this.sim.events.push({ type: "comms", speaker: "quill", message: "They called it a voluntary reconciliation. I asked why the door was locked. My staff fob still works on the rear exit. Let's go." });
       }
     }
     if (this.phase === "escort") {
@@ -129,6 +139,7 @@ export class EscortMission extends Mission {
       cargoReleased: this.cargoReleased, marker: this.marker, enemyShots: this.enemyShots,
       deployedAt: this.deployedAt, finishedAt: this.finishedAt, survivors: this.sim.squad.filter(a => !a.dead).length,
       doorHp: this.doorHp, doorMaxHp: this.doorMaxHp, guardsRemaining: this.guards.length,
+      rearOpen: this.rearOpen,
       reinforcementAt: this.reinforcementAt, arrivedAt: this.arrivedAt, reinforcements: this.reinforcements.length,
       escort: this.escort.inspect(), failureReason: this.failureReason };
   }

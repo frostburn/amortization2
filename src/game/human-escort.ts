@@ -1,4 +1,3 @@
-import RAPIER from "@dimforge/rapier3d-compat";
 import { HUMAN, STEP, distance2, type Vec2 } from "./config";
 import type { Actor, Simulation } from "./simulation";
 
@@ -6,11 +5,9 @@ import type { Actor, Simulation } from "./simulation";
 export class HumanEscort {
   state: "captive" | "following" | "waiting" = "captive";
   guide?: number;
-  crouching = true;
   walkTime = 0;
   rescuedAt?: number;
   private nextRoute = 0;
-  private shapeCrouched = false;
   constructor(private sim: Simulation, readonly human: Actor) {}
   get leader() { return this.sim.squad.find(a => a.id === this.guide && !a.dead); }
   rescue(guide: Actor) {
@@ -70,20 +67,12 @@ export class HumanEscort {
         this.sim.navigate(a, goal);
       }
     } else this.halt();
-    // Waiting in cover uses the same crouch as the model study. Collision
-    // follows the smaller silhouette without moving the feet or body origin.
-    this.crouching = this.state !== "following" || !a.path.length && speed < .15;
-    if (this.crouching !== this.shapeCrouched) {
-      const height = this.crouching ? HUMAN.crouchHeight : HUMAN.height;
-      a.collider.setShape(new RAPIER.Capsule(height / 2 - HUMAN.radius, HUMAN.radius));
-      a.collider.setTranslationWrtParent({ x: 0, y: (height - HUMAN.height) / 2, z: 0 });
-      this.shapeCrouched = this.crouching;
-    }
   }
+  get pose() { return this.human.dead || Math.hypot(this.human.body.linvel().x, this.human.body.linvel().z) < .15 ? "standing" : "walking"; }
   inspect() {
     return { id: this.human.id, name: "Ren Quill", state: this.state, guide: this.guide ?? null,
       hp: this.human.hp, maxHp: this.human.maxHp, dead: this.human.dead,
-      position: { ...this.human.body.translation() }, crouching: this.crouching,
+      position: { ...this.human.body.translation() }, pose: this.pose,
       walkTime: this.walkTime, rescuedAt: this.rescuedAt };
   }
 }

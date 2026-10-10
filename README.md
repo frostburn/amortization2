@@ -37,7 +37,7 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 ## Release
 
-**04 · Release** is a pistols-only rescue and escort. Break into Gannet's records office, clear three guards and reach **Ren Quill**. He follows a robot at walking pace; click him or press **H** to wait, resume or change guides. Cover the withdrawal when a fresh four-robot squad arrives. Quill has his own health, and both he and every surviving chassis must reach the van. Handling's debrief offers this next contract; it is also available in the deployment selector. See [Release and human escorts](docs/escort.md).
+**04 · Release** is a pistols-only rescue and escort. Enter Gannet's street-corner records office through its front lobby, fight through reception and the archive, and reach **Ren Quill**. He follows a robot at walking pace; click him or press **H** to wait, resume or change guides. He unlocks the rear staff exit. Cover the east street against a fresh four-robot squad, then withdraw through the rear alley to the back-street van. Quill has his own health, and both he and every surviving chassis must reach the van. Handling's debrief offers this next contract; it is also available in the deployment selector. See [Release and human escorts](docs/escort.md).
 
 ## Proving Ground
 

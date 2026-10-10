@@ -80,12 +80,12 @@ describe("faceless civilian prefab", () => {
       }
       const { start, end } = human.mesh.geometry.userData.parts.jacket;
       const standing = Array.from({ length: end - start }, (_, i) => human.mesh.getVertexPosition(start + i, new THREE.Vector3()));
-      human.pose("crouching");
+      human.pose("sitting");
       const changed = standing.filter((p, i) => p.distanceTo(human.mesh.getVertexPosition(start + i, new THREE.Vector3())) > .05);
       expect(changed.length).toBeGreaterThan(standing.length / 2);
     } finally { human.dispose(); }
   });
-  test("walking feet stay above the floor and crouching lowers the head without moving the prefab", () => {
+  test("walking feet stay above the floor and sitting lowers the head without moving the prefab", () => {
     const human = makeHuman(), rootPosition = human.root.position.clone();
     try {
       for (let time = 0; time < 1.2; time += .1) {
@@ -93,9 +93,9 @@ describe("faceless civilian prefab", () => {
         const bounds = new THREE.Box3().setFromObject(human.root);
         expect(bounds.min.y).toBeGreaterThanOrEqual(-.001); expect(bounds.max.y).toBeLessThan(1.8);
       }
-      human.pose("crouching");
-      const crouch = new THREE.Box3().setFromObject(human.root);
-      expect(crouch.max.y).toBeLessThan(1.45); expect(crouch.min.y).toBeGreaterThanOrEqual(-.001);
+      human.pose("sitting");
+      const sit = new THREE.Box3().setFromObject(human.root);
+      expect(sit.max.y).toBeLessThan(1.45); expect(sit.min.y).toBeGreaterThanOrEqual(-.001);
       human.pose("standing"); expect(new THREE.Box3().setFromObject(human.root).max.y).toBeGreaterThan(1.73);
       expect(human.root.position.equals(rootPosition)).toBe(true);
     } finally { human.dispose(); }
@@ -107,7 +107,7 @@ describe("faceless civilian prefab", () => {
       return human.mesh.material[hit.face!.materialIndex].color.getHex();
     };
     try {
-      for (const [pose, time] of [["standing", 0], ["crouching", 0], ["walking", .1], ["walking", .4], ["walking", .8]] as const) {
+      for (const [pose, time] of [["standing", 0], ["sitting", 0], ["walking", .1], ["walking", .4], ["walking", .8]] as const) {
         human.pose(pose, time);
         const hips = human.skeleton.bones.find(b => b.name === "hips")!.getWorldPosition(p);
         for (const x of [-.14, -.08, 0, .08, .14]) for (const dy of [-.075, -.025, .015]) {
@@ -176,9 +176,9 @@ describe("faceless civilian prefab", () => {
     const resting = human.mesh.getVertexPosition(hem, new THREE.Vector3()).sub(hip.getWorldPosition(new THREE.Vector3()));
     const ray = new THREE.Ray(), point = new THREE.Vector3(), center = new THREE.Vector3();
     try {
-      human.pose("crouching"); const lifted = human.mesh.getVertexPosition(hem, new THREE.Vector3()).sub(hip.getWorldPosition(new THREE.Vector3()));
+      human.pose("sitting"); const lifted = human.mesh.getVertexPosition(hem, new THREE.Vector3()).sub(hip.getWorldPosition(new THREE.Vector3()));
       expect(lifted.y - resting.y).toBeGreaterThan(.10); expect(lifted.z - resting.z).toBeGreaterThan(.05);
-      for (const [pose, time] of [["crouching", 0], ...Array.from({ length: 12 }, (_, i) => ["walking", HUMAN_WALK_PERIOD * i / 12] as const)] as const) {
+      for (const [pose, time] of [["sitting", 0], ...Array.from({ length: 12 }, (_, i) => ["walking", HUMAN_WALK_PERIOD * i / 12] as const)] as const) {
         human.pose(pose, time);
         const vertices = Array.from({ length: base.count }, (_, i) => human.mesh.getVertexPosition(i, new THREE.Vector3()));
         for (const face of panels) {

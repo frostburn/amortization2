@@ -119,8 +119,9 @@ before the cooperative's business was interrupted.
 The playable tutorial sequence continues through [Crossing](crossing.md) and
 [Handling](handling.md), then [Release](escort.md). Quill visits Gannet's records
 office himself to inspect those operating rights. Its hired security locks him
-in for "account reconciliation"; the robot team breaks in and escorts him past
-an arriving response squad. His second rescue brings a person into the field
+in for "account reconciliation"; the robot team breaks in through reception. Quill opens the rear staff exit,
+and the team escorts him along the back alley while covering an arriving
+response squad on the eastern street. His second rescue brings a person into the field
 and returns him, with the records, to his work on the cooperative's agreements.
 
 ### 2. Right of Way

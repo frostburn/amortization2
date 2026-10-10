@@ -1064,10 +1064,6 @@ export class Simulation {
       }
     }
     if (a.hp <= 0) {
-      if (a.kind === "human") {
-        a.collider.setShape(new RAPIER.Capsule(HUMAN.height / 2 - HUMAN.radius, HUMAN.radius));
-        a.collider.setTranslationWrtParent({ x: 0, y: 0, z: 0 });
-      }
       if (a.kind === "player" && a.model === "sniper") this.endSniping();
       a.dead = true;
       this.selected.delete(a.id);

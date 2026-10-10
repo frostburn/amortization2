@@ -86,7 +86,7 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", escort ? mission.phase === "breach" ? "Shoot the entrance shutter"
+  setText("mission-detail", escort ? mission.phase === "breach" ? "Shoot the entrance lock"
     : mission.phase === "rescue" ? rescue.guards.length ? `${rescue.guards.length} guards remaining` : "Bring a robot to Quill"
     : mission.phase === "escort" ? `${near} / ${living.length} robots at the van · ${rescue.reinforcements.length} response machines`
     : mission.phase === "complete" ? "Quill recovered · Squad recovered" : mission.failureReason ?? "Recovery required"
