@@ -35,6 +35,10 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 **03 · Handling** teaches hauling with the fixed pistol squad. Select robots and press **H** (or the box icon) to collect cargo; RMB moves the team, and H puts it down. Deliver a one-robot return box to open the guarded service hall, eliminate its three guards, then recover a heavy tool chest with two robots. Carriers cannot shoot, so keep the other pistols defending. Inventory drones arrive while cargo is carried; setting it down pauses new waves. The entire surviving squad must return to the van. See [Handling and physical cargo](docs/handling.md).
 
+## Release
+
+**04 · Release** is a pistols-only rescue and escort. Enter Gannet's street-corner records office through its front lobby, fight through reception and the archive, and reach **Ren Quill**. He follows a robot at walking pace; click him or press **H** to wait, resume or change guides. He unlocks the rear staff exit. Cover the east street against a fresh four-robot squad, then withdraw through the rear alley to the back-street van. Quill has his own health, and both he and every surviving chassis must reach the van. Handling's debrief offers this next contract; it is also available in the deployment selector. See [Release and human escorts](docs/escort.md).
+
 ## Proving Ground
 
 - **Ballistics:** clear six orange plate targets with the machine gun or minigun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.
@@ -119,6 +123,8 @@ See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original fi
 ## Development
 
 TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and Web Audio. No backend is required.
+
+Open **`/model-room.html`** (or **Controls & settings → Model room**) to orbit the original faceless maintenance worker beside the squad, civilian robots and self-driving vehicles. Switch between standing, walking and crouching, inspect the front/back, or use the game's isometric and tactical-scale camera. Models retain their original relative sizes. See [faceless human direction and viewer controls](docs/faceless-humans.md).
 
 - [Range design and implementation](docs/proving-ground.md)
 - [Receiving — first playable contract](docs/first-mission.md)

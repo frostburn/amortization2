@@ -10,6 +10,7 @@ export default defineConfig({
   define: { __REPLAY_REVISION__: JSON.stringify(revision) },
   build: {
     rolldownOptions: {
+      input: { game: "index.html", modelRoom: "model-room.html" },
       output: {
         codeSplitting: {
           groups: [

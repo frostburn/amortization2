@@ -572,7 +572,7 @@ export class RangeAudio {
         this.pistolShots++;
       }
       if (e.impact && e.material !== "glass")
-        this.impact(e.to, e.material === "metal");
+        this.impact(e.to, e.material === "metal", e.material === "soft" ? .25 : 1);
       this.flyby(e.from, e.to);
     } else if (e.type === "explosion") {
       const vehicle=e.vehicle!==undefined;

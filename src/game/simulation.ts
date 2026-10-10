@@ -15,6 +15,7 @@ import {
   RIFLE,
   ROBOT_MODELS,
   STEP,
+  HUMAN,
   clamp,
   distance2,
   grenadeVelocity,
@@ -35,11 +36,13 @@ import type { EnemyBrain } from "./enemies";
 import { ReceivingMission, type Mission, type Contact } from "./missions";
 import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
+import { EscortMission } from "./escort-mission";
+import type { HumanEscort } from "./human-escort";
 import type { SquadHauling } from "./hauling";
 import type { ReplayAction } from "./replay";
 import { manualFire, orderCoverFire, startCoverFire, stopCoverFire, updateCoverFire, type CoverBrain } from "./cover";
 
-export type ActorKind = "player" | "enemy" | TargetKind;
+export type ActorKind = "player" | "enemy" | "human" | TargetKind;
 export interface Actor {
   id: number;
   kind: ActorKind;
@@ -113,7 +116,7 @@ export type GameEvent =
       to: Vec3;
       hit: boolean;
       impact: boolean;
-      material: "metal" | "concrete" | "glass";
+      material: "metal" | "concrete" | "glass" | "soft";
       normal: Vec3;
     }
   | { type: "explosion"; position: Vec3; affected: number; team: "player" | "enemy" | "neutral"; vehicle?: number }
@@ -153,6 +156,7 @@ export class Simulation {
   arena?: ArenaCombat;
   mission?: Mission;
   hauling?: SquadHauling;
+  escort?: HumanEscort;
   city?: CityLife;
   security?: SecurityResponse;
   time = 0;
@@ -189,6 +193,7 @@ export class Simulation {
     this.fourthModel = fourthModel;
     this.mission = undefined;
     this.hauling = undefined;
+    this.escort = undefined;
     this.security = undefined;
     this.navigation = new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
@@ -277,7 +282,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : undefined;
+    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : undefined;
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
@@ -379,6 +384,17 @@ export class Simulation {
 
   addEnemy(model: RobotModel, position: Vec2) {
     return this.addActor(this.nextId++, "enemy", position.x, position.z, 0, model);
+  }
+  addHuman(position: Vec2) {
+    const a = this.addActor(this.nextId++, "human", position.x, position.z);
+    this.world.removeCollider(a.collider, true);
+    a.collider = this.world.createCollider(RAPIER.ColliderDesc.capsule(HUMAN.height / 2 - HUMAN.radius, HUMAN.radius)
+      .setMass(HUMAN.mass).setFriction(.3).setRestitution(0), a.body);
+    a.body.setTranslation({ ...position, y: HUMAN.height / 2 }, true);
+    a.spawn = a.previous = { ...a.body.translation() };
+    a.hp = a.maxHp = HUMAN.hp;
+    a.weapons = []; a.ammo = a.pistol.ammo = 0;
+    return a;
   }
   addSecurityDrone(position: Vec3) {
     const a = this.addActor(this.nextId++, "enemy", position.x, position.z, position.y - .98, "assault");
@@ -603,7 +619,7 @@ export class Simulation {
       })),
       ...(includeTargets
         ? this.actors
-            .filter((a) => !a.model && !a.dead)
+            .filter((a) => !a.model && a.kind !== "human" && !a.dead)
             .map((a) => ({
               x: a.body.translation().x,
               z: a.body.translation().z,
@@ -714,6 +730,7 @@ export class Simulation {
   }
 
   haulCargo(id?: number) { return this.hauling?.command(id) ?? null; }
+  escortHuman() { return this.escort?.command() ?? null; }
 
   reloadSelected() {
     this.onInput?.({ type: "reload" });
@@ -801,7 +818,7 @@ export class Simulation {
   }
 
   team(a: Actor) {
-    return a.kind === "player" ? "player" : "enemy";
+    return a.kind === "player" || a.kind === "human" ? "player" : "enemy";
   }
 
   /** Preview, optical aim and shots share the equipped weapon's friendly-fire policy. */
@@ -914,7 +931,8 @@ export class Simulation {
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
     const hitOpponent = !!target && !target.dead && this.team(target) !== this.team(a);
     const glass = !!hit && !!this.city?.windows.hit(hit.collider.handle, to, hit.normal);
-    if (!glass && target && !target.dead) {
+    const fixture = !!hit && !glass && !!this.mission?.damageFixture(hit.collider.handle, spec.damage);
+    if (!glass && !fixture && target && !target.dead) {
       this.damage(
         target,
         spec.damage,
@@ -931,12 +949,12 @@ export class Simulation {
         if (covering) this.coverHits++;
         else this.hits++;
       }
-    } else if (!glass && hit && this.city?.neutral(hit.collider.handle)) {
+    } else if (!glass && !fixture && hit && this.city?.neutral(hit.collider.handle)) {
       const cart = this.city.neutral(hit.collider.handle)!;
       const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
       this.city.damage(cart, spec.damage, { x: dir.x * strength,
         y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to, this.team(a));
-    } else if (!glass && hit?.collider.parent()?.isDynamic()) {
+    } else if (!glass && !fixture && hit?.collider.parent()?.isDynamic()) {
       // Break the grip before the shot impulse can transfer into PORTER's hull.
       if (rifle) {
         const porter = this.city?.porters.find(p => p.grip && p.cargo.body.handle === hit.collider.parent()!.handle);
@@ -978,7 +996,7 @@ export class Simulation {
       hit: hitOpponent,
       impact: !!hit,
       material:
-        glass ? "glass" : target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
+        glass ? "glass" : target?.kind === "human" ? "soft" : fixture || target || hit?.collider.parent()?.isDynamic() ? "metal" : "concrete",
       normal: hit ? vcopy(hit.normal) : { x: 0, y: 1, z: 0 },
     });
   }
@@ -1235,6 +1253,7 @@ export class Simulation {
     this.time += STEP;
     this.arena?.update();
     this.hauling?.update();
+    this.escort?.update();
     this.mission?.updateCombat();
     this.security?.update();
     updateCoverFire(this);
@@ -1280,7 +1299,7 @@ export class Simulation {
           if (state.reload === 0) state.ammo = this.magazine(a, weapon);
         }
       }
-      if (a.kind === "player" || a.kind === "enemy") {
+      if (a.kind === "player" || a.kind === "enemy" || a.kind === "human") {
         const selected = a.kind === "player" && this.selected.has(a.id);
         const state = this.ammunition(a);
         const fire =
@@ -1391,7 +1410,7 @@ export class Simulation {
     if (a.path.length && !a.braced && !this.isDisrupted(a)) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
-      const speed = Math.min(this.hauling?.escortSpeed(a, target) ?? (a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2), distance * 5);
+      const speed = Math.min(this.escort?.movementSpeed(a) ?? this.hauling?.escortSpeed(a, target) ?? (a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2), distance * 5);
       const forwardX = (target.x - p.x) / distance,
         forwardZ = (target.z - p.z) / distance;
       dx = forwardX * speed;
@@ -1422,7 +1441,7 @@ export class Simulation {
       .filter(
         (other) =>
           other !== a &&
-          (!other.dead || !!other.model) &&
+          (!other.dead || !!other.model || other.kind === "human") &&
           // During collection, wrecks yield through real hull contacts rather
           // than steering away forever from a grip occupied by a fallen hand.
           !(collecting && other.dead) &&
@@ -1432,11 +1451,11 @@ export class Simulation {
       .map((other) => {
         // Disabled capsules can lie across an aisle. Their rotated footprint
         // still blocks walking even though they no longer have movement intent.
-        const wreck = other.dead && !!other.model;
+        const wreck = other.dead && (!!other.model || other.kind === "human");
         const q = wreck ? other.body.rotation() : null;
         return {
           p: other.body.translation(), v: other.body.linvel(),
-          player: !!other.model && !wreck && !other.flight,
+          player: (!!other.model || other.kind === "human") && !wreck && !other.flight,
           w: other.flight ? WATCH.radius * 2 : q ? 0.74 + 1.12 * Math.abs(2 * (q.x * q.y - q.w * q.z)) : this.range === "long" ? 0.6 : 0.96,
           d: other.flight ? WATCH.radius * 2 : q ? 0.74 + 1.12 * Math.abs(2 * (q.w * q.x + q.y * q.z)) : this.range === "long" ? 0.96 : 0.6,
         };
@@ -1557,6 +1576,7 @@ export class Simulation {
       arena: this.arena?.inspect() ?? null,
       mission: this.mission?.inspect() ?? null,
       hauling: this.hauling?.inspect() ?? null,
+      escort: this.escort?.inspect() ?? null,
       city: this.city?.inspect() ?? null,
       security: this.security?.inspect() ?? null,
       aim: vcopy(this.aim),

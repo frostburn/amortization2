@@ -4,6 +4,7 @@ import {
   BLAST_RADIUS,
   AUTOMATIC_AIM,
   FORMATION_SPACING,
+  HUMAN,
   FIREARMS,
   GRAVITY,
   GRENADE_FUSE,
@@ -24,7 +25,8 @@ import { MissionView } from "./mission";
 import { squadCargo } from "./hauling";
 import { CoverOrderView } from "./cover";
 import { CartFleet } from "./carts";
-import { makeWatch } from "./security";
+import { makeActorBody } from "./actor-model";
+import { makeHuman } from "./humans";
 import { KiteFleet } from "./kites";
 import { PorterFleet, makeTote } from "./porters";
 import { TrafficFleet } from "./traffic";
@@ -163,6 +165,8 @@ type ActorVisual = {
   barrels?: THREE.Group;
   rotors?: THREE.Group[];
   beacon?: THREE.Mesh;
+  human?: ReturnType<typeof makeHuman>;
+  name?: THREE.Sprite;
   dead: boolean;
 };
 type Particle = {
@@ -760,6 +764,7 @@ export class RangeScene {
     this.sun.shadow.normalBias = this.sim.city ? 0.1 : 0.035;
     camera.updateProjectionMatrix();
     this.cityView?.captureReflections(this.renderer, this.scene);
+    this.missionView?.setReflections(this.cityView?.reflectionTexture);
   }
 
   resetEnvironment() {
@@ -885,176 +890,11 @@ export class RangeScene {
   }
 
   private makeActor(a: Actor): ActorVisual {
-    const root = new THREE.Group(),
-      model = new THREE.Group(),
-      torso = new THREE.Group();
-    root.add(model);
-    model.position.y = -0.96;
-    const legs: THREE.Group[] = [];
-    const friend = a.kind === "player";
-    const sniper = a.model === "sniper";
-    const minigunner = a.model === "minigunner";
-    const bodyMat = friend ? sniper ? sniperShell : minigunner ? minigunShell : shell : orange;
-    let bipod: THREE.Group | undefined;
-    let primaryGun: THREE.Group | undefined, pistol: THREE.Group | undefined;
-    let arms: THREE.Group | undefined, carryArms: THREE.Group | undefined;
-    let barrels: THREE.Group | undefined;
-    let rotors: THREE.Group[] | undefined, beacon: THREE.Mesh | undefined;
-    if (sniper) model.scale.x = 0.74;
-    if (a.flight) ({ rotors, beacon } = makeWatch(model, torso, a.flight.contract));
-    else if (a.model || a.kind === "heavy") {
-      for (const x of [-0.24, 0.24]) {
-        const leg = new THREE.Group();
-        leg.position.set(x, 0.8, 0);
-        model.add(leg);
-        legs.push(leg);
-        box(leg, 0.25, 0.36, 0.28, 0, -0.18, 0, bodyMat);
-        box(leg, 0.2, 0.34, 0.23, 0, -0.52, 0, dark);
-        box(leg, 0.31, 0.17, 0.52, 0, -0.71, 0.09, metal);
-        const knee = cylinder(leg, 0.14, 0.28, 0, -0.37, 0.04, silver);
-        knee.rotation.z = Math.PI / 2;
-        box(leg, 0.17, 0.18, 0.045, 0, -0.5, 0.14, bodyMat);
-      }
-      box(model, 0.63, 0.27, 0.4, 0, 0.83, 0, dark);
-      torso.position.y = 1.05;
-      model.add(torso);
-      box(torso, 0.74, 0.55, 0.44, 0, 0.24, 0, bodyMat);
-      box(torso, 0.54, 0.2, 0.08, 0, 0.35, 0.25, pale);
-      box(torso, 0.4, 0.42, 0.23, 0, 0.24, -0.3, dark);
-      if (minigunner) {
-        box(torso, 0.95, 0.23, 0.52, 0, 0.45, 0, bodyMat);
-        const pack = cylinder(torso, 0.32, 0.7, 0, 0.22, -0.47, metal);
-        pack.rotation.z = Math.PI / 2;
-        for (let i = 0; i < 5; i++) box(torso, 0.1, 0.12, 0.1, 0.48, 0.14 + i * 0.08, -0.2 + i * 0.1, yellow);
-      }
-      box(torso, 0.42, 0.3, 0.35, 0, 0.7, 0.02, bodyMat);
-      box(torso, 0.34, 0.065, 0.03, 0, 0.73, 0.207, friend ? glow : pale);
-      arms = new THREE.Group(); torso.add(arms);
-      for (const sign of [-1, 1]) {
-        const shoulder = box(
-          arms,
-          0.27,
-          0.25,
-          0.4,
-          sign * 0.5,
-          0.39,
-          0,
-          bodyMat,
-        );
-        shoulder.rotation.z = sign * 0.16;
-        box(arms, 0.18, 0.35, 0.2, sign * 0.53, 0.14, 0.12, dark);
-        box(arms, 0.2, 0.19, 0.35, sign * 0.48, 0.02, 0.32, bodyMat);
-      }
-      this.batchRigidPart(arms);
-      if (friend) {
-        carryArms = new THREE.Group(); torso.add(carryArms);
-        for (const side of [-1, 1]) {
-          box(carryArms, 0.22, 0.26, 0.3, side * 0.5, 0.32, 0, bodyMat);
-          const upper = box(carryArms, 0.17, 0.38, 0.18, side * 0.5, 0.12, 0.13, dark);
-          upper.rotation.x = -0.65;
-          box(carryArms, 0.18, 0.16, 0.44, side * 0.42, -0.07, 0.43, bodyMat);
-          box(carryArms, 0.18, 0.14, 0.15, side * 0.36, -0.07, 0.7, metal);
-        }
-        this.batchRigidPart(carryArms); carryArms.visible = false;
-      }
-      if (a.model) {
-        primaryGun = new THREE.Group();
-        torso.add(primaryGun);
-        box(
-          primaryGun,
-          sniper ? 0.16 : 0.22,
-          sniper ? 0.17 : 0.2,
-          sniper ? 0.72 : 0.63,
-          0.28,
-          0.3,
-          sniper ? 0.61 : 0.47,
-          dark,
-        );
-        const barrel = cylinder(
-          primaryGun,
-          sniper ? 0.043 : 0.052,
-          sniper ? 0.85 : 0.4,
-          0.28,
-          0.3,
-          sniper ? 1.28 : 0.66,
-          silver,
-        );
-        barrel.rotation.x = Math.PI / 2;
-        if (minigunner) {
-          primaryGun.remove(barrel);
-          const housing = cylinder(primaryGun, 0.19, 0.36, 0.28, 0.3, 0.48, metal);
-          housing.rotation.x = Math.PI / 2;
-          barrels = new THREE.Group();
-          barrels.position.set(0.28, 0.3, 0.83);
-          primaryGun.add(barrels);
-          for (let i = 0; i < 6; i++) {
-            const angle = i * Math.PI / 3;
-            const tube = cylinder(barrels, 0.035, 0.7, Math.cos(angle) * 0.11, Math.sin(angle) * 0.11, 0, silver);
-            tube.rotation.x = Math.PI / 2;
-          }
-          for (const z of [-0.23, 0.27]) {
-            const collar = cylinder(barrels, 0.155, 0.07, 0, 0, z, dark);
-            collar.rotation.x = Math.PI / 2;
-          }
-          this.batchRigidPart(barrels);
-          box(primaryGun, 0.2, 0.13, 0.2, 0.28, 0.51, 0.42, yellow);
-        } else if (sniper) {
-          box(primaryGun, 0.12, 0.28, 0.2, 0.28, 0.11, 0.56, metal);
-          const optic = cylinder(primaryGun, 0.085, 0.36, 0.28, 0.49, 0.6, dark);
-          optic.rotation.x = Math.PI / 2;
-          const lens = cylinder(primaryGun, 0.065, 0.02, 0.28, 0.49, 0.79, friend ? glow : targetPaint);
-          lens.rotation.x = Math.PI / 2;
-          bipod = new THREE.Group();
-          for (const sign of [-1, 1]) {
-            const leg = cylinder(
-              bipod,
-              0.025,
-              0.38,
-              0.28 + sign * 0.12,
-              0.06,
-              1.04,
-              silver,
-            );
-            leg.rotation.z = sign * 0.5;
-          }
-          primaryGun.add(bipod);
-          this.batchRigidPart(bipod);
-        } else {
-          box(primaryGun, 0.3, 0.27, 0.26, 0.38, 0.17, 0.38, metal);
-          box(primaryGun, 0.09, 0.12, 0.13, 0.28, 0.47, 0.61, dark);
-        }
-        this.batchRigidPart(primaryGun);
-        if (a.weapons.includes("pistol")) {
-          pistol = new THREE.Group();
-          torso.add(pistol);
-          box(pistol, 0.16, 0.15, 0.35, 0.28, 0.3, 0.46, dark);
-          box(pistol, 0.12, 0.23, 0.13, 0.28, 0.14, 0.35, metal);
-          const tip = cylinder(pistol, 0.027, 0.12, 0.28, 0.3, 0.6, silver);
-          tip.rotation.x = Math.PI / 2;
-          this.batchRigidPart(pistol);
-        }
-        cylinder(torso, 0.013, 0.44, -0.25, 0.87, -0.2, dark);
-      }
-    } else {
-      box(model, 1.15, 0.15, 0.8, 0, 0.075, 0, metal);
-      box(model, 0.13, 0.58, 0.16, 0, 0.43, 0, silver);
-      torso.position.y = 0.92;
-      model.add(torso);
-      box(torso, 0.8, 0.9, 0.23, 0, 0.18, 0, orange);
-      box(torso, 0.4, 0.35, 0.2, 0, 0.8, 0, orange);
-      for (const x of [-0.49, 0.49])
-        box(torso, 0.18, 0.45, 0.17, x, 0.22, 0, orange);
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(0.16, 0.18, 24),
-        targetPaint,
-      );
-      ring.position.set(0, 0.28, 0.124);
-      torso.add(ring);
-      box(torso, 0.04, 0.38, 0.012, 0, 0.28, 0.13, dark);
-      box(torso, 0.38, 0.04, 0.012, 0, 0.28, 0.13, dark);
-    }
-    // Keep animated joints separate; batch rigid pieces by material within each joint.
-    for (const part of [torso, ...legs, model]) this.batchRigidPart(part);
+    const human = a.kind === "human" ? makeHuman({ name: "Ren Quill", coat: 0x34494c, trim: 0x76a79e, hair: 0x57534d, glasses: true }) : undefined;
+    const body = human ? { root: new THREE.Group(), torso: new THREE.Group(), legs: [] }
+      : makeActorBody(a, { metal, dark, silver, yellow, shell, sniperShell, minigunShell, orange, pale, glow, targetPaint });
+    if (human) { human.root.position.y = -HUMAN.height / 2; body.torso.add(human.root); body.root.add(body.torso); }
+    const { root, torso } = body, friend = this.sim.team(a) === "player", sniper = a.model === "sniper";
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.74, 0.79, 40),
       new THREE.MeshBasicMaterial({
@@ -1090,8 +930,10 @@ export class RangeScene {
     health.scale.set(1.2, 0.15, 1);
     this.dynamic.add(health);
     health.visible = false;
+    const name = human ? new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture("QUILL", "#a8e6d4", undefined, 100), transparent: true, depthTest: false })) : undefined;
+    if (name) { name.scale.set(1.7, .36, 1); this.dynamic.add(name); }
     this.dynamic.add(root);
-    return { root, torso, legs, ring, flash, health, bipod, primaryGun, pistol, arms, carryArms, barrels, rotors, beacon, dead: false };
+    return { ...body, human, name, ring, flash, health, dead: false };
   }
 
   private batchRigidPart(group: THREE.Group) {
@@ -1121,6 +963,8 @@ export class RangeScene {
   }
 
   private disposeActor(visual: ActorVisual) {
+    visual.human?.dispose();
+    if (visual.name) { visual.name.material.map?.dispose(); visual.name.material.dispose(); visual.name.removeFromParent(); }
     visual.root.traverse((object) => {
       if (object instanceof THREE.Mesh && object.geometry.userData.owned) object.geometry.dispose();
     });
@@ -1305,6 +1149,8 @@ export class RangeScene {
     } else if (!grenade && hit && this.sim.city?.neutral(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.city?.windows.has(hit.collider.handle))
+      aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
+    else if (!grenade && hit && this.sim.mission?.breakables.has(hit.collider.handle))
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
     else if (!grenade && hit && this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle))
       // Loose cargo keeps its physical hitbox when dropped. Aim at its actual
@@ -1559,10 +1405,10 @@ export class RangeScene {
       this.trails.push({ mesh, life: 0.055 });
       this.flashes.set(e.actor, 0.048);
       this.lightFlash.position.copy(from);
-      this.lightFlash.intensity = 2;
+      this.lightFlash.intensity = e.material === "soft" ? 0 : 2;
       this.emit(
         e.to,
-        e.material === "metal" ? 9 : 5,
+        e.material === "soft" ? 0 : e.material === "metal" ? 9 : 5,
         e.material === "metal" ? 0xffc168 : 0x9e9b86,
         2.7,
         false,
@@ -1714,6 +1560,7 @@ export class RangeScene {
       const velocity = a.body.linvel(),
         speed = Math.hypot(velocity.x, velocity.z);
       const stagger = this.sim.isDisrupted(a) ? a.stagger / a.staggerDuration : 0;
+      if (v.human) v.human.pose(this.sim.escort?.pose ?? "standing", this.sim.escort?.walkTime ?? 0);
       const stride = a.dead || a.braced || stagger > 0 ? 0 : Math.min(0.5, speed * 0.12);
       v.legs.forEach((leg, i) => {
         leg.rotation.x = Math.sin(elapsed * 10 + i * Math.PI) * stride;
@@ -1764,7 +1611,8 @@ export class RangeScene {
         v.torso.rotation.z -= stagger * sideways * 0.23;
       }
       v.ring.visible =
-        !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)));
+        !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)) || (a.kind === "human" &&
+          !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2)));
       v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
         stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced || a.haul ? AMBER : MINT,
@@ -1773,7 +1621,7 @@ export class RangeScene {
       v.health.visible =
         !a.dead &&
         !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2) &&
-        (a.kind === "enemy" || (a.hp < a.maxHp &&
+        (a.kind === "enemy" || a.kind === "human" || (a.hp < a.maxHp &&
         (this.sim.time - a.hitTime < 4 || a.kind === "player")));
       v.health.position.set(
         v.root.position.x,
@@ -1781,9 +1629,10 @@ export class RangeScene {
         v.root.position.z,
       );
       v.health.scale.x = Math.max(0.1, (a.hp / a.maxHp) * 1.3);
+      if (v.name) { v.name.visible = !a.dead && v.health.visible; v.name.position.set(v.root.position.x, v.root.position.y + 1.5, v.root.position.z); }
       const flash = (this.flashes.get(a.id) ?? 0) - delta;
       this.flashes.set(a.id, flash);
-      v.flash.visible = flash > 0 && !a.dead;
+      v.flash.visible = flash > 0 && !a.dead && !v.human;
     }
     for (const p of this.sim.props) {
       const visual = this.props.get(p.id)!;

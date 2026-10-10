@@ -90,11 +90,19 @@ export function roofPanels(spec: BuildingSpec, w: number = BUILDING_KIT[spec.pre
   return wallPanels({ x: 0, z: 0, turn: 0, w, h: d, openings }).map(p => ({ x: p.x, z: p.y - d / 2, w: p.w, d: p.h }));
 }
 
-function facadeShells(faces: Facade[], x: number, z: number, turn: number, elevation = 0): BoxSpec[] {
+export function facadePanes(faces: Facade[], id: string): PaneSpec[] {
+  return faces.flatMap((face, f) => face.openings.flatMap((o, i) => o.kind !== "window" ? [] :
+    openingPanes(o).map((p, n) => {
+      const at = turnPoint({ x: p.x, y: p.y, z: .04 }, face.turn);
+      return { ...p, x: face.x + at.x, y: at.y, z: face.z + at.z, turn: face.turn, id: `${id}/${f}/${i}/${n}` };
+    })));
+}
+
+export function facadeShells(faces: Facade[], x: number, z: number, turn: number, elevation = 0, closedDoors = true): BoxSpec[] {
   return faces.flatMap(face => {
     const solids = [...wallPanels(face)];
     for (const o of face.openings) {
-      if (o.kind !== "window") { solids.push(o); continue; }
+      if (o.kind !== "window") { if (closedDoors) solids.push(o); continue; }
       for (const side of [-1, 1]) {
         solids.push({ x: o.x, y: o.y + side * (o.h - WINDOW_BORDER) / 2, w: o.w, h: WINDOW_BORDER });
         solids.push({ x: o.x + side * (o.w - WINDOW_BORDER) / 2, y: o.y, w: WINDOW_BORDER, h: o.h });

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { HandlingView } from "./hauling";
+import { EscortView } from "./escort";
 import { RECEIVING_SITES } from "../game/receiving";
 import { CROSSING_BRIDGE, CROSSING_SITES } from "../game/crossing";
 import { SingleLoadBridgeView } from "./bridges";
@@ -114,11 +115,12 @@ class CrossingView {
 
 /** Contract-specific landmarks built from shared district and vehicle kits. */
 export class MissionView {
-  private view: ReceivingView | CrossingView | HandlingView;
+  private view: ReceivingView | CrossingView | HandlingView | EscortView;
   readonly root: THREE.Group;
   constructor(sim: Simulation, coverage = true) {
-    this.view = sim.hauling ? new HandlingView(sim, coverage) : sim.mission?.bridge ? new CrossingView() : new ReceivingView();
+    this.view = sim.escort ? new EscortView(coverage) : sim.hauling ? new HandlingView(sim, coverage) : sim.mission?.bridge ? new CrossingView() : new ReceivingView();
     this.root = this.view.root;
   }
   update(sim: Simulation, reducedMotion: boolean) { this.view.update(sim, reducedMotion); }
+  setReflections(texture?: THREE.Texture) { if (this.view instanceof EscortView) this.view.setReflections(texture); }
 }
