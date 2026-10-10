@@ -8,14 +8,14 @@ import type { CivilianVehicle } from "./traffic";
 
 export const PRIORITY_CONTRACT = {
   id: "priority", number: "05", title: "Priority Access", location: "Wharf neighbourhood · Independent exchange",
-  summary: "Gannet's recovery contractor is removing the neighbourhood's dispatch equipment. Keep it here and get the owners' technicians back inside. Military weapons authorised; choose your squad before deployment.",
+  summary: "Gannet's recovery contractor has seized the neighbourhood's dispatch equipment. Reclaim it and get the owners' technicians back inside. Military weapons authorised; choose your squad before deployment.",
   selectableSquad: true,
   briefing: [
     { speaker: "rook", message: "NEEDLE gives you reach. The two heavies turn back an advance. Four machinegunners give you two useful pairs. Q for automatic fire, E for the rifle, G for grenades. Rifle shots and grenades can hit our own team." },
-    { speaker: "morrow", message: "Quill established who owns the equipment. Gannet is taking it anyway. Clear their six machines, stop the loading van, and open access for the technicians. Keep the equipment here. Get their people back inside." },
-    { speaker: "vale", message: "They carry pistols. The street patrol stays by the yard; the yard and concourse posts brace. Four ramps reach the upper route; a lane runs underneath. Get a robot beside the loading van to stop removal. If loading finishes, it waits at the east gate. Their response can use the east street and concourse ramp." },
+    { speaker: "morrow", message: "Quill established who owns the equipment. Gannet has seized it anyway. Clear their six machines, reclaim the load in the yellow van, and open access for the technicians. Keep the equipment here. Get their people back inside." },
+    { speaker: "vale", message: "They carry pistols. The street patrol stays by the yard; the yard and concourse posts brace. Four ramps reach the upper route; a lane runs underneath. Hold a robot beside the yellow contractor van to secure the equipment. It stays in the loading bay. The green service van brings the technicians when you release the east gate. Their response can use the east street and concourse ramp." },
   ],
-  objectives: ["Break the yard perimeter", "Stop the equipment removal", "Open access at the service door", "Protect the restart and defeat the response", "Recover the surviving squad"],
+  objectives: ["Break the yard perimeter", "Secure the dispatch equipment", "Open access at the service door", "Protect the restart and defeat the response", "Recover the surviving squad"],
   releaseSeconds: 1.5, returnSeconds: 1,
 } as const satisfies MissionDefinition;
 
@@ -24,7 +24,6 @@ const DEFENDERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: 
 const RESPONSE: EnemyProfile = { brace: false, grenades: false, automaticBurst: .06,
   attackInterval: 2.4, reactionTime: 1.1, noticeRange: 60, pistolRange: 22 };
 const REPAIR_SECONDS = 20;
-const LOADING_SECONDS = 65;
 
 /** Finite combat contract: seize equipment, reopen a gate, defend a physical restart. */
 export class PriorityMission extends Mission {
@@ -41,8 +40,7 @@ export class PriorityMission extends Mission {
   private heldTraffic: CivilianVehicle[];
   private repairNotice = false;
   private serviceBlockedSeconds = 0;
-  loadingProgress = 0;
-  removal: "loading" | "departing" | "gate" | "secured" = "loading";
+  removal: "held" | "secured" = "held";
   accessProgress = 0;
   stopProgress = 0;
   gateOpen = false;
@@ -163,7 +161,6 @@ export class PriorityMission extends Mission {
       this.finish("failed"); return;
     }
     if (this.removal !== "secured") {
-      this.loadingProgress = Math.min(1, this.loadingProgress + STEP / LOADING_SECONDS);
       if (living.some(a => this.inside(a, this.equipmentSite))) this.stopProgress = Math.min(1, this.stopProgress + STEP);
       else this.stopProgress = 0;
       if (this.stopProgress >= 1) {
@@ -171,17 +168,13 @@ export class PriorityMission extends Mission {
         this.sim.events.push({ type: "comms", speaker: "vale", message: this.recovery.hp > 0
           ? "The recovery operator has relinquished the load. The equipment stays. Access control is at the exchange's service door."
           : "The van is wrecked. The equipment can be recovered here; get access open for the service crew." });
-      } else if (this.removal === "loading" && this.loadingProgress >= 1) {
-        this.removal = "departing";
-        this.sim.city!.traffic.go(this.recovery, PRIORITY_SITES.outerGate);
-        this.sim.events.push({ type: "comms", speaker: "vale", message: "Loading finished. The van is moving to the closed east gate. Stop the removal there." });
-      } else if (this.removal === "departing" && (this.recovery.parked || this.recovery.hp <= 0)) this.removal = "gate";
+      }
     }
     if (this.phase === "yard" && !this.guards.length) {
       this.phase = this.removal === "secured" ? "dispatch" : "seizure";
       this.sim.events.push({ type: "comms", speaker: "vale", message: this.removal === "secured"
         ? "Perimeter clear. Open access at the service door."
-        : "Perimeter clear. Get a robot beside the recovery van and stop the removal." });
+        : "Perimeter clear. Get a robot beside the yellow contractor van and secure the equipment." });
     }
     if (this.phase === "seizure" && this.removal === "secured") this.phase = "dispatch";
     if (this.phase === "dispatch") {
@@ -217,7 +210,7 @@ export class PriorityMission extends Mission {
       }
       if (this.restoredAt !== undefined && this.responseGroups.size === PRIORITY_RESPONSE.length && !this.response.length) {
         this.phase = "return";
-        this.sim.events.push({ type: "comms", speaker: "morrow", message: "The exchange is theirs and the response is finished. Bring the surviving squad back to the west-square van." });
+        this.sim.events.push({ type: "comms", speaker: "morrow", message: "The exchange is theirs and the response is finished. Bring the surviving squad back to the pickup bay beside the west ramp." });
       }
     }
     if (this.phase === "return") {
@@ -232,7 +225,7 @@ export class PriorityMission extends Mission {
       releaseProgress: this.releaseProgress, returnProgress: this.returnProgress, cargoReleased: this.cargoReleased,
       marker: this.marker, enemyShots: this.enemyShots, deployedAt: this.deployedAt, finishedAt: this.finishedAt,
       survivors: this.sim.squad.filter(a => !a.dead).length, failureReason: this.failureReason,
-      loadingProgress: this.loadingProgress, removal: this.removal, equipmentSite: this.equipmentSite,
+      removal: this.removal, equipmentSite: this.equipmentSite,
       recoveryVehicle: this.recovery.id, serviceVehicle: this.service.id, accessProgress: this.accessProgress,
       gateOpen: this.gateOpen, repairProgress: this.repairProgress, contested: this.contested,
       responseAt: this.responseAt, responseGroups: this.responseGroups.size, restoredAt: this.restoredAt,

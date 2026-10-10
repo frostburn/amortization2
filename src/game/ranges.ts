@@ -18,7 +18,7 @@ import { HANDLING_DISTRICT, HANDLING_FIXTURES, HANDLING_SHELTERS } from "./handl
 import { ESCORT_DISTRICT, ESCORT_FIXTURES, ESCORT_SHELTERS, ESCORT_SPAWNS } from "./escort";
 import { CONCOURSE_DISTRICT, CONCOURSE_FIXTURES, CONCOURSE_RAILS, CONCOURSE_SURFACES } from "./concourse";
 import type { WalkSurface } from "./walk-surfaces";
-import { PRIORITY_DISTRICT, PRIORITY_FIXTURES, PRIORITY_RAILS, PRIORITY_SURFACES } from "./priority";
+import { PRIORITY_DISTRICT, PRIORITY_FIXTURES, PRIORITY_RAILS, PRIORITY_SITES, PRIORITY_SURFACES } from "./priority";
 
 export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "priority" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
@@ -48,7 +48,8 @@ export const RANGES: Record<RangeId, RangeDefinition> = {
   priority: {
     name: "05 · PRIORITY ACCESS", contract: true, city: PRIORITY_DISTRICT, bounds: PRIORITY_DISTRICT.bounds,
     barriers: PRIORITY_FIXTURES, platforms: [], walkSurfaces: PRIORITY_SURFACES, walkVolumes: PRIORITY_RAILS,
-    players: [{ x: -43.1, z: 32.1 }, { x: -43.1, z: 29.9 }, { x: -40.9, z: 29.9 }, { x: -40.9, z: 32.1 }],
+    players: [[-1.1, 1.1], [-1.1, -1.1], [1.1, -1.1], [1.1, 1.1]].map(([x, z]) =>
+      ({ x: PRIORITY_SITES.exit.x + x, z: PRIORITY_SITES.exit.z + z })),
     targets: [], props: [22, 26].map(x => ({ x, z: -5.4, w: 1.15, h: 1.7, d: .9, mass: 65, style: "equipment" })),
   },
   concourse: {

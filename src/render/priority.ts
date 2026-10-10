@@ -13,8 +13,6 @@ export class PriorityView {
   private lamp = new THREE.MeshBasicMaterial({ color: 0xdbac5b });
   private marker = new THREE.Mesh(new THREE.RingGeometry(.97, 1, 64),
     new THREE.MeshBasicMaterial({ color: 0xdbac5b, transparent: true, opacity: .8, depthWrite: false }));
-  private loading = new THREE.Group();
-  private loadSegments: THREE.Mesh[] = [];
   constructor() {
     const kit = new THREE.Group(), concrete = surface(0xa3a59a), steel = surface(0x526568, .45),
       dark = surface(0x283639), paint = surface(0xbca779), white = surface(0xc7c7b6), rubber = surface(0x222b2c);
@@ -46,7 +44,7 @@ export class PriorityView {
       const roller = tube(kit, .08, 1.45, x, .6, -3.5, dark);
       roller.rotation.x = Math.PI / 2;
     }
-    for (const p of [PRIORITY_SITES.loading, PRIORITY_SITES.outerGate, PRIORITY_SITES.exit]) for (const sign of [-1, 1]) {
+    for (const p of [PRIORITY_SITES.loading, PRIORITY_SITES.exit]) for (const sign of [-1, 1]) {
       block(kit, p.radius * 2, .006, .1, p.x, .047, p.z + sign * p.radius, paint);
       block(kit, .1, .006, p.radius * 2, p.x + sign * p.radius, .047, p.z, paint);
     }
@@ -54,18 +52,18 @@ export class PriorityView {
     const van = vehicleBody("VAN"); van.paint.color.setHex(0x728c82);
     van.root.position.set(PRIORITY_SITES.van.x, VEHICLES.VAN.height / 2 + .035, PRIORITY_SITES.van.z);
     this.root.add(van.root);
+    // A marked parking space, wholly beyond the road and its sidewalk.
+    for (const side of [-1, 1]) block(kit, .09, .006, 7, PRIORITY_SITES.van.x + side * 1.6,
+      .047, PRIORITY_SITES.van.z, white);
+    block(kit, 3.2, .006, .09, PRIORITY_SITES.van.x, .047, PRIORITY_SITES.van.z + 3.5, white);
     for (const side of [-1, 1]) for (const end of [-1, 1]) {
       const wheel = tube(kit, .36, .23, PRIORITY_SITES.van.x + side * .98, .36,
         PRIORITY_SITES.van.z + end * VEHICLES.VAN.wheelbase / 2, rubber, 16);
       wheel.rotation.z = Math.PI / 2;
     }
-    for (let i = 0; i < 6; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color: 0x514d41 });
-      this.loadSegments.push(block(this.loading, .1, .1, .25, -.9 + i * .32, 2.22, 0, mat));
-    }
     batchRigid(kit); batchRigid(this.gate);
     this.marker.rotation.x = -Math.PI / 2;
-    this.root.add(kit, this.gate, this.marker, this.loading);
+    this.root.add(kit, this.gate, this.marker);
   }
   update(sim: Simulation, reducedMotion: boolean) {
     const mission = sim.mission;
@@ -73,11 +71,6 @@ export class PriorityView {
     this.gate.position.z = mission.gateOpen ? 10.5 : 0;
     this.gate.visible = !mission.gateOpen;
     this.lamp.color.setHex(mission.cargoReleased ? 0xa3e6d0 : 0xdbac5b);
-    const p = mission.recovery.body.translation();
-    this.loading.position.set(p.x, p.y - VEHICLES.VAN.height / 2, p.z);
-    this.loading.visible = mission.removal !== "secured" && mission.recovery.hp > 0;
-    this.loadSegments.forEach((mesh, i) => (mesh.material as THREE.MeshBasicMaterial).color.setHex(
-      i / this.loadSegments.length < mission.loadingProgress ? 0xdbac5b : 0x514d41));
     const marker = mission.marker;
     this.marker.visible = !!marker;
     if (marker) {

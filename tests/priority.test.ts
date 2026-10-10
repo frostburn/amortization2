@@ -49,6 +49,8 @@ describe("Priority Access", () => {
 
   test.each(["sniper", "minigunner", "assault"] as const)("%s deployment stays safe while the player orients", async model => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy();
+    // The pickup van and deployed squad must leave both traffic lanes clear.
+    for (const z of [25.6, 30.4]) expect(sim.ray({ x: -52, y: .35, z }, { x: -38, y: .35, z })).toBeNull();
     ticks(20);
     expect(mission().enemyShots).toBe(0);
     expect(sim.squad.every(a => a.hp === a.maxHp)).toBe(true);
@@ -59,7 +61,7 @@ describe("Priority Access", () => {
     sim = await Simulation.create("priority", "assault"); sim.mission!.deploy();
     expect(mission().guards.every(a => a.weapon === "pistol" && a.weapons.length === 1 &&
       a.pistol.ammo === PISTOL.magazine && a.ammo === 0)).toBe(true);
-    sim.select(5); sim.move({ x: -16, z: 25 }); ticks(5);
+    sim.select(5); sim.move({ x: -16, z: 25 }); ticks(9);
     const shots = sim.events.filter(e => e.type === "shot" && mission().guards.some(a => a.id === e.actor));
     expect(shots.length).toBeGreaterThan(0);
     expect(shots.every(e => e.type === "shot" && e.weapon === "pistol")).toBe(true);
@@ -85,12 +87,13 @@ describe("Priority Access", () => {
     expect(mission().removal).not.toBe("secured");
   });
 
-  test("loading moves the van to the closed gate and remains recoverable without a timed failure", async () => {
+  test("equipment stays in the loading bay through a long approach and leaves the service lane usable", async () => {
     sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
     ticks(85);
     expect(mission().finished).toBe(false); expect(mission().phase).toBe("seizure");
-    expect(mission().removal).toBe("gate");
-    expect(distance2(mission().recovery.body.translation(), PRIORITY_SITES.outerGate)).toBeLessThan(1);
+    expect(mission().removal).toBe("held");
+    expect(distance2(mission().recovery.body.translation(), PRIORITY_SITES.loading)).toBeLessThan(.1);
+    expect(mission().recovery.parked).toBe(true); expect(mission().recovery.arrival).toBeUndefined();
     expect(mission().gateOpen).toBe(false);
     place(sim.squad[0], { x: mission().equipmentSite.x, z: -4 }); ticks(1.1);
     expect(mission().removal).toBe("secured"); expect(mission().phase).toBe("dispatch");
@@ -98,8 +101,19 @@ describe("Priority Access", () => {
     for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {
       disable(mission().response); sim.step();
     }
-    // The secured contractor van still occupies the inbound lane. The owners'
-    // crew must complete the job without requiring the player to destroy it.
+    expect(distance2(mission().service.body.translation(), PRIORITY_SITES.serviceStop)).toBeLessThan(2);
+    expect(mission().service.parked).toBe(true);
+    expect(mission().inspect().serviceBlockedSeconds).toBe(0);
+    expect(mission().repairing).toHaveLength(2);
+    expect(mission().phase, JSON.stringify(mission().inspect())).toBe("return");
+  });
+
+  test("technicians still disembark and finish on foot if another vehicle blocks their driveway", async () => {
+    await open();
+    sim.city!.traffic.park("CAB", 0x687f87, { x: 46, z: 0 }, -Math.PI / 2);
+    for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {
+      disable(mission().response); sim.step();
+    }
     expect(mission().service.body.translation().x).toBeGreaterThan(PRIORITY_SITES.serviceStop.x + 8);
     expect(mission().repairing).toHaveLength(2);
     expect(mission().phase, JSON.stringify(mission().inspect())).toBe("return");

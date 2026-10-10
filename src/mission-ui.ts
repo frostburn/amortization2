@@ -92,8 +92,8 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines · ${priority.removal === "secured" ? "Equipment secured" : priority.removal === "loading" ? "Removal loading" : "Removal at the east gate"}`
-    : mission.phase === "seizure" ? "Bring a robot beside the recovery van"
+  setText("mission-detail", priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines · ${priority.removal === "secured" ? "Equipment secured" : "Equipment in contractor van"}`
+    : mission.phase === "seizure" ? "Bring a robot beside the yellow contractor van"
     : mission.phase === "dispatch" ? "Bring a robot to the service door"
     : mission.phase === "restore" ? priority.restoredAt !== undefined ? `${priority.response.length} response machines remaining`
       : priority.contested ? "Restart paused · Clear the service-door approach"

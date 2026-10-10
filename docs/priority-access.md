@@ -7,8 +7,8 @@ remain available independently.
 
 ## Assignment
 
-Gannet's recovery contractor has occupied a neighbourhood exchange and is
-removing the independent owners' dispatch equipment. Quill's recovered records
+Gannet's recovery contractor has occupied a neighbourhood exchange and seized
+the independent owners' dispatch equipment. Quill's recovered records
 establish ownership. Morrow accepts the owners' request to stop removal, admit
 their service crew and hold access until dispatch works again. Rook prepares
 the chosen configuration; Vale supplies observations from local contacts.
@@ -42,11 +42,12 @@ ramp's filled base to begin climbing.
    deployment lies beyond its notice and firing range. There is time to orient
    and move out before engaging. The guards fire single shots at a 2.2-second
    cadence, with ordinary recoil, stagger, ammunition and physical navigation.
-2. **Stop removal.** Hold a ground-level robot beside the recovery van for a
-   second. This can happen during the perimeter fight. Loading takes 65 seconds;
-   if it finishes, the van drives to the closed east gate and remains recoverable.
-   There is no timed failure. A wrecked van still leaves the equipment recoverable
-   at its position, with ordinary collateral/security consequences.
+2. **Secure the equipment.** Hold a ground-level robot beside the yellow
+   contractor van for a second to reclaim its load. This can happen during the
+   perimeter fight. The van stays in the loading bay, leaving the technicians'
+   arrival lane clear. There is no removal timer or gate drive. A wrecked van
+   still leaves the equipment recoverable at its position, with ordinary
+   collateral/security consequences.
 3. **Open access.** Once the perimeter and equipment are secure, occupy the pad
    beside the exchange service door. Its 1.5-second release opens the east gate
    physically, admits the service van and starts the response.
@@ -56,16 +57,16 @@ ramp's filled base to begin climbing.
    arrival cue. Both groups carry pistols, fire at a 2.4-second cadence and have
    no grenades. This is one finite response, with no repeated waves or refits.
 5. **Recover the squad.** After restoration and defeat of the response, every
-   surviving chassis must reach the west-square van.
+   surviving chassis must reach the pickup bay beside the west ramp. The squad
+   deploys here too; van, formation and extraction area all clear the street.
 
 The service van parks in the yard; two technicians disembark and walk to the
 exchange. Together they need twenty seconds of uncontested work. An enemy
 within fourteen metres of the service door pauses work without erasing progress.
 One surviving technician can finish at half speed. If their vehicle is destroyed
 or stranded, or waits stationary behind an obstruction for five seconds, they
-disembark there and continue on foot. This also keeps the late-loading route
-working when the secured recovery van occupies the service lane. Losing both technicians
-or all player robots fails the contract.
+disembark there and continue on foot. Losing both technicians or all player
+robots fails the contract.
 
 Restoring service resumes held PORTER deliveries and queued autonomous vans.
 This happens in the level before recovery and debrief, rather than merely
@@ -87,7 +88,7 @@ to friendly robots and people. Technicians and civilian vehicles can be harmed.
 
 ## Inspection
 
-`window.amortization2.inspect().mission` includes loading/removal state, vehicle
+`window.amortization2.inspect().mission` includes equipment-seizure state, vehicle
 IDs, gate state, repair progress, contest status, response groups and technician
 positions. Human replay capture and playback record the chosen configuration
 and the resolved movement/weapon inputs through the existing format.

@@ -4,10 +4,9 @@ import type { WalkSurface } from "./walk-surfaces";
 
 export const PRIORITY_SITES = {
   loading: { x: 25, z: 0, radius: 5 },
-  outerGate: { x: 46, z: 0, radius: 5 },
   dispatch: { x: 10, z: -19, radius: 3.2 },
-  exit: { x: -42, z: 33, radius: 5 },
-  van: { x: -49, z: 33 },
+  exit: { x: -49, z: 20, radius: 2.8 },
+  van: { x: -50, z: 15 },
   serviceVan: { x: 68, z: 0 },
   serviceStop: { x: 35, z: 0 },
   technicians: [{ x: 8.5, z: -21 }, { x: 11.5, z: -21 }],
@@ -92,6 +91,7 @@ export const PRIORITY_DISTRICT: CityDistrict = {
       turn: 2 as const, finish: "brick" as const, accent: 0x84948e })),
   ],
   plazas: [{ x: 14, z: -5, w: 74, d: 34 }, { x: -42, z: 32, w: 19, d: 21 },
+    { x: -50, z: 16, w: 8, d: 13 }, // Off-street pickup bay beside the west ramp.
     { x: 37, z: 44, w: 15, d: 21 }, { x: 52, z: 0, w: 33, d: 10 }],
   furniture: [-53, 53].flatMap(x => [-39, 7, 39].map(z => ({ x, z, w: .18, d: .18, h: 4.8,
     style: "barrier" as const, fixture: "lamp" as const }))),
