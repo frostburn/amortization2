@@ -22,8 +22,8 @@ describe("Priority Access", () => {
     a.body.setTranslation({ x: p.x, y: (p.y ?? 0) + (a.kind === "human" ? .85 : .93), z: p.z }, true);
     a.body.setLinvel({ x: 0, y: 0, z: 0 }, true); a.path = []; a.moveTarget = undefined;
   };
-  const open = async () => {
-    sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
+  const open = async (model: "sniper" | "minigunner" | "assault" = "sniper") => {
+    sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
     place(sim.squad[0], { x: 25, z: -4 }); ticks(1.1);
     place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(1.6);
     expect(mission().phase).toBe("restore");
@@ -104,6 +104,18 @@ describe("Priority Access", () => {
     disable(mission().response); ticks(8);
     expect(sim.actors.filter(a => a.kind === "enemy")).toHaveLength(12);
     expect(mission().inspect().responseGroups).toBe(2);
+  });
+
+  test("a street attacker commits to its flank around a filled ramp instead of oscillating", async () => {
+    await open("assault"); ticks(17);
+    const attacker = mission().response.find(a => a.ai!.gate === "STREET RESPONSE" && a.ai!.flank > 0)!;
+    disable(mission().response.filter(a => a !== attacker));
+    place(attacker, { x: 48, z: 14 });
+    place(sim.squad[3], { x: 20.5, z: 4.6 });
+    Object.assign(attacker.ai!, { state: "advancing", entryUntil: 0, nextThink: 0, nextRoute: 0, nextAttack: Infinity });
+    until(() => attacker.ai!.visible, 12);
+    expect(attacker.ai!.target).toBe(4);
+    expect(Math.abs(sim.walkingPoint(attacker).y)).toBeLessThan(.1);
   });
 
   test.each(["sniper", "minigunner", "assault"] as const)("%s contract can restart service with real vehicle/crew navigation, then recover the whole squad", async model => {

@@ -12,6 +12,7 @@ export type EnemyBrain = {
   state: "holding" | "entering" | "advancing" | "aiming" | "firing" | "suppressed" | "reloading";
   nextThink: number;
   nextRoute: number;
+  routeTarget?: Vec3;
   nextAttack: number;
   entryUntil: number;
   nextGrenade: number;
@@ -127,7 +128,14 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
       brain.nextAttack = Math.max(brain.nextAttack, now + 0.55);
       if (now >= brain.nextRoute) {
         brain.nextRoute = now + 1.2;
-        sim.navigate(a, firingPosition(sim, a, target, profile));
+        const foot = sim.walkingPoint(target);
+        // Rotating the candidate ring around a stationary target can alternate
+        // between opposite sides of cover before either flank is reached.
+        const continuing = sim.terrain && a.path.length > 0 && a.moveTarget && brain.routeTarget &&
+          distance2(foot, brain.routeTarget) < 3 && Math.abs(foot.y - brain.routeTarget.y) < .5;
+        const goal = continuing ? a.moveTarget! : firingPosition(sim, a, target, profile);
+        if (!continuing) brain.routeTarget = foot;
+        sim.navigate(a, goal);
       }
     }
   }
