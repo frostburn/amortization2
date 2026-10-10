@@ -2,7 +2,7 @@
 
 Campaign proposal for **2038**, twelve years after the first game's events. The
 original campaign did not establish a calendar year; this is the sequel's working
-chronology. These notes guide future missions and scenes. The playable build includes four tutorial contracts, the first armed operation,
+chronology. These notes guide future missions and scenes. The playable build includes four tutorial contracts, two armed operations,
 and the combat, district and civilian prototypes.
 
 ## Continuity
@@ -132,6 +132,17 @@ Deliveries resume in the district. Meridian then offers priority network access
 in exchange for control of dispatch, introducing its useful but conditional help.
 
 ### 2. Right of Way
+
+[Recovery Fee](recovery-fee.md) follows Priority Access. Gannet is moving the
+cooperative's seized charging racks and drive assemblies out of the district.
+The squad intercepts the convoy, disables its cargo truck and fights a finite
+security detail with two machinegunners. Its dispatch case must be carried
+back under pursuit from a small Gannet patrol while the cooperative collects
+the bulk equipment. Securing an intact load restores more
+of the cooperative's capacity; destroying it leaves a salvage recovery. Quill
+finds the equipment was sold before seizure was authorised, with an extra
+payment for delivery that day. A buyer beyond the local contractor now has a
+reason to take an interest in the squad.
 
 Meridian offers help against Gannet and submits requests of its own. The crew
 fights through streets, service yards and utility approaches. Some assignments
