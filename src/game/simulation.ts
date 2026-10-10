@@ -686,13 +686,14 @@ export class Simulation {
     };
     const requestedHeight = this.terrain?.resolve({ ...requested, y: point.y }).y;
     const boxes = this.navigationBoxes();
+    const dynamic = this.terrain ? this.dynamicNavigationBoxes() : [];
     const free = (p: Vec2) => {
       if (this.terrain) {
         const center = this.terrain.resolve({ ...p, y: requestedHeight });
         return Math.abs(center.y - requestedHeight!) < .6 && offsets.every(offset => {
           const slot = this.terrain!.resolve({ x: p.x + offset.x, z: p.z + offset.z, y: center.y });
           return Math.abs(slot.y - center.y) <= Math.hypot(offset.x, offset.z) * .3 + .05 &&
-            this.terrain!.canStand(slot, .55, this.dynamicNavigationBoxes());
+            this.terrain!.canStand(slot, .55, dynamic);
         });
       }
       return boxes.every(

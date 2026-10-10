@@ -457,7 +457,7 @@ async function start() {
     canvas.dataset.cursor = interaction.type === "haul" ? interaction.verb : interaction.type;
     if (interaction.type !== "fire") sim.trigger = false;
   }
-  const aimAtPointer = (groundOnly = false) => {
+  const aimAtPointer = (groundOnly = false, queued = false) => {
     if (sim.sniping) {
       scene.scope.aim(sim);
       return null;
@@ -466,6 +466,7 @@ async function start() {
       pointer.x,
       pointer.y,
       sim.weapon === "grenade" || groundOnly,
+      groundOnly ? (queued ? sim.primary.path.at(-1)?.y : undefined) ?? sim.walkingPoint(sim.primary).y : undefined,
     );
     if (result) {
       ground = result.ground;
@@ -547,10 +548,10 @@ async function start() {
     if (
       !force &&
       (sim.time - moveDrag.lastTime < 0.08 ||
-        distance2(ground, moveDrag.lastGoal) < 0.15)
+        distance2(ground, moveDrag.lastGoal) < 0.15 && Math.abs(ground.y - (moveDrag.lastGoal.y ?? ground.y)) < .15)
     )
       return;
-    if (force && distance2(ground, moveDrag.lastGoal) < 0.01) return;
+    if (force && distance2(ground, moveDrag.lastGoal) < 0.01 && Math.abs(ground.y - (moveDrag.lastGoal.y ?? ground.y)) < .01) return;
     if (moveDrag.queued) scene.previewMove(sim.moveDestinations(ground));
     else {
       sim.move(ground);
@@ -615,7 +616,7 @@ async function start() {
       selectionBox.style.width = `${Math.abs(pointer.x - selectionDrag.x)}px`;
       selectionBox.style.height = `${Math.abs(pointer.y - selectionDrag.y)}px`;
     }
-    aimAtPointer(!!moveDrag || !!selectionDrag || covering);
+    aimAtPointer(!!moveDrag || !!selectionDrag || covering, !!moveDrag?.queued);
     if (covering) scene.previewCover(pointer.inside ? ground : null);
     if (moveDrag?.queued) updateMove();
   });
@@ -634,7 +635,7 @@ async function start() {
       return;
     }
     updatePointer(e);
-    const picked = aimAtPointer(e.button === 2 || e.shiftKey || covering);
+    const picked = aimAtPointer(e.button === 2 || e.shiftKey || covering, e.button === 2 && e.shiftKey);
     if (covering && e.button === 0 && !e.shiftKey) {
       sim.coverSector(ground);
       armCover(false);
@@ -647,7 +648,7 @@ async function start() {
       selectionBox.hidden = true;
       moveDrag = {
         queued: e.shiftKey,
-        lastGoal: { x: ground.x, z: ground.z },
+        lastGoal: { x: ground.x, y: ground.y, z: ground.z },
         lastTime: sim.time,
       };
       if (e.shiftKey) scene.previewMove(sim.moveDestinations(ground));
@@ -720,7 +721,7 @@ async function start() {
       updateUI(sim, audio);
     }
     if (e.button === 2 && moveDrag) {
-      aimAtPointer(true);
+      aimAtPointer(true, moveDrag.queued);
       if (moveDrag.queued) {
         sim.move(ground, true);
         scene.markMove();
@@ -933,7 +934,7 @@ async function start() {
         if (keys.has("KeyW")) scene.pan(0, -panSpeed);
         if (keys.has("KeyS")) scene.pan(0, panSpeed);
         if (pointer.inside && (sim.weapon !== "rifle" || moveDrag || selectionDrag || covering))
-          aimAtPointer(!!moveDrag || !!selectionDrag || covering);
+          aimAtPointer(!!moveDrag || !!selectionDrag || covering, !!moveDrag?.queued);
         else if (pointer.inside) updateInteraction(scene.pick(pointer.x, pointer.y));
         if (covering) scene.previewCover(pointer.inside ? ground : null);
         updateMove();

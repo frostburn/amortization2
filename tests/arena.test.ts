@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { FIREARMS, GRENADE_FUSE, PISTOL, RIFLE, STEP, distance2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
 import { ARENA_ENTRIES } from "../src/game/ranges";
@@ -193,9 +193,14 @@ describe("endless arena", () => {
     enemy.path = [];
     enemy.moveTarget = undefined;
     for (const a of sim.arena!.enemies) a.ai!.nextAttack = sim.time + 30;
+    const throws = vi.spyOn(sim, "throwGrenade");
     ticks(sim, 6.1);
     const frag = sim.grenades.find((g) => g.team === "enemy");
     expect(frag).toBeDefined();
+    const hostileThrow = throws.mock.calls.find(([, a]) => a?.kind === "enemy");
+    expect(hostileThrow).toBeDefined();
+    expect(Math.abs(hostileThrow![0].y!)).toBeLessThan(.08);
+    throws.mockRestore();
     expect(sim.actors.find((a) => a.id === frag!.owner)?.model).toBe("assault");
     expect(sim.grenades.filter((g) => g.team === "enemy")).toHaveLength(1);
     expect(sim.throws).toBe(0);

@@ -44,7 +44,9 @@ export class ConcourseView {
     }
     for (const s of CONCOURSE_RAILS) {
       prism(root, s, railing);
-      prism(root, { ...s, height: s.height + .035, thickness: .05 }, trim);
+      // Coping overhangs the wall; its overlapping skirt must not share the
+      // wall's vertical faces (especially visible along inclined parapets).
+      prism(root, { ...s, w: s.w + .04, d: s.d + .04, height: s.height + .035, thickness: .05 }, trim);
     }
     for (const b of CONCOURSE_FIXTURES.filter(b => !b.building && !('fixture' in b) && !b.y))
       block(root, b.w, b.h, b.d, b.x, b.h / 2, b.z, concrete);

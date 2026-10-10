@@ -104,7 +104,7 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
         !sim.grenades.some((g) => g.team === "enemy") &&
         living.filter((other) => distance2(q, other.body.translation()) < 4).length >= 2 &&
         sim.actors.filter(other => other.kind === "enemy" && !other.dead).every((other) => distance2(q, other.body.translation()) > 8)) {
-      if (sim.throwGrenade(q, a)) {
+      if (sim.throwGrenade({ ...q, y: sim.walkingHeight(sim.walkingPoint(target)) }, a)) {
         brain.nextGrenade = now + 8;
         brain.nextAttack = now + 0.8;
         brain.burstUntil = 0;

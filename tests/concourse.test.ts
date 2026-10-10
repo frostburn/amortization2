@@ -57,6 +57,46 @@ describe("raised debug district", () => {
     expect(t.pick({ x: 0, y: 30, z: 16 }, { x: 0, y: -1, z: 0 }).y).toBe(0);
   });
 
+  test("movement chooses the current floor under open decks without changing weapon picking", () => {
+    const t = terrain(), bridge = t.pick({ x: 0, y: 30, z: -16 }, { x: 0, y: -1, z: 0 });
+    expect(t.movementPoint(bridge, 0)).toEqual({ x: 0, y: 0, z: -16 });
+    expect(t.movementPoint(bridge, 4.8)).toEqual({ ...bridge, y: 4.8 });
+    expect(t.movementPoint({ x: 0, y: 8.4, z: -45 }, 0).y).toBe(0);
+    expect(t.movementPoint({ x: -26, y: 2.4, z: 3 }, 0).y).toBe(2.4);
+    expect(t.movementPoint({ x: -26, y: 4.8, z: -16 }, 0).y).toBe(4.8);
+    // A support pillar below the click must nudge the ground order, not lift it.
+    expect(t.movementPoint({ x: 14, y: 4.8, z: -16 }, 0).y).toBe(0);
+    expect(bridge.y).toBeCloseTo(4.8);
+  });
+
+  test("a ground squad clicking a bridge approaches its underpass and never climbs the deck", async () => {
+    sim = await Simulation.create("concourse");
+    const point = sim.terrain!.movementPoint({ x: 0, y: 4.8, z: -16 }, sim.walkingPoint(sim.primary).y);
+    sim.move(point);
+    expect(sim.active.every(a => a.moveTarget?.y === 0)).toBe(true);
+    for (let i = 0; i < 24 / STEP && sim.active.some(a => a.path.length); i++) {
+      sim.step(); expect(sim.active.every(a => a.body.translation().y < 1.4)).toBe(true);
+    }
+    expect(sim.active.every(a => !a.path.length && distance2(a.body.translation(), a.moveTarget!) < .15)).toBe(true);
+  });
+
+  test("long flat shortcuts reject unsupported gaps and narrow obstructions", () => {
+    const surfaces = [0, 12].map(x => ({ id: `deck-${x}`, x, z: 0, w: 8, d: 8, height: 4.8, thickness: .4 }));
+    const t = new WalkTerrain(surfaces, [], [], { left: -20, right: 20, back: -20, front: 20 });
+    expect(t.segmentClear({ x: 0, y: 4.8, z: 0 }, { x: 12, y: 4.8, z: 0 })).toBe(false);
+    const wall = { x: 4.17, z: 10, w: .03, d: 2, y: 0, h: 2 };
+    expect(t.segmentClear({ x: 0, y: 0, z: 10 }, { x: 12, y: 0, z: 10 }, .55, [wall])).toBe(false);
+    expect(t.segmentClear({ x: 0, y: 0, z: 10 }, { x: 12, y: 0, z: 10 }, .55, [{ ...wall, y: 4.8 }])).toBe(true);
+    new SurfaceNavigation(t);
+    // Reusing the same surface array after an edit must rebuild its static graph.
+    surfaces[0].w = 16; surfaces[1].x = 8;
+    t.boxes.push({ x: 4, z: 0, w: 1, d: 2, y: 4.8, h: 2 });
+    const edited = new SurfaceNavigation(t), path = edited.findPath({ x: 0, y: 4.8, z: 0 }, { x: 8, y: 4.8, z: 0 });
+    expect(path.length).toBeGreaterThan(1);
+    expect(path.at(-1)).toEqual({ x: 8, y: 4.8, z: 0 });
+    path.forEach((p, i) => expect(t.segmentClear(i ? path[i - 1] : { x: 0, y: 4.8, z: 0 }, p)).toBe(true));
+  });
+
   test("a bridge fades for a selected robot underneath while collision stays closed", async () => {
     sim = await Simulation.create("concourse"); sim.select(1);
     arrive({ x: 0, y: 0, z: -16 });

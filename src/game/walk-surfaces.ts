@@ -46,6 +46,17 @@ export class WalkTerrain {
       : heights.reduce((best, h) => Math.abs(h - p.y!) < Math.abs(best - p.y!) ? h : best);
     return { x: p.x, y, z: p.z };
   }
+  /** Movement keeps the selected floor beneath an open deck. Filled ramps
+   * have no lower floor, so clicking them still allows a change of level. */
+  movementPoint(p: Vec3, level: number): Vec3 {
+    const floors = this.heights(p).filter(y => this.surfaces.every(s => {
+      if (!contains(s, p, -.001)) return true;
+      const top = surfaceHeight(s, p), bottom = s.filled ? -.12 : top - s.thickness;
+      return y >= top - .03 || y + 1.86 <= bottom + .03;
+    }));
+    const y = floors.reduce((best, h) => Math.abs(h - level) < Math.abs(best - level) ? h : best, floors[0] ?? p.y);
+    return { x: p.x, y, z: p.z };
+  }
   private blocked(p: Vec3, boxes: Obstacle[], radius: number) {
     return boxes.some(b => contains(b, p, radius - 0.0001) &&
       p.y + 1.86 > (b.y ?? 0) + 0.02 && p.y < (b.y ?? 0) + (b.h ?? 2) - 0.02);
@@ -89,6 +100,13 @@ export class WalkTerrain {
   }
   segmentClear(a: Vec2, b: Vec2, radius = 0.55, dynamic: Obstacle[] = []) {
     let height = a.y ?? this.resolve(a).y;
+    // Long flat corridors change support only at rectangle boundaries. Sweep
+    // those boundaries instead of repeating footprint queries every 25 cm.
+    // Slopes near the body's height retain the continuous sampled check below.
+    if (b.y !== undefined && Math.abs(height - b.y) < .001 && distance2(a, b) > 4) {
+      const clear = this.flatSegmentClear({ ...a, y: height }, { ...b, y: height }, radius, dynamic);
+      if (clear !== undefined) return clear;
+    }
     const count = Math.max(1, Math.ceil(distance2(a, b) / 0.25));
     const step = distance2(a, b) / count;
     for (let i = 1; i <= count; i++) {
@@ -99,6 +117,54 @@ export class WalkTerrain {
       height = heights.reduce((best, y) => Math.abs(y - height) < Math.abs(best - height) ? y : best);
     }
     return b.y === undefined || Math.abs(height - b.y) < 0.05;
+  }
+  private flatSegmentClear(a: Vec3, b: Vec3, radius: number, dynamic: Obstacle[]) {
+    if (!this.obstacleSegmentClear(a, b, dynamic, radius)) return false;
+    const times = new Set([0, 1]);
+    for (const s of this.hulls) {
+      if (!this.crosses(a, b, s, radius)) continue;
+      const rise = Math.abs(s.slopeX ?? 0) * s.w / 2 + Math.abs(s.slopeZ ?? 0) * s.d / 2;
+      if ((s.filled ? -.12 : s.height - rise - s.thickness) >= a.y + 1.86 ||
+          s.height + rise < a.y - Math.SQRT2 * radius * .3 - .025) continue;
+      if (s.slopeX || s.slopeZ) {
+        if (s.height + rise > a.y - .03 && (s.filled ? -.12 : s.height - rise - s.thickness) < a.y + 1.86)
+          return undefined;
+      }
+      // Preserve the sampled motor's tolerance for small authored steps.
+      else if (this.surfaces.includes(s) && Math.abs(s.height - a.y) > .001 && Math.abs(s.height - a.y) < .1)
+        return undefined;
+      this.boundaries(times, a, b, s, [-radius, 0, radius]);
+    }
+    for (const box of this.boxes) if (a.y + 1.86 > (box.y ?? 0) + .02 &&
+        a.y < (box.y ?? 0) + (box.h ?? 2) - .02 && this.crosses(a, b, box, radius))
+      this.boundaries(times, a, b, box, [-radius, radius]);
+    const cuts = [...times].sort((x, y) => x - y);
+    const clear = (t: number) => this.canStand({ x: a.x + (b.x - a.x) * t, y: a.y, z: a.z + (b.z - a.z) * t }, radius);
+    return cuts.every((t, i) => clear(t) && (!i || clear((cuts[i - 1] + t) / 2)));
+  }
+  private crosses(a: Vec3, b: Vec3, box: Obstacle, radius: number) {
+    let enter = 0, leave = 1;
+    for (const axis of ["x", "z"] as const) {
+      const min = box[axis] - (axis === "x" ? box.w : box.d) / 2 - radius;
+      const max = box[axis] + (axis === "x" ? box.w : box.d) / 2 + radius;
+      const delta = b[axis] - a[axis];
+      if (Math.abs(delta) < 1e-8) { if (a[axis] < min || a[axis] > max) return false; }
+      else {
+        const lo = (min - a[axis]) / delta, hi = (max - a[axis]) / delta;
+        enter = Math.max(enter, Math.min(lo, hi)); leave = Math.min(leave, Math.max(lo, hi));
+        if (enter > leave) return false;
+      }
+    }
+    return true;
+  }
+  private boundaries(times: Set<number>, a: Vec3, b: Vec3, box: Obstacle, margins: number[]) {
+    for (const axis of ["x", "z"] as const) {
+      const delta = b[axis] - a[axis]; if (Math.abs(delta) < 1e-8) continue;
+      for (const side of [-1, 1]) for (const margin of margins) {
+        const t = (box[axis] + side * (axis === "x" ? box.w : box.d) / 2 + margin - a[axis]) / delta;
+        if (t > 0 && t < 1) times.add(t);
+      }
+    }
   }
   /** Pick only walking planes, independently of robots, railings and roofs. */
   pick(origin: Vec3, direction: Vec3) {
@@ -117,6 +183,8 @@ export class WalkTerrain {
 }
 
 const CELL = 0.75;
+type StaticWalkGraph = { signature: string; cells: number[][]; nodes: Vec3[]; links: (number[] | undefined)[] };
+const staticGraphs = new WeakMap<WalkSurface[], StaticWalkGraph>();
 /** Cached layered A*: ground and overhead nodes share XY cells, not connectivity. */
 export class SurfaceNavigation {
   private width: number;
@@ -136,13 +204,23 @@ export class SurfaceNavigation {
     const b = terrain.bounds;
     this.width = Math.floor((b.right - b.left) / CELL);
     this.height = Math.floor((b.front - b.back) / CELL);
-    this.cells = Array.from({ length: this.width * this.height }, () => []);
-    for (let z = 0; z < this.height; z++) for (let x = 0; x < this.width; x++) {
-      const p = { x: b.left + (x + 0.5) * CELL, z: b.back + (z + 0.5) * CELL };
-      for (const y of terrain.heights(p)) if (terrain.canStand({ ...p, y }, radius)) {
-        this.cells[z * this.width + x].push(this.nodes.length);
-        this.nodes.push({ ...p, y });
+    const signature = JSON.stringify([terrain.surfaces, terrain.volumes, terrain.boxes, b, radius]);
+    const graph = staticGraphs.get(terrain.surfaces);
+    if (graph?.signature === signature) {
+      this.cells = graph.cells; this.nodes = graph.nodes; this.links = graph.links;
+    } else {
+      this.cells = Array.from({ length: this.width * this.height }, () => []);
+      for (let z = 0; z < this.height; z++) for (let x = 0; x < this.width; x++) {
+        const p = { x: b.left + (x + 0.5) * CELL, z: b.back + (z + 0.5) * CELL };
+        for (const y of terrain.heights(p)) if (terrain.canStand({ ...p, y }, radius)) {
+          this.cells[z * this.width + x].push(this.nodes.length);
+          this.nodes.push({ ...p, y });
+        }
       }
+      // Build support links behind the loading screen, then share only this
+      // immutable graph across resets. Geometry edits invalidate the signature.
+      for (let i = 0; i < this.nodes.length; i++) this.neighbours(i);
+      staticGraphs.set(terrain.surfaces, { signature, cells: this.cells, nodes: this.nodes, links: this.links });
     }
     const n = this.nodes.length;
     this.blocked = new Uint8Array(n); this.costs = new Float64Array(n);
@@ -225,6 +303,20 @@ export class SurfaceNavigation {
       // turn instead; local yielding handles the transit, then reforms at b.
       const shared = [...route.path.slice(0, -1).map(p => ({ ...p })), b];
       if (shared.every((p, i) => this.terrain.segmentClear(i ? shared[i - 1] : a, p, this.radius, dynamic))) return shared;
+      // A neighbour may start on the other side of a ramp mouth. A short
+      // connector to the cached entry avoids searching the entire district
+      // again; the distance guard above bounds this detour to one squad width.
+      const joined = [{ ...route.start }, ...shared];
+      if (joined.every((p, i) => this.terrain.segmentClear(i ? joined[i - 1] : a, p, this.radius, dynamic))) return joined;
+      // Keep the proven long corridor when changing its last leg would clip
+      // a distant pillar. Turn into the new slot near the destination, before
+      // reaching a squadmate's occupied corner.
+      const end = route.path.at(-1)!, before = route.path.at(-2) ?? route.start;
+      const lengthToEnd = distance2(before, end), t = Math.min(.5, 4 / (lengthToEnd || 1));
+      const exit = this.terrain.resolve({ x: end.x + (before.x - end.x) * t,
+        z: end.z + (before.z - end.z) * t, y: end.y + (before.y - end.y) * t });
+      const corridor = [{ ...route.start }, ...route.path.slice(0, -1).map(p => ({ ...p })), exit, b];
+      if (corridor.every((p, i) => this.terrain.segmentClear(i ? corridor[i - 1] : a, p, this.radius, dynamic))) return corridor;
     }
     this.blocked.fill(0);
     if (dynamic.length) for (let i = 0; i < this.nodes.length; i++)
@@ -234,7 +326,9 @@ export class SurfaceNavigation {
     this.generation = (this.generation + 1) >>> 0;
     if (!this.generation) { this.seen.fill(0); this.closed.fill(0); this.generation = 1; }
     const stamp = this.generation;
-    const estimate = (id: number) => Math.hypot(this.nodes[id].x - this.nodes[last].x,
+    // A small goal bias avoids exploring thousands of equivalent paved cells.
+    // The returned corridor still has every shortcut checked against support.
+    const estimate = (id: number) => 1.15 * Math.hypot(this.nodes[id].x - this.nodes[last].x,
       this.nodes[id].y - this.nodes[last].y, this.nodes[id].z - this.nodes[last].z);
     this.frontier.clear(); this.frontier.push(first, estimate(first));
     this.costs[first] = 0; this.seen[first] = stamp;
@@ -248,8 +342,14 @@ export class SurfaceNavigation {
         if (exact) path.push(b);
         const turns: Vec3[] = []; let anchor = a;
         for (let i = 0; i < path.length;) {
-          let next = i;
-          while (next + 1 < path.length && this.terrain.segmentClear(anchor, path[next + 1], this.radius, dynamic)) next++;
+          // Bisection finds a supported shortcut without testing hundreds of
+          // nearly identical rays along the same blocked side of a ramp.
+          let next = i, limit = path.length - 1;
+          while (next < limit) {
+            const probe = Math.ceil((next + limit) / 2);
+            if (this.terrain.segmentClear(anchor, path[probe], this.radius, dynamic)) next = probe;
+            else limit = probe - 1;
+          }
           turns.push({ ...path[next] }); anchor = path[next]; i = next + 1;
         }
         this.routes.unshift({ start: a, goal: b, path: turns }); this.routes.length = Math.min(this.routes.length, 8);
