@@ -75,6 +75,10 @@ fire remains enabled.
 
 ## Inspection and replays
 
+The [complete assault verification run](replays/README.md#recovery-fee-four-machinegunners)
+includes a viewable JSON and its gameplay revision. Four robots return, the
+load remains intact and the machinegunners fire 22 shots during the encounter.
+
 `window.amortization2.inspect().mission` exposes convoy IDs and positions,
 truck hull/drive integrity, movement state, engagement/disable/capture times,
 guard count, load condition and escape result. The existing development

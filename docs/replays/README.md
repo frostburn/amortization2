@@ -1,5 +1,51 @@
 # Recorded verification runs
 
+## Recovery Fee: four machinegunners
+
+[recovery-fee-assault.json](recovery-fee-assault.json) is the unchanged
+current-attempt export from a complete Playwright/Chromium run of Contract 06.
+Its gameplay source is
+[`b82d6138d716d2f6edc6cc84de8facfb1255f9cb`](https://github.com/frostburn/amortization2/commit/b82d6138d716d2f6edc6cc84de8facfb1255f9cb).
+The capture records revision `b82d613`.
+
+| Result | Recorded value |
+| --- | --- |
+| Simulated duration | 54.42 seconds / 3,265 ticks |
+| Outcome | Complete; cargo intact; all five guards defeated |
+| Truck | Drive disabled; 780 / 900 hull integrity |
+| Squad recovered | 4 / 4 |
+| Robot health, IDs 1–4 | 100, 88, 160, 160 / 160 |
+| Combat counters | 277 shots; 135 robot hits; no grenades |
+| Enemy shots | 22, all from the two machinegunners |
+| Capture | One attempt; 155 inputs; 113 snapshots; six camera observations |
+
+Run `npm run dev`, open **Controls & settings → View replay**, select the JSON,
+then Play or seek through the interception. For a textual reconstruction:
+
+```sh
+npm run inspect:replay -- docs/replays/recovery-fee-assault.json
+```
+
+The command reproduces combat counters, health, ammunition and final robot
+positions within two centimetres. Future gameplay/physics changes can diverge;
+use the source commit above when comparing versions.
+
+The agent played with native keyboard and mouse: choose four machinegunners,
+move through the maintenance-yard opening, stop the moving truck from the
+workshop lane, pan west, close the firing distance, fight the detail, secure
+the truck and return the entire squad. Target positions came from the public
+read-only `inspect()` and `project()` helpers. Health, positions, enemy deaths
+and objectives progressed through the ordinary simulation and controls.
+Playwright's virtual clock drives normal fixed steps; capture timestamps follow
+that clock. The JSON is the original recorder export.
+
+This is a precise scripted interception early in the route. It verifies a full
+assault attempt, rather than establishing human difficulty or every ambush
+position. Focused tests separately exercise the other squad configurations,
+late interception, route escape, braced enemy bursts, elevated routes, salvage
+completion and replay reconstruction. Civilian CARTs, parked cars and the
+cooperative's recovery van retain their health; civilian security is not called.
+
 ## Priority Access: four machinegunners (archived flow)
 
 The current mission admits the technicians automatically after perimeter clearance.
