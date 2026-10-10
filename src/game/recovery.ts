@@ -31,7 +31,9 @@ export const RECOVERY_RAILS: WalkSurface[] = RECOVERY_SURFACES.flatMap(s => [-1,
 export const RECOVERY_COVER: BoxSpec[] = [
   // The maintenance yard protects deployment, with an eastern opening to the junction.
   { x: -39, z: 6, w: 32, d: .6, h: 2.7, style: "wall" },
-  { x: -56, z: 23, w: .6, d: 34, h: 2.7, style: "wall" },
+  // A west service entrance makes the loaded return a short fighting withdrawal.
+  { x: -56, z: 10, w: .6, d: 8, h: 2.7, style: "wall" },
+  { x: -56, z: 33, w: .6, d: 14, h: 2.7, style: "wall" },
   { x: -27, z: -15, w: 5, d: 2, h: 2.2, style: "crate" },
   { x: 8, z: -38, w: 5, d: 1.2, h: 2.5, style: "crate" },
   { x: 35, z: 2, w: 4, d: 3, h: 2.4, style: "crate" },
@@ -72,4 +74,5 @@ export const RECOVERY_DISTRICT: CityDistrict = {
 };
 export const RECOVERY_FIXTURES: BoxSpec[] = [
   ...RECOVERY_DISTRICT.buildings.map(buildingSolid), ...RECOVERY_DISTRICT.furniture, ...RECOVERY_COVER,
+  { ...RECOVERY_SITES.van, w: 2.3, d: 5.6, h: 2.1, style: "crate" },
 ];

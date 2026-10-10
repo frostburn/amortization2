@@ -56,6 +56,9 @@ export function updateMissionUI(sim: Simulation) {
   const note = document.querySelector(".loadout-note")!;
   note.textContent = selectable ? "Choose before deployment. Restart the contract to change the squad." : "Changing the squad restarts the combat floor.";
   document.getElementById("haul-controls")!.hidden = !sim.hauling;
+  document.querySelector("#haul-controls span")!.textContent = sim.hauling?.loads.some(l => l.hands === 2)
+    ? "Click cargo or press H to collect / put it down. Right-click moves the hauling team. The chest needs two; carriers cannot shoot. Ctrl-click deliberately fires."
+    : "Click the dispatch case or press H to collect / put it down. Right-click moves the carrier. Other robots can cover; the carrier cannot shoot. Ctrl-click deliberately fires.";
   document.getElementById("escort-controls")!.hidden = !sim.escort;
   document.getElementById("escort-status")!.hidden = !sim.escort;
   if (!mission) return;
@@ -101,7 +104,7 @@ export function updateMissionUI(sim: Simulation) {
       : `${recovery.enemies.length} security machines · Truck still moving`
     : mission.phase === "secure" ? recovery.enemies.length ? `Truck stopped · ${recovery.enemies.length} security machines`
       : "Security clear · Bring a robot beside the truck"
-    : mission.phase === "return" ? `${recovery.loadCondition === "intact" ? "Load intact" : "Salvage secured"} · ${near} / ${living.length} robots at the van`
+    : mission.phase === "return" ? `${recovery.case.delivered ? "Case aboard" : recovery.case.state === "carried" ? "Carrying dispatch case" : "Collect dispatch case · H"}${recovery.patrolAt === undefined ? "" : ` · ${recovery.enemies.length} pursuers`} · ${near} / ${living.length} at the van`
     : mission.phase === "complete" ? `${recovery.loadCondition === "intact" ? "Load intact" : "Salvage secured"} · Squad recovered`
     : mission.failureReason ?? "Recovery required"
     : priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines remaining`

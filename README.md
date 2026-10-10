@@ -45,7 +45,7 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 ## Recovery Fee
 
-**06 · Recovery Fee** reverses the escort role: intercept Gannet's convoy before its cargo truck escapes. Choose any squad, set an ambush along the dogleg road or its raised walkway, then disable the truck's drive with rifle or automatic fire. The security van deploys two machinegunners and three pistol robots; their finite response uses bracing, stagger and ordinary navigation. A stopped truck remains physical cover. Destroying it leaves a poorer salvage result. Defeat security, bring a robot beside the load and recover every survivor to the maintenance-yard van. Priority Access's debrief leads here; the deployment selector also opens it directly. See [Recovery Fee](docs/recovery-fee.md).
+**06 · Recovery Fee** reverses the escort role: intercept Gannet's convoy before its cargo truck escapes. Choose any squad, set an ambush along the dogleg road or its raised walkway, then disable the truck's drive with rifle or automatic fire. The security van deploys two machinegunners and three pistol robots; their finite response uses bracing, stagger and ordinary navigation. A stopped truck remains physical cover. Destroying it leaves a poorer salvage result. Defeat security, secure the bulk load, then carry its dispatch case back to the maintenance-yard van. One carrier has its hands full; the others cover against a single chasing patrol of one machinegunner and two pistol robots. The west service entrance shortens the return. Deliver the case and recover every survivor; you can leave pursuers alive. Priority Access's debrief leads here; the deployment selector also opens it directly. See [Recovery Fee](docs/recovery-fee.md).
 
 ## Proving Ground
 

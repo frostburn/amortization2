@@ -1665,6 +1665,7 @@ export class RangeScene {
     }
     for (const p of this.sim.props) {
       const visual = this.props.get(p.id)!;
+      visual.visible = p.body.isEnabled();
       const position = p.body.translation(),
         q = p.body.rotation();
       visual.position.set(

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { STEP, distance2, type Vec2 } from "../src/game/config";
 import { Simulation, type Actor } from "../src/game/simulation";
-import { RecoveryMission } from "../src/game/recovery-mission";
+import { RECOVERY_PATROL_DELAY, RecoveryMission } from "../src/game/recovery-mission";
 import { RECOVERY_DRIVE_HP, RECOVERY_ROLL_DELAY, RECOVERY_SITES } from "../src/game/recovery";
 import { VEHICLES, vehicleFootprint } from "../src/game/traffic";
 import { NEXT_CONTRACT } from "../src/game/missions";
@@ -24,6 +24,15 @@ describe("Recovery Fee", () => {
       { x: -28, y: 1.5, z: -10 });
   };
   const killGuards = () => mission().enemies.forEach(a => sim.damage(a, a.hp, { x: 0, y: 0, z: 0 }, a.body.translation(), "gun"));
+  const collectCase = () => {
+    const load = mission().case, p = load.prop.body.translation(), a = sim.squad.find(a => !a.dead && !sim.isDisrupted(a))!;
+    place(a, { x: p.x, z: p.z - 1 }); sim.selectGroup([a.id]);
+    expect(sim.haulCargo(load.prop.id)).toBeNull();
+    for (let i = 0; i < 6 / STEP && load.state !== "carried"; i++) sim.step();
+    sim.step(); // Mission observes the first lift on the following combat tick.
+    expect(load.state).toBe("carried");
+    return load;
+  };
 
   test.each(["sniper", "minigunner", "assault"] as const)("%s config starts safely and briefing holds the convoy", async model => {
     sim = await Simulation.create("recovery", model);
@@ -114,6 +123,19 @@ describe("Recovery Fee", () => {
     expect(sim.security!.pressure).toBe(1);
   });
 
+  test.each([2, 30])("engagement at %s seconds does not park the scout across the operational truck's route", async seconds => {
+    sim = await Simulation.create("recovery"); sim.mission!.deploy(); ticks(seconds);
+    const m = mission(), p = m.scout.body.translation();
+    sim.city!.damage(m.scout, 1, { x: 0, y: 0, z: 0 }, p, "player"); sim.step();
+    expect(m.engagedAt).toBeDefined();
+    // Keep combat out of this vehicle-controller check.
+    killGuards(); ticks(25);
+    const before = { ...m.truck.body.translation() };
+    ticks(15);
+    expect(distance2(m.truck.body.translation(), before)).toBeGreaterThan(15);
+    expect(m.scout.parked).toBe(false);
+  });
+
   test("machinegunners brace and fire bursts, while pistol escorts approach without grenades", async () => {
     sim = await Simulation.create("recovery", "assault"); sim.mission!.deploy(); hit(6); sim.step();
     const m = mission();
@@ -163,9 +185,41 @@ describe("Recovery Fee", () => {
     expect(mission().phase).toBe("return"); expect(mission().cargoReleased).toBe(true);
     expect(mission().loadCondition).toBe(destroyed ? "salvage" : "intact");
     ticks(2); expect(mission().phase).toBe("return");
+    const load = collectCase(); sim.hauling!.drop(load);
     sim.squad.forEach((a, i) => place(a, { x: RECOVERY_SITES.exit.x + (i % 2) * 2 - 1, z: RECOVERY_SITES.exit.z + Math.floor(i / 2) * 2 - 1 }));
+    ticks(1.1); expect(mission().phase).toBe("return"); // Squad alone is insufficient.
+    load.prop.body.setTranslation({ ...RECOVERY_SITES.exit, y: load.prop.h / 2 + .02 }, true);
     ticks(1.1); expect(mission().phase).toBe("complete");
+    expect(load.delivered).toBe(true);
     expect(mission().recoveryVan.distance).toBeGreaterThan(0);
+  });
+
+  test("first lift starts one finite pursuit; dropping and collecting the case cannot reset it", async () => {
+    sim = await Simulation.create("recovery", "assault"); sim.mission!.deploy();
+    expect(mission().case.prop.body.isEnabled()).toBe(false);
+    hit(RECOVERY_DRIVE_HP); sim.step(); killGuards(); place(sim.squad[0], { x: -76, z: -19 }); sim.step();
+    const m = mission(); expect(m.case.unlocked).toBe(true); expect(m.case.prop.body.isEnabled()).toBe(true);
+    ticks(10); expect(m.patrolAt).toBeUndefined();
+    const load = collectCase(), due = m.pursuitDue!;
+    expect(due).toBeGreaterThan(sim.time); sim.hauling!.drop(load);
+    ticks(1); collectCase(); expect(m.pursuitDue).toBe(due);
+    ticks(RECOVERY_PATROL_DELAY + 1); expect(m.patrolAt).toBeDefined(); expect(m.inspect().patrol).toBe(3);
+    expect(m.enemies.filter(a => a.weapon === "gun")).toHaveLength(1);
+    expect(m.enemies.filter(a => a.weapon === "pistol")).toHaveLength(2);
+    expect(m.enemies.every(a => sim.terrain!.canStand({ ...sim.walkingPoint(a), y: 0 }))).toBe(true);
+    ticks(10); expect(m.inspect().patrol).toBe(3); expect(m.enemyShots).toBeGreaterThan(0);
+    // Extraction is an escape, not another kill-all objective.
+    sim.hauling!.drop(load); load.prop.body.setTranslation({ ...RECOVERY_SITES.exit, y: .295 }, true);
+    sim.squad.filter(a => !a.dead).forEach((a, i) => place(a, { x: -43 + i % 2 * 2, z: 30 + Math.floor(i / 2) * 2 }));
+    ticks(1.1); expect(m.phase).toBe("complete"); expect(m.enemies.length).toBeGreaterThan(0);
+  });
+
+  test("pickup van blocks bullets and the west service entrance admits ground movement", async () => {
+    sim = await Simulation.create("recovery"); sim.mission!.deploy();
+    const hit = sim.ray({ x: -51, y: 1, z: 24 }, { x: -51, y: 1, z: 38 });
+    expect(hit).not.toBeNull();
+    const a = sim.squad[0]; place(a, { x: -59, z: 20 }); sim.navigate(a, { x: -48, z: 20 }); ticks(5);
+    expect(distance2(a.body.translation(), { x: -48, z: 20 })).toBeLessThan(.5);
   });
 
   test("normal fire and convoy response replay even when the renderer drains events", async () => {

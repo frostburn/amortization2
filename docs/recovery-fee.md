@@ -7,7 +7,9 @@ available. This is the first authored encounter with enemy machine guns.
 
 Gannet is transporting the freight cooperative's seized charging racks and
 replacement drive assemblies out of the district. The squad intercepts the
-convoy, defeats its finite security detail and secures the load for collection.
+convoy, defeats its security detail and secures the bulk load for collection.
+One robot must carry the dispatch case back while the others cover against
+a finite pursuing patrol.
 Morrow accepts the recovery contract; Vale reports the route and its progress;
 Rook identifies the machine-gun threat; Sable confirms physical immobilisation.
 Quill's debrief discovery connects the seizure to a sale signed beforehand, with
@@ -23,6 +25,9 @@ failure line, so the scout never parks across the cargo truck's exit.
 
 The squad deploys in a sheltered maintenance yard. Solid walls and a workshop
 screen the starting position; the eastern opening reaches the service lane.
+A twelve-metre west service entrance gives the carrier a direct return through
+the yard instead of circling its southern wall. The squad pickup van has
+matching physical collision.
 A **4.8 metre** pedestrian crossing passes over the western road. Both ramps
 connect it to street level. Ground orders stay below the open span. Concrete
 supports clear the traffic lane and the truck's roof. Tall equipment and
@@ -38,16 +43,34 @@ are no unrelated traffic loops in the convoy road.
    its exit after moving, leaving time for relocation. Road chevrons indicate
    its route until it is stopped. Vale reports movement and both turns.
 2. **Stop and secure.** A visible opponent or damage to any convoy vehicle
-   stops the scout/security van and deploys exactly five ground robots: two
-   machinegunners and three pistol units. The cargo truck keeps driving.
+   stops the security van and deploys exactly five ground robots: two
+   machinegunners and three pistol units. The scout and cargo truck keep driving;
+   the scout no longer blocks the truck after contact. Disembarkation and rally
+   positions spread the detail across both sides rather than concentrating it
+   in one vehicle blast.
    Machinegunners seek separate positions and brace when firing; pistols
    approach the squad. Machine guns fire 0.42-second bursts at a 2.4-second
    cadence. Ordinary sight, range, recoil, stagger, ammunition and navigation
-   apply. No enemy grenades, heavy weapons or reinforcement waves.
+   apply. No enemy grenades, snipers, miniguns or endless reinforcements.
 3. **Recover.** Once the truck is immobilised and all five guards defeated,
    bring a living robot within six metres on ground level. The cooperative's
-   recovery van approaches through the workshop yard. Every surviving squad
-   robot must then reach the off-street pickup bay.
+   recovery van approaches through the workshop yard. An impact-resistant
+   dispatch case appears on clear ground beside the truck or wreck. Click it
+   or press **H** to assign one carrier; that robot cannot fire. **RMB** moves
+   the carrying team, **C** assigns cover and **H** puts the case down.
+4. **Withdraw under pursuit.** The first completed lift wakes the inventory
+   tag. Sable warns immediately; six seconds later Vale announces a single
+   patrol of **one machinegunner and two pistol robots** entering the street
+   behind the load. Entries avoid buildings, vehicles and nearby squad members.
+   Dropping or collecting the case again does not reset the timer or add patrols.
+   The patrol uses lighter chassis (120/100 HP), a slower machine-gun cadence,
+   normal sight and navigation, and no grenades. Keep the carrier moving,
+   cover its retreat or put the case down to fight.
+5. **Extract.** Deliver the carried case into the pickup bay and bring every
+   surviving robot there for one second. Cargo delivery is required; merely
+   returning the squad cannot complete the contract. Pursuers can remain alive.
+   With one survivor, the case can still be recovered by alternating hauling
+   and fighting. A lost carrier drops the physical case for another robot.
 
 ## Physical vehicle disabling
 
@@ -81,7 +104,8 @@ load remains intact and the machinegunners fire 22 shots during the encounter.
 
 `window.amortization2.inspect().mission` exposes convoy IDs and positions,
 truck hull/drive integrity, movement state, engagement/disable/capture times,
-guard count, load condition and escape result. The existing development
+guard count, load condition and escape result, plus case position/carriers,
+pursuit deadline, patrol arrival/count and delivery time. The existing development
 recorder/viewer supports the new range, moving vehicles and security deployment.
 Attack reports persist in simulation state; they do not depend on retained
 presentation events, which the renderer drains each frame.
@@ -89,4 +113,6 @@ presentation events, which the renderer drains each frame.
 Tests cover briefing/squad choice, safe deployment, the full truck footprint
 through both turns, escape, drive permanence, disembarkation along the route,
 actual enemy bursts, civilian affiliation, stopped-truck navigation, elevated
-and ground routes, intact/salvage completion and deterministic replay playback.
+and ground routes, intact/salvage completion, required physical cargo delivery,
+the one-shot pursuit timer through drop/recollection, escape with live pursuers,
+pickup-van collision, the service entrance and deterministic replay playback.

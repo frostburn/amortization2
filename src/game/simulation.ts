@@ -633,7 +633,7 @@ export class Simulation {
     return [
       ...(this.city?.vehicles ?? []).filter(c => !c.hp || c.driveHp === 0 || c.state === "stranded").map(vehicleFootprint),
       ...(this.mission?.obstacles ?? []),
-      ...this.props.filter(p => !actor || p.id !== actor.haul || this.hauling?.loadFor(actor)?.state === "approaching").map((p) => ({
+      ...this.props.filter(p => p.body.isEnabled() && (!actor || p.id !== actor.haul || this.hauling?.loadFor(actor)?.state === "approaching")).map((p) => ({
         x: p.body.translation().x,
         z: p.body.translation().z,
         w: p.w,

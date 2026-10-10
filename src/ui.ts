@@ -287,7 +287,8 @@ export function updateUI(sim: Simulation, audio: RangeAudio) {
   haulButton.disabled = !sim.active.length || !!sim.mission?.stopped || !hauling && !sim.hauling?.available();
   haulButton.classList.toggle("selected", hauling);
   haulButton.setAttribute("aria-label", hauling ? "Put down cargo (H)" : "Collect cargo (H)");
-  haulButton.title = hauling ? "Put down cargo (H)" : "Collect cargo (H); select two robots for the chest";
+  haulButton.title = hauling ? "Put down cargo (H)" : sim.hauling?.loads.some(l => l.hands === 2)
+    ? "Collect cargo (H); select two robots for the chest" : "Collect case (H); one carrier cannot fire";
   const escortButton = document.getElementById("escort-order") as HTMLButtonElement;
   escortButton.hidden = !sim.escort;
   escortButton.disabled = !sim.active.length || !!sim.mission?.stopped || !sim.escort || sim.escort.state === "captive" || sim.escort.human.dead;
