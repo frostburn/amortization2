@@ -169,6 +169,9 @@ describe("Priority Access", () => {
     expect(Math.abs(sim.walkingPoint(sim.primary).y)).toBeLessThan(.1);
   });
 
+  // This runs the vehicle, crew and complete squad return routes. Shared CI
+  // runners need the same allowance as district initialization; the simulated
+  // route deadlines and all outcome assertions remain bounded below.
   test.each(["sniper", "minigunner", "assault"] as const)("%s contract can restart service with real vehicle/crew navigation, then recover the whole squad", async model => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
     sim.select(1); sim.move({ x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 });
@@ -191,7 +194,7 @@ describe("Priority Access", () => {
     sim.select(5); sim.move(PRIORITY_SITES.exit);
     until(() => mission().phase === "complete", 55);
     expect(mission().inspect().survivors).toBe(4);
-  });
+  }, 15_000);
 
   test("contesting the service door pauses repair, retaining completed work", async () => {
     await open(); ticks(17);
