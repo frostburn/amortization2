@@ -58,7 +58,9 @@ The service van parks in the yard; two technicians disembark and walk to the
 exchange. Together they need twenty seconds of uncontested work. An enemy
 within fourteen metres of the service door pauses work without erasing progress.
 One surviving technician can finish at half speed. If their vehicle is destroyed
-or stranded they disembark there and continue on foot. Losing both technicians
+or stranded, or waits stationary behind an obstruction for five seconds, they
+disembark there and continue on foot. This also keeps the late-loading route
+working when the secured recovery van occupies the service lane. Losing both technicians
 or all player robots fails the contract.
 
 Restoring service resumes held PORTER deliveries and queued autonomous vans.

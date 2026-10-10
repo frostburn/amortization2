@@ -71,6 +71,15 @@ describe("Priority Access", () => {
     expect(mission().gateOpen).toBe(false);
     place(sim.squad[0], { x: mission().equipmentSite.x, z: -4 }); ticks(1.1);
     expect(mission().removal).toBe("secured"); expect(mission().phase).toBe("dispatch");
+    place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(1.6);
+    for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {
+      disable(mission().response); sim.step();
+    }
+    // The secured contractor van still occupies the inbound lane. The owners'
+    // crew must complete the job without requiring the player to destroy it.
+    expect(mission().service.body.translation().x).toBeGreaterThan(PRIORITY_SITES.serviceStop.x + 8);
+    expect(mission().repairing).toHaveLength(2);
+    expect(mission().phase, JSON.stringify(mission().inspect())).toBe("return");
   });
 
   test("a loading-bay visit does not open access through a live perimeter", async () => {

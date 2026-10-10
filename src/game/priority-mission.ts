@@ -40,6 +40,7 @@ export class PriorityMission extends Mission {
   private profiles = new Map<number, EnemyProfile>();
   private heldTraffic: CivilianVehicle[];
   private repairNotice = false;
+  private serviceBlockedSeconds = 0;
   loadingProgress = 0;
   removal: "loading" | "departing" | "gate" | "secured" = "loading";
   accessProgress = 0;
@@ -137,10 +138,11 @@ export class PriorityMission extends Mission {
     this.sim.city!.traffic.go(this.service, PRIORITY_SITES.serviceStop);
     this.sim.events.push({ type: "comms", speaker: "vale", message: "East gate released. The owners' service van is coming in. Keep the yard and the concourse approaches covered while their crew restores dispatch." });
   }
-  private bringCrew() {
+  private bringCrew(blocked = false) {
     if (this.crewArrivedAt !== undefined) return;
     const p = this.service.body.translation();
     this.crewArrivedAt = this.sim.time;
+    if (blocked) this.sim.events.push({ type: "comms", speaker: "vale", message: "The service lane is blocked. The owners' crew is leaving the van and walking in. Keep their approach to the service door clear." });
     PRIORITY_SITES.technicians.forEach((goal, i) => {
       const a = this.sim.addHuman({ x: p.x - i * 1.2, z: p.z - 2.5 }, {
         name: `Technician ${i + 1}`, coat: i ? 0x687e81 : 0x8b8468, trim: 0xc7b574, hair: i ? 0x3e3732 : 0x64615c,
@@ -184,8 +186,11 @@ export class PriorityMission extends Mission {
       if (this.accessProgress >= 1) this.openAccess();
     }
     if (this.phase === "restore") {
-      if (this.service.hp <= 0 || this.service.state === "stranded" || this.service.parked && distance2(this.service.body.translation(), PRIORITY_SITES.serviceStop) < 2)
-        this.bringCrew();
+      const velocity = this.service.body.linvel();
+      const blocked = !this.service.parked && this.service.state === "yield" && Math.hypot(velocity.x, velocity.z) < .25;
+      this.serviceBlockedSeconds = blocked ? this.serviceBlockedSeconds + STEP : 0;
+      if (this.service.hp <= 0 || this.service.state === "stranded" || this.service.parked && distance2(this.service.body.translation(), PRIORITY_SITES.serviceStop) < 2 || this.serviceBlockedSeconds >= 5)
+        this.bringCrew(this.serviceBlockedSeconds >= 5);
       // Contact can push a worker away from the cabinet. Recover at a bounded
       // cadence instead of issuing a route search every simulation tick.
       this.technicians.forEach((a, i) => {
@@ -229,6 +234,7 @@ export class PriorityMission extends Mission {
       responseAt: this.responseAt, responseGroups: this.responseGroups.size, restoredAt: this.restoredAt,
       crewArrivedAt: this.crewArrivedAt, technicians: this.technicians.map(a => ({ id: a.id, hp: a.hp, dead: a.dead,
         working: this.repairing.includes(a), position: { ...a.body.translation() } })),
+      serviceBlockedSeconds: this.serviceBlockedSeconds,
     };
   }
 }
