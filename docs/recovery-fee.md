@@ -68,7 +68,9 @@ are no unrelated traffic loops in the convoy road.
    cover its retreat or put the case down to fight.
 5. **Extract.** Deliver the carried case into the pickup bay and bring every
    surviving robot there for one second. Cargo delivery is required; merely
-   returning the squad cannot complete the contract. Pursuers can remain alive.
+   returning the squad cannot complete the contract. Unloading preserves an
+   existing return order and gathers its carrier/escorts inside the bay; held
+   rear guards still need their own move order. Pursuers can remain alive.
    With one survivor, the case can still be recovered by alternating hauling
    and fighting. A lost carrier drops the physical case for another robot.
 
@@ -98,9 +100,11 @@ fire remains enabled.
 
 ## Inspection and replays
 
-The [complete assault verification run](replays/README.md#recovery-fee-four-machinegunners)
+The [complete hauling/pursuit verification run](replays/README.md#recovery-fee-hauling-and-pursuit)
 includes a viewable JSON and its gameplay revision. Four robots return, the
-load remains intact and the machinegunners fire 22 shots during the encounter.
+load remains intact and the case is carried to the van. The enemy fires 36
+rounds, including 16 from the pursuing patrol. The rear guard takes damage
+while the carrier advances; extraction completes in 70.68 seconds.
 
 `window.amortization2.inspect().mission` exposes convoy IDs and positions,
 truck hull/drive integrity, movement state, engagement/disable/capture times,

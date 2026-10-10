@@ -1,6 +1,64 @@
 # Recorded verification runs
 
-## Recovery Fee: four machinegunners
+## Recovery Fee: hauling and pursuit
+
+[recovery-fee-pursuit-assault.json](recovery-fee-pursuit-assault.json) is the
+unchanged recorder export from a complete native keyboard/mouse playthrough.
+Its gameplay source is
+[`f5a63e0053e08d0d590195ee5abc2168073d0a8c`](https://github.com/frostburn/amortization2/commit/f5a63e0053e08d0d590195ee5abc2168073d0a8c);
+the capture records revision `f5a63e0`.
+
+| Result | Recorded value |
+| --- | --- |
+| Simulated duration | 70.68 seconds / 4,241 ticks |
+| Outcome | Complete; bulk cargo intact; dispatch case delivered |
+| Truck | Drive disabled; 780 / 900 hull integrity |
+| Squad recovered | 4 / 4 |
+| Robot health, IDs 1–4 | 82, 34, 116, 160 / 160 |
+| Player combat counters | 544 shots; 158 robot hits; no grenades |
+| Enemy shots | 36: 20 convoy detail, 16 pursuing patrol |
+| Case lifted / patrol arrival | 35.07 s / 41.08 s |
+| Case delivered / squad extracted | 59.82 s / 70.68 s |
+| Capture | One attempt; 405 inputs; 146 snapshots; seven camera observations |
+
+The four-machinegun squad intercepts from the workshop lane, defeats the five
+convoy guards and secures the bulk load. ANCHOR picks up the case using **H**.
+All four receive an extraction movement order, then the other three receive a
+cover-sector order and hold a rear guard while the carrier advances through the
+west service entrance. A single patrol enters after the six-second warning.
+The rear guard uses normal aimed fire, defeats the pursuers, then moves to the
+pickup bay. The patrol damages two supporting robots; the carrier keeps moving.
+The case is accepted automatically and the squad completes extraction.
+
+Play used installed Playwright/Chromium and its virtual clock to advance the
+ordinary fixed simulation. Coordinates came from public read-only `inspect()`
+and `project()` helpers. Health, positions, ammunition, enemy deaths and mission
+outcomes were not injected. The source includes a separate physical-navigation
+test verifying a single loaded return order completes unloading and gathering.
+
+Run `npm run dev`, open **Controls & settings → View replay**, select the JSON,
+then play or seek through the hauling/pursuit sequence. Textual reconstruction:
+
+```sh
+npm run inspect:replay -- docs/replays/recovery-fee-pursuit-assault.json
+```
+
+The offline inspector and browser viewer reproduce recorded combat and robot
+positions within two centimetres at this source. The browser check imports,
+plays, seeks to completion, seeks backwards and exits to the original live game.
+Later gameplay/physics changes can diverge; compare against the source above.
+
+This precise early interception verifies the four-machinegun route, not human
+difficulty, every interception point or every configuration. Focused tests cover
+other squad choices, intact/salvage outcomes, late guard deployment, a pursuit
+that persists through dropping/recollecting cargo, and extraction with living
+pursuers. The original pre-hauling run remains below as an archive.
+
+## Recovery Fee: four machinegunners (archived flow)
+
+This recording predates case hauling, the pursuing patrol and the west service
+entrance. Use its source commit below for matching playback; it is retained as
+a historical verification run.
 
 [recovery-fee-assault.json](recovery-fee-assault.json) is the unchanged
 current-attempt export from a complete Playwright/Chromium run of Contract 06.
