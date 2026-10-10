@@ -16,8 +16,10 @@ import { CROSSING_DISTRICT, CROSSING_FIXTURES } from "./crossing";
 
 import { HANDLING_DISTRICT, HANDLING_FIXTURES, HANDLING_SHELTERS } from "./handling";
 import { ESCORT_DISTRICT, ESCORT_FIXTURES, ESCORT_SHELTERS, ESCORT_SPAWNS } from "./escort";
+import { CONCOURSE_DISTRICT, CONCOURSE_FIXTURES, CONCOURSE_RAILS, CONCOURSE_SURFACES } from "./concourse";
+import type { WalkSurface } from "./walk-surfaces";
 
-export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "proving" | "long" | "arena" | "city" | "port";
+export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -30,6 +32,8 @@ type RangeDefinition = {
   contract?: boolean;
   city?: CityDistrict;
   shelters?: RoofedArea[];
+  walkSurfaces?: WalkSurface[];
+  walkVolumes?: WalkSurface[];
   bounds: RangeBounds;
   barriers: BoxSpec[];
   platforms: BoxSpec[];
@@ -39,6 +43,14 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  concourse: {
+    name: "RAISED CONCOURSE", city: CONCOURSE_DISTRICT, bounds: CONCOURSE_DISTRICT.bounds,
+    barriers: CONCOURSE_FIXTURES, platforms: [], walkSurfaces: CONCOURSE_SURFACES, walkVolumes: CONCOURSE_RAILS,
+    players: [{ x: -27.1, z: 20.1 }, { x: -27.1, z: 17.9 }, { x: -24.9, z: 17.9 }, { x: -24.9, z: 20.1 }],
+    targets: [{ x: 26, z: -16, elevation: 4.8, kind: "heavy" },
+      { x: 0, z: -45, elevation: 8.4, kind: "precision" }, { x: 11, z: 12, kind: "plate" }],
+    props: [{ x: -15, z: 10, w: .9, h: .8, d: .9, mass: 18 }],
+  },
   escort: {
     name: "04 · RELEASE", contract: true, city: ESCORT_DISTRICT, bounds: ESCORT_DISTRICT.bounds,
     barriers: ESCORT_FIXTURES, platforms: [], shelters: ESCORT_SHELTERS,

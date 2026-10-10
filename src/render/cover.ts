@@ -34,7 +34,7 @@ export class CoverOrderView {
       positions.setXYZ(21, 0, 0, 0);
       positions.needsUpdate = true;
       line.geometry.computeBoundingSphere();
-      line.position.set(p.x, 0.075, p.z);
+      line.position.set(p.x, sim.walkingHeight(sim.walkingPoint(a)) + 0.075, p.z);
       line.material.color.setHex(preview ? 0xdbac5b : 0xa3e6d0);
     }
   }

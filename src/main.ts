@@ -180,9 +180,11 @@ async function start() {
 
   function configureMenu() {
     document.getElementById("menu-title")!.textContent = sim.mission ? sim.mission.definition.title
+      : sim.range === "concourse" ? "Raised concourse"
       : sim.range === "port" ? "Marine port" : sim.range === "city" ? "City district"
       : sim.arena ? "Endless arena" : sim.range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent = sim.mission ? sim.mission.definition.summary
+      : sim.range === "concourse" ? "Explore the pedestrian loop above the street. Broad ramps connect the bridge and upper gallery; target stands test firing between elevations. Right-click the paving to move. Shift+R restores the district."
       : sim.range === "port" ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
       : sim.range === "city" ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
       : sim.arena ? "Survive incoming robot squads. Survivors repair and rearm between waves. Shift+R restarts."
@@ -455,7 +457,7 @@ async function start() {
     canvas.dataset.cursor = interaction.type === "haul" ? interaction.verb : interaction.type;
     if (interaction.type !== "fire") sim.trigger = false;
   }
-  const aimAtPointer = (groundOnly = false) => {
+  const aimAtPointer = (groundOnly = false, queued = false) => {
     if (sim.sniping) {
       scene.scope.aim(sim);
       return null;
@@ -464,6 +466,7 @@ async function start() {
       pointer.x,
       pointer.y,
       sim.weapon === "grenade" || groundOnly,
+      groundOnly ? (queued ? sim.primary.path.at(-1)?.y : undefined) ?? sim.walkingPoint(sim.primary).y : undefined,
     );
     if (result) {
       ground = result.ground;
@@ -545,16 +548,16 @@ async function start() {
     if (
       !force &&
       (sim.time - moveDrag.lastTime < 0.08 ||
-        distance2(ground, moveDrag.lastGoal) < 0.15)
+        distance2(ground, moveDrag.lastGoal) < 0.15 && Math.abs(ground.y - (moveDrag.lastGoal.y ?? ground.y)) < .15)
     )
       return;
-    if (force && distance2(ground, moveDrag.lastGoal) < 0.01) return;
+    if (force && distance2(ground, moveDrag.lastGoal) < 0.01 && Math.abs(ground.y - (moveDrag.lastGoal.y ?? ground.y)) < .01) return;
     if (moveDrag.queued) scene.previewMove(sim.moveDestinations(ground));
     else {
       sim.move(ground);
       scene.markMove();
     }
-    moveDrag.lastGoal = { x: ground.x, z: ground.z };
+    moveDrag.lastGoal = { x: ground.x, y: ground.y, z: ground.z };
     moveDrag.lastTime = sim.time;
   }
   // Mouse events retain per-button transitions when firing and steering together.
@@ -613,7 +616,7 @@ async function start() {
       selectionBox.style.width = `${Math.abs(pointer.x - selectionDrag.x)}px`;
       selectionBox.style.height = `${Math.abs(pointer.y - selectionDrag.y)}px`;
     }
-    aimAtPointer(!!moveDrag || !!selectionDrag || covering);
+    aimAtPointer(!!moveDrag || !!selectionDrag || covering, !!moveDrag?.queued);
     if (covering) scene.previewCover(pointer.inside ? ground : null);
     if (moveDrag?.queued) updateMove();
   });
@@ -632,7 +635,7 @@ async function start() {
       return;
     }
     updatePointer(e);
-    const picked = aimAtPointer(e.button === 2 || e.shiftKey || covering);
+    const picked = aimAtPointer(e.button === 2 || e.shiftKey || covering, e.button === 2 && e.shiftKey);
     if (covering && e.button === 0 && !e.shiftKey) {
       sim.coverSector(ground);
       armCover(false);
@@ -645,7 +648,7 @@ async function start() {
       selectionBox.hidden = true;
       moveDrag = {
         queued: e.shiftKey,
-        lastGoal: { x: ground.x, z: ground.z },
+        lastGoal: { x: ground.x, y: ground.y, z: ground.z },
         lastTime: sim.time,
       };
       if (e.shiftKey) scene.previewMove(sim.moveDestinations(ground));
@@ -718,7 +721,7 @@ async function start() {
       updateUI(sim, audio);
     }
     if (e.button === 2 && moveDrag) {
-      aimAtPointer(true);
+      aimAtPointer(true, moveDrag.queued);
       if (moveDrag.queued) {
         sim.move(ground, true);
         scene.markMove();
@@ -884,6 +887,7 @@ async function start() {
         render: {
           calls: scene.renderer.info.render.calls,
           triangles: scene.renderer.info.render.triangles,
+          surfaces: scene.inspectSurfaces(),
         },
       }),
       project: (p: Vec3) => scene.project(p),
@@ -930,7 +934,7 @@ async function start() {
         if (keys.has("KeyW")) scene.pan(0, -panSpeed);
         if (keys.has("KeyS")) scene.pan(0, panSpeed);
         if (pointer.inside && (sim.weapon !== "rifle" || moveDrag || selectionDrag || covering))
-          aimAtPointer(!!moveDrag || !!selectionDrag || covering);
+          aimAtPointer(!!moveDrag || !!selectionDrag || covering, !!moveDrag?.queued);
         else if (pointer.inside) updateInteraction(scene.pick(pointer.x, pointer.y));
         if (covering) scene.previewCover(pointer.inside ? ground : null);
         updateMove();

@@ -1,5 +1,6 @@
 export type Vec3 = { x: number; y: number; z: number };
-export type Vec2 = { x: number; z: number };
+/** Orders optionally retain the height of their walking surface. */
+export type Vec2 = { x: number; z: number; y?: number };
 /** Roof remains closed to aircraft even when rendered as a cutaway. */
 export type RoofedArea = Vec2 & { w: number; d: number; h: number; y?: number; exits: Vec2[] };
 export type BoxSpec = {
@@ -160,7 +161,7 @@ export function grenadeVelocity(
   const scale = distance > 0.001 ? range / distance : 0;
   const target = {
     x: from.x + (requested.x - from.x) * scale,
-    y: 0.15,
+    y: (requested.y ?? 0) + 0.15,
     z: from.z + (requested.z - from.z) * scale,
   };
   const duration = 0.72 + range / 22;

@@ -175,7 +175,7 @@ function validAction(value: unknown): value is ReplayAction {
   if (!value || typeof value !== "object") return false;
   const a = value as Record<string, unknown>;
   const point = (p: unknown, keys: string[]) => !!p && typeof p === "object" &&
-    keys.every(key => typeof (p as Record<string, unknown>)[key] === "number" &&
+    [...keys, ...(keys.length === 2 && Object.hasOwn(p, "y") ? ["y"] : [])].every(key => typeof (p as Record<string, unknown>)[key] === "number" &&
       Number.isFinite((p as Record<string, number>)[key]) && Math.abs((p as Record<string, number>)[key]) <= 10000);
   const id = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 5;
   switch (a.type) {
