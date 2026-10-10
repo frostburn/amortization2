@@ -4,12 +4,13 @@ import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
-export type Contact = "morrow" | "vale" | "rook" | "quill";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "complete" | "failed";
+export type Contact = "morrow" | "vale" | "rook" | "sable" | "quill";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "seizure" | "restore" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];
   objectives: readonly string[]; releaseSeconds: number; returnSeconds: number;
+  selectableSquad?: boolean;
 };
 export const RECEIVING_CONTRACT = {
   id: "receiving",
@@ -92,7 +93,7 @@ export abstract class Mission {
   }
 }
 
-export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort" } as const;
+export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority" } as const;
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
 export class ReceivingMission extends Mission {

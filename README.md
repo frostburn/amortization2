@@ -1,6 +1,6 @@
 # Amortization II — Futures Contract
 
-A desktop browser real-time tactics game about controlling a squad of machines. The first playable contract, **Receiving**, is a low-stakes, pistols-only job at a cooperative's pickup yard: clear four guards, release the cargo and return to the service van. Morrow and Vale introduce the operation using the returning cast's portraits. The existing ranges, endless arena and city/port sandboxes remain under **Practice / debug**.
+A desktop browser real-time tactics game about controlling a squad of machines. The first playable contract, **Receiving**, is a low-stakes, pistols-only job at a cooperative's pickup yard: clear four guards, release the cargo and return to the service van. Morrow and Vale introduce the operation using the returning cast's portraits. Four pistol tutorials lead to **Priority Access**, the first contract with a selectable armed squad. The existing ranges, endless arena and city/port sandboxes remain under **Practice / debug**.
 
 The overhead view is true isometric: 45° yaw, 35.3° elevation, and world axes projected at 120°. Wider maps and a lower default zoom give the squad more room to manoeuvre. Automatic fire centres on **herding**: track an opponent to push it out of cover, change firing angle to redirect it, and regroup during a reload. Hits briefly stagger robots, interrupting walking and firing while physical knockback continues. Orders resume after recovery, and robots can return fire between staggers. **Bracing recovers 2.5× faster.** Torso jolts, bright ground rings and squad-card status show the reaction. See [camera and kinetic combat tuning](docs/combat-feel.md).
 
@@ -38,6 +38,10 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 ## Release
 
 **04 · Release** is a pistols-only rescue and escort. Enter Gannet's street-corner records office through its front lobby, fight through reception and the archive, and reach **Ren Quill**. He follows a robot at walking pace; click him or press **H** to wait, resume or change guides. He unlocks the rear staff exit. Cover the east street against a fresh four-robot squad, then withdraw through the rear alley to the back-street van. Quill has his own health, and both he and every surviving chassis must reach the van. Handling's debrief offers this next contract; it is also available in the deployment selector. See [Release and human escorts](docs/escort.md).
+
+## Priority Access
+
+**05 · Priority Access** unlocks the three squad configurations: NEEDLE with three machinegunners, ROOK and SPINDLE with two machinegunners, or four machinegunners. Choose before deployment. Fight through a 180 × 140 metre exchange district using its street, raised concourse and service underpass. Stop the recovery van, release the east gate at the service door, and protect the technicians' restart against a finite street/concourse response. Loading can move the removal van to the gate; it never triggers a timed failure. Hostiles near the service door pause work without undoing it. Deliveries resume when service returns, then every surviving robot must reach the recovery van. Release's debrief offers the contract; the deployment selector also opens it directly. See [Priority Access](docs/priority-access.md).
 
 ## Proving Ground
 
@@ -128,12 +132,14 @@ See [CREDITS.md](CREDITS.md) for sample provenance and licenses. The original fi
 
 TypeScript + Vite, Three.js rendering, Rapier physics, native DOM controls, and Web Audio. No backend is required.
 
-Open **`/model-room.html`** (or **Controls & settings → Model room**) to orbit the original faceless maintenance worker beside the squad, civilian robots and self-driving vehicles. Switch between standing, walking and crouching, inspect the front/back, or use the game's isometric and tactical-scale camera. Models retain their original relative sizes. See [faceless human direction and viewer controls](docs/faceless-humans.md).
+Open **`/model-room.html`** (or **Controls & settings → Model room**) to orbit the original faceless maintenance worker beside the squad, civilian robots and self-driving vehicles. Switch between standing, walking and sitting, inspect the front/back, or use the game's isometric and tactical-scale camera. Models retain their original relative sizes. See [faceless human direction and viewer controls](docs/faceless-humans.md).
 
 - [Range design and implementation](docs/proving-ground.md)
 - [Receiving — first playable contract](docs/first-mission.md)
 - [Crossing — covering orders](docs/crossing.md)
 - [Handling — two-robot cargo and drone defence](docs/handling.md)
+- [Release — human rescue and escort](docs/escort.md)
+- [Priority Access — selectable armed squads](docs/priority-access.md)
 - [Isometric camera and kinetic combat](docs/combat-feel.md)
 - [Sniper model, scope, and long range](docs/sniper-range.md)
 - [Arena waves and enemy combat](docs/arena.md)
@@ -145,6 +151,6 @@ Open **`/model-room.html`** (or **Controls & settings → Model room**) to orbit
 
 In the browser console, `window.amortization2.inspect()` returns current state, `project({ x, y, z })` maps a world point to the screen, and `exportReport()` returns a JSON bug report. These are current-state inspection helpers. In Vite development mode, **Controls & settings → Export human replay** (also available in the mission debrief) downloads commands and observed combat for the current attempt. **Export all attempts** includes earlier retries from the page session. Use **View replay** to watch it in development with pause, seeking, speed and attempt controls; bundled histories open on the latest attempt. Inspect it with `npm run inspect:replay -- /path/to/replay.json`. See [human replays](docs/human-replays.md) for capture limits and version matching.
 
-Three tutorial contracts now accompany the combat sandboxes. Campaign progression, multiplayer, controller support and mobile controls remain future work. The arena refines live combat; the city district establishes reusable mission scenery and civilian activity. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
+Four tutorial contracts and a first armed operation now accompany the combat sandboxes. The wider campaign, multiplayer, controller support and mobile controls remain future work. The arena refines live combat; the city district establishes reusable mission scenery and civilian activity. Visuals are deliberately economical 3D models. Hardware performance and Firefox/Safari audio still need testing beyond the Chromium smoke test.
 
 Code is [MIT licensed](LICENSE). Asset licensing is documented separately in the credits.

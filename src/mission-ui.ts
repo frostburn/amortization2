@@ -1,6 +1,7 @@
 import { NEXT_CONTRACT, type Contact } from "./game/missions";
 import { RANGES } from "./game/ranges";
 import type { EscortMission } from "./game/escort-mission";
+import { PriorityMission } from "./game/priority-mission";
 import { squadName } from "./game/config";
 import type { Simulation } from "./game/simulation";
 import { rookDebrief } from "./game/debrief";
@@ -10,6 +11,7 @@ const CONTACTS = {
   morrow: { name: "MORROW", role: "Operations" },
   vale: { name: "VALE", role: "Recon / contacts" },
   rook: { name: "ROOK", role: "Weapons / security" },
+  sable: { name: "SABLE", role: "Systems" },
   quill: { name: "REN QUILL", role: "Agreements" },
 };
 const portrait = (speaker: Contact) => `${import.meta.env.BASE_URL}portraits/${speaker}.webp`;
@@ -36,18 +38,21 @@ const setText = (id: string, value: string) => {
 
 export function updateMissionUI(sim: Simulation) {
   const mission = sim.mission;
+  const selectable = !!mission?.definition.selectableSquad;
   document.getElementById("mission-panel")!.hidden = !mission;
   document.getElementById("mission-briefing")!.hidden = !mission;
   document.getElementById("menu")!.classList.toggle("mission-menu", !!mission);
   document.getElementById("app")!.classList.toggle("on-mission", !!mission);
   for (const id of ["loadout-select", "menu-loadout"]) {
     const select = document.getElementById(id) as HTMLSelectElement;
-    select.disabled = !!mission;
-    select.closest("label")!.hidden = !!mission;
+    select.disabled = !!mission && (!selectable || mission.phase !== "briefing");
+    select.closest("label")!.hidden = !!mission && !selectable;
   }
   for (const selector of ["#loadout-description", ".loadout-note", "#debug-controls", ".aim-settings"])
-    (document.querySelector(selector) as HTMLElement).hidden = !!mission;
-  document.getElementById("mission-controls")!.hidden = !mission;
+    (document.querySelector(selector) as HTMLElement).hidden = !!mission && !selectable;
+  document.getElementById("mission-controls")!.hidden = !sim.pistolsOnly;
+  const note = document.querySelector(".loadout-note")!;
+  note.textContent = selectable ? "Choose before deployment. Restart the contract to change the squad." : "Changing the squad restarts the combat floor.";
   document.getElementById("haul-controls")!.hidden = !sim.hauling;
   document.getElementById("escort-controls")!.hidden = !sim.escort;
   document.getElementById("escort-status")!.hidden = !sim.escort;
@@ -56,7 +61,7 @@ export function updateMissionUI(sim: Simulation) {
   const briefing = document.getElementById("mission-briefing")!;
   if (briefing.dataset.contract !== mission.definition.id) {
     const definition = mission.definition;
-    briefing.innerHTML = `<p class="contract-location">${definition.location}</p>${definition.briefing.map(line => contact(line.speaker, line.message)).join("")}<ol class="contract-steps">${definition.objectives.map(label => `<li>${label}</li>`).join("")}</ol><p class="contract-equipment">FOUR PISTOLS · NO RIFLES OR GRENADES</p>`;
+    briefing.innerHTML = `<p class="contract-location">${definition.location}</p>${definition.briefing.map(line => contact(line.speaker, line.message)).join("")}<ol class="contract-steps">${definition.objectives.map(label => `<li>${label}</li>`).join("")}</ol><p class="contract-equipment">${selectable ? "MILITARY WEAPONS AUTHORISED" : "FOUR PISTOLS · NO RIFLES OR GRENADES"}</p>`;
     briefing.dataset.contract = definition.id;
   }
   setText("mission-name", `${mission.definition.number} / ${mission.definition.title.toUpperCase()}`);
@@ -79,6 +84,7 @@ export function updateMissionUI(sim: Simulation) {
   const across = mission.bridge ? living.filter(a => mission.bridge!.shore(a.body.translation()) === 1).length : 0;
   const load = sim.hauling?.available();
   const escort = sim.escort, rescue = mission as EscortMission;
+  const priority = mission instanceof PriorityMission ? mission : undefined;
   if (escort) {
     const guide = escort.leader;
     setText("escort-state", escort.human.dead ? "Lost" : escort.state === "captive" ? "Inside office"
@@ -86,7 +92,16 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", escort ? mission.phase === "breach" ? "Shoot the entrance lock"
+  setText("mission-detail", priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines · ${priority.removal === "secured" ? "Equipment secured" : priority.removal === "loading" ? "Removal loading" : "Removal at the east gate"}`
+    : mission.phase === "seizure" ? "Bring a robot beside the recovery van"
+    : mission.phase === "dispatch" ? "Bring a robot to the service door"
+    : mission.phase === "restore" ? priority.restoredAt !== undefined ? `${priority.response.length} response machines remaining`
+      : priority.contested ? "Restart paused · Clear the service-door approach"
+      : priority.repairing.length ? `${priority.repairing.length} technicians working · ${priority.response.length} response machines`
+      : "Service crew arriving · Cover the street and concourse"
+    : mission.phase === "return" ? `${near} / ${living.length} robots at the van`
+    : mission.phase === "complete" ? "Exchange restored · Squad recovered" : mission.failureReason ?? "Recovery required"
+    : escort ? mission.phase === "breach" ? "Shoot the entrance lock"
     : mission.phase === "rescue" ? rescue.guards.length ? `${rescue.guards.length} guards remaining` : "Bring a robot to Quill"
     : mission.phase === "escort" ? `${near} / ${living.length} robots at the van · ${rescue.reinforcements.length} response machines`
     : mission.phase === "complete" ? "Quill recovered · Squad recovered" : mission.failureReason ?? "Recovery required"
@@ -103,6 +118,11 @@ export function updateMissionUI(sim: Simulation) {
   const progress = document.getElementById("mission-progress") as HTMLProgressElement;
   progress.hidden = !marker || !!escort && mission.phase === "rescue" || !!sim.hauling && mission.phase === "delivery" && !mission.releaseProgress;
   progress.value = mission.phase === "breach" ? 1 - rescue.doorHp / rescue.doorMaxHp : (mission.phase === "dispatch" || mission.phase === "delivery") ? mission.releaseProgress : mission.returnProgress;
+  if (priority) {
+    progress.hidden = mission.phase === "yard" || mission.finished;
+    progress.value = mission.phase === "seizure" ? priority.stopProgress : mission.phase === "dispatch" ? priority.accessProgress
+      : mission.phase === "restore" ? priority.repairProgress : mission.returnProgress;
+  }
   if (escort && mission.phase === "breach") progress.hidden = false;
 
   if (mission.finished) {
@@ -110,7 +130,11 @@ export function updateMissionUI(sim: Simulation) {
     setText("mission-result-state", complete ? "CONTRACT COMPLETE" : "RECOVERY REQUIRED");
     const civilians = [...sim.city!.carts, ...sim.city!.kites, ...sim.city!.porters, ...sim.city!.vehicles];
     const damaged = civilians.filter(c => c.hp <= 0).length;
-    const message = escort ? !complete
+    const message = priority ? !complete
+      ? `${mission.failureReason ?? "Recovery required"}. Vale is getting the owners and a recovery crew clear of the district.`
+      : damaged ? "Dispatch is running again. We also owe the neighbourhood repairs. Meridian has offered priority access, with control of dispatch attached. Quill will handle their terms."
+      : "The owners have their exchange and their equipment. Meridian has already offered priority access in return for control of dispatch. Quill is answering them. Send our invoice to the cooperative."
+      : escort ? !complete
       ? escort.human.dead ? "Ren didn't make it. We can recover machines. We cannot replace him."
         : "Ren is still at the office. We're arranging another way in before Gannet moves him."
       : escort.human.hp < escort.human.maxHp ? "Ren is aboard. We've arranged treatment. The files can wait until he's ready."

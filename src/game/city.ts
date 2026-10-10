@@ -10,6 +10,7 @@ export const BUILDING_KIT = {
   depot: { w: 22, d: 18, h: 7.2, floors: 1 },
   civic: { w: 22, d: 14, h: 9.6, floors: 2 },
   pump: { w: 12, d: 12, h: 5.2, floors: 1 },
+  exchange: { w: 34, d: 20, h: 7.2, floors: 0 },
 } as const;
 export type BuildingSpec = {
   id: string;

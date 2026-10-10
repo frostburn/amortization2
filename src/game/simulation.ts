@@ -38,6 +38,7 @@ import { ReceivingMission, type Mission, type Contact } from "./missions";
 import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
+import { PriorityMission } from "./priority-mission";
 import type { HumanEscort } from "./human-escort";
 import type { SquadHauling } from "./hauling";
 import type { ReplayAction } from "./replay";
@@ -57,6 +58,7 @@ export interface Actor {
   /** Cargo work assignment, including the walk to the grip. */
   haul?: number;
   escort?: number;
+  human?: { name: string; coat: number; trim: number; hair: number; glasses?: boolean };
   deathTime?: number;
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
@@ -94,7 +96,7 @@ export interface Prop {
   w: number;
   h: number;
   d: number;
-  style?: "tote" | "parcel" | "chest";
+  style?: "tote" | "parcel" | "chest" | "equipment";
   previous: Vec3;
   previousRotation: { x: number; y: number; z: number; w: number };
 }
@@ -186,6 +188,8 @@ export class Simulation {
     this.fourthModel = fourthModel;
     this.reset();
   }
+  get pistolsOnly() { return !!this.layout.pistolsOnly; }
+
   get layout() {
     return RANGES[this.range];
   }
@@ -214,7 +218,7 @@ export class Simulation {
     this.selected = new Set((range === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
     this.trigger = false;
     this.sniping = false;
-    this.weapon = this.layout.contract ? "pistol" : range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
+    this.weapon = this.pistolsOnly ? "pistol" : range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
     this.aim =
       range === "long" ? { x: 58, y: 3.25, z: 0 }
         : range === "arena" ? { x: 0, y: 1.25, z: -14 }
@@ -288,6 +292,7 @@ export class Simulation {
       );
       this.props.push({
         id: this.nextId++,
+        style: p.style,
         body,
         w: p.w,
         h: p.h,
@@ -297,7 +302,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : undefined;
+    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : undefined;
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
@@ -316,7 +321,7 @@ export class Simulation {
     const player = kind === "player";
     const robot = player || kind === "enemy";
     const model: RobotModel | null = robot
-      ? enemyModel ?? (this.layout.contract ? "assault" : id === 4 || (id === 2 && this.fourthModel === "minigunner")
+      ? enemyModel ?? (this.pistolsOnly ? "assault" : id === 4 || (id === 2 && this.fourthModel === "minigunner")
         ? this.fourthModel
         : "assault")
       : null;
@@ -363,9 +368,9 @@ export class Simulation {
       id,
       kind,
       model,
-      weapon: this.layout.contract ? "pistol" : model ? ROBOT_MODELS[model].weapon : "gun",
-      weapons: this.layout.contract ? ["pistol"] : model ? ROBOT_MODELS[model].weapons : [],
-      pistol: { ammo: this.layout.contract || model === "sniper" ? PISTOL.magazine : 0, reload: 0, shotWait: 0 },
+      weapon: this.pistolsOnly ? "pistol" : model ? ROBOT_MODELS[model].weapon : "gun",
+      weapons: this.pistolsOnly ? ["pistol"] : model ? ROBOT_MODELS[model].weapons : [],
+      pistol: { ammo: this.pistolsOnly || model === "sniper" ? PISTOL.magazine : 0, reload: 0, shotWait: 0 },
       body,
       collider,
       spawn: { x, y: elevation + 0.98, z },
@@ -373,7 +378,7 @@ export class Simulation {
       maxHp: hp,
       stability: 1,
       yaw,
-      ammo: this.layout.contract ? 0 : FIREARMS[model ? ROBOT_MODELS[model].weapon : "gun"].magazine,
+      ammo: this.pistolsOnly ? 0 : FIREARMS[model ? ROBOT_MODELS[model].weapon : "gun"].magazine,
       reload: 0,
       grenadeCooldown: 0,
       shotWait: 0,
@@ -398,15 +403,16 @@ export class Simulation {
   }
 
   addEnemy(model: RobotModel, position: Vec2) {
-    return this.addActor(this.nextId++, "enemy", position.x, position.z, 0, model);
+    return this.addActor(this.nextId++, "enemy", position.x, position.z, position.y ?? 0, model);
   }
-  addHuman(position: Vec2) {
+  addHuman(position: Vec2, appearance?: Actor["human"]) {
     const a = this.addActor(this.nextId++, "human", position.x, position.z);
     this.world.removeCollider(a.collider, true);
     a.collider = this.world.createCollider(RAPIER.ColliderDesc.capsule(HUMAN.height / 2 - HUMAN.radius, HUMAN.radius)
       .setMass(HUMAN.mass).setFriction(.3).setRestitution(0), a.body);
     a.body.setTranslation({ ...position, y: HUMAN.height / 2 }, true);
     a.spawn = a.previous = { ...a.body.translation() };
+    a.human = appearance;
     a.hp = a.maxHp = HUMAN.hp;
     a.weapons = []; a.ammo = a.pistol.ammo = 0;
     return a;
@@ -464,7 +470,7 @@ export class Simulation {
       : this.supports(a, weapon);
   }
   get closeWeapon(): Firearm {
-    if (this.mission) return "pistol";
+    if (this.pistolsOnly) return "pistol";
     return this.weapon === "pistol" && this.canUse("pistol") ? "pistol" : this.closeWeapons[0] ?? "gun";
   }
   get closeWeapons(): Firearm[] {
@@ -503,7 +509,7 @@ export class Simulation {
       !this.canUse(this.weapon) &&
       this.active.length
     )
-      this.chooseWeapon(this.mission ? "pistol" : ROBOT_MODELS[this.primary.model!].weapon);
+      this.chooseWeapon(this.pistolsOnly ? "pistol" : ROBOT_MODELS[this.primary.model!].weapon);
   }
   get grenadeThrower(): Actor | undefined {
     const ready = this.active.filter((a) => this.supports(a, "grenade") && a.grenadeCooldown === 0 && !this.isDisrupted(a));
@@ -1458,7 +1464,7 @@ export class Simulation {
     if (a.path.length && !a.braced && !this.isDisrupted(a)) {
       const target = a.path[0],
         distance = distance2(p, target) || 1;
-      const speed = Math.min(this.escort?.movementSpeed(a) ?? this.hauling?.escortSpeed(a, target) ?? (a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2), distance * 5);
+      const speed = Math.min(this.escort?.movementSpeed(a) ?? this.hauling?.escortSpeed(a, target) ?? (a.kind === "human" ? HUMAN.walkSpeed : a.model === "minigunner" ? a.firing || a.spooling ? 1.9 : 3.2 : a.firing ? 2.6 : 4.2), distance * 5);
       const forwardX = (target.x - p.x) / distance,
         forwardZ = (target.z - p.z) / distance;
       dx = forwardX * speed;

@@ -149,14 +149,15 @@ function firingPosition(sim: Simulation, a: Actor, target: Actor, profile: Enemy
   const b = sim.layout.bounds;
   const solids = [...sim.layout.barriers, ...sim.layout.platforms,
     ...sim.props.map((prop) => ({ x: prop.body.translation().x, z: prop.body.translation().z, w: prop.w, d: prop.d }))];
-  let best = profile.leash === undefined ? { x: q.x, z: q.z } : { ...a.ai!.rally }, bestScore = Infinity;
+  let best: Vec2 = profile.leash === undefined ? sim.walkingPoint(target) : { ...a.ai!.rally }, bestScore = Infinity;
   for (const offset of [0, 0.65, -0.65, 1.2, -1.2, 1.8, -1.8]) {
     const angle = bearing + a.ai!.flank + offset;
-    const goal = { x: clamp(q.x + Math.sin(angle) * radius, b.left + 1, b.right - 1),
+    const raw = { x: clamp(q.x + Math.sin(angle) * radius, b.left + 1, b.right - 1),
       z: clamp(q.z + Math.cos(angle) * radius, b.back + 1, b.front - 1) };
+    const goal: Vec2 = sim.terrain ? sim.terrain.resolve({ ...raw, y: sim.walkingPoint(a).y }) : raw;
     if (profile.leash !== undefined && distance2(goal, a.ai!.rally) > profile.leash) continue;
-    if (!segmentClear(goal, goal, solids, 0.6)) continue;
-    const hit = sim.fireRay(a, { ...goal, y: 1.4 }, { ...q, y: q.y + 0.25 });
+    if (sim.terrain ? !sim.terrain.canStand({ ...goal, y: goal.y ?? 0 }) : !segmentClear(goal, goal, solids, 0.6)) continue;
+    const hit = sim.fireRay(a, { ...goal, y: (goal.y ?? 0) + 1.4 }, { ...q, y: q.y + 0.25 });
     const visible = hit?.collider.handle === target.collider.handle;
     const score = distance2(p, goal) + Math.abs(offset) * 2 + (visible ? 0 : 18);
     if (score < bestScore) { bestScore = score; best = goal; }
