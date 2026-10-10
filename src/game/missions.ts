@@ -5,7 +5,7 @@ import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
 export type Contact = "morrow" | "vale" | "rook" | "sable" | "quill";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "restore" | "complete" | "failed";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "restore" | "intercept" | "secure" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];
@@ -93,7 +93,7 @@ export abstract class Mission {
   }
 }
 
-export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority" } as const;
+export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery" } as const;
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
 export class ReceivingMission extends Mission {

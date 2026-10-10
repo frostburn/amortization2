@@ -29,7 +29,7 @@ const rifleIcon =
 const minigunIcon =
   '<svg viewBox="0 0 100 36" aria-hidden="true"><path d="M9 11h35v17H9zM23 3h16v8H23zM43 9h10v22H43zM53 11h44v4H53zm0 7h44v4H53zm0 7h44v4H53zM67 8h5v25h-5zM85 8h5v25h-5z" fill="currentColor"/></svg>';
 const rangeOptions =
-  '<optgroup label="MISSIONS"><option value="receiving">01 · RECEIVING</option><option value="crossing">02 · CROSSING</option><option value="handling">03 · HANDLING</option><option value="escort">04 · RELEASE</option><option value="priority">05 · PRIORITY ACCESS</option></optgroup><optgroup label="PRACTICE / DEBUG"><option value="proving">PROVING GROUND</option><option value="long">LONG RANGE</option><option value="arena">ENDLESS ARENA</option><option value="city">CITY DISTRICT</option><option value="concourse">RAISED CONCOURSE</option><option value="port">MARINE PORT</option></optgroup>';
+  '<optgroup label="MISSIONS"><option value="receiving">01 · RECEIVING</option><option value="crossing">02 · CROSSING</option><option value="handling">03 · HANDLING</option><option value="escort">04 · RELEASE</option><option value="priority">05 · PRIORITY ACCESS</option><option value="recovery">06 · RECOVERY FEE</option></optgroup><optgroup label="PRACTICE / DEBUG"><option value="proving">PROVING GROUND</option><option value="long">LONG RANGE</option><option value="arena">ENDLESS ARENA</option><option value="city">CITY DISTRICT</option><option value="concourse">RAISED CONCOURSE</option><option value="port">MARINE PORT</option></optgroup>';
 const loadoutOptions =
   '<option value="sniper">NEEDLE · SNIPER</option><option value="minigunner">TWIN MINIGUNS</option><option value="assault">BOLT · MACHINE GUNNER</option>';
 

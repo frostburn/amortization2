@@ -39,6 +39,7 @@ import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
 import { PriorityMission } from "./priority-mission";
+import { RecoveryMission } from "./recovery-mission";
 import type { HumanEscort } from "./human-escort";
 import type { SquadHauling } from "./hauling";
 import type { ReplayAction } from "./replay";
@@ -302,7 +303,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : undefined;
+    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
@@ -630,7 +631,7 @@ export class Simulation {
   }
   private dynamicNavigationBoxes(includeTargets = true, actor?: Actor) {
     return [
-      ...(this.city?.vehicles ?? []).filter(c => !c.hp || c.state === "stranded").map(vehicleFootprint),
+      ...(this.city?.vehicles ?? []).filter(c => !c.hp || c.driveHp === 0 || c.state === "stranded").map(vehicleFootprint),
       ...(this.mission?.obstacles ?? []),
       ...this.props.filter(p => !actor || p.id !== actor.haul || this.hauling?.loadFor(actor)?.state === "approaching").map((p) => ({
         x: p.body.translation().x,
@@ -1002,8 +1003,9 @@ export class Simulation {
     } else if (!glass && !fixture && hit && this.city?.neutral(hit.collider.handle)) {
       const cart = this.city.neutral(hit.collider.handle)!;
       const strength = KINETIC.impulse[weapon] * (rifle ? 1.5 : 1);
-      this.city.damage(cart, spec.damage, { x: dir.x * strength,
-        y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to, this.team(a));
+      if (!("path" in cart && cart.team === "enemy" && this.team(a) === "enemy" && !FRIENDLY_FIRE[weapon]))
+        this.city.damage(cart, spec.damage, { x: dir.x * strength,
+        y: (cart.model === "KITE" ? dir.y : Math.max(0, dir.y) + (rifle ? 0.6 : 0.55)) * strength, z: dir.z * strength }, to, this.team(a), from);
     } else if (!glass && !fixture && hit?.collider.parent()?.isDynamic()) {
       // Break the grip before the shot impulse can transfer into PORTER's hull.
       if (rifle) {

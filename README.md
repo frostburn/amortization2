@@ -43,6 +43,10 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 **05 · Priority Access** unlocks the three squad configurations: NEEDLE with three machinegunners, ROOK and SPINDLE with two machinegunners, or four machinegunners. Choose before deployment. Fight through a 180 × 140 metre exchange district using its street, raised concourse and service underpass. Opponents carry pistols without grenades; the yard patrol stays clear of deployment. Hits alert the active enemy force to the firing position, releasing their post limits so long-range fire draws a response. Defeat all six perimeter guards to open the east gate and admit the technicians’ green service van automatically, then protect their restart against a finite street/concourse response. Hostiles near the service door pause work without undoing it. Deliveries resume when service returns, then every surviving robot must reach the squad van in its off-street bay beside the west ramp. Release's debrief offers the contract; the deployment selector also opens it directly. See [Priority Access](docs/priority-access.md).
 
+## Recovery Fee
+
+**06 · Recovery Fee** reverses the escort role: intercept Gannet's convoy before its cargo truck escapes. Choose any squad, set an ambush along the dogleg road or its raised walkway, then disable the truck's drive with rifle or automatic fire. The security van deploys two machinegunners and three pistol robots; their finite response uses bracing, stagger and ordinary navigation. A stopped truck remains physical cover. Destroying it leaves a poorer salvage result. Defeat security, bring a robot beside the load and recover every survivor to the maintenance-yard van. Priority Access's debrief leads here; the deployment selector also opens it directly. See [Recovery Fee](docs/recovery-fee.md).
+
 ## Proving Ground
 
 - **Ballistics:** clear six orange plate targets with the machine gun or minigun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.

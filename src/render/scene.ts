@@ -464,7 +464,10 @@ export class RangeScene {
         this.concourseView = this.sim.range === "priority"
           ? new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false,
             this.sim.layout.walkSurfaces, this.sim.layout.walkVolumes, PRIORITY_SUPPORTS)
-          : new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false);
+          : this.sim.range === "recovery"
+            ? new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false,
+              this.sim.layout.walkSurfaces, this.sim.layout.walkVolumes, [])
+            : new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.concourseView.root);
       }
       if (this.sim.mission) {
