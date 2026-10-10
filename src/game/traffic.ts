@@ -20,10 +20,11 @@ export type CivilianVehicle = {
   explodedAt?: number;
 };
 
-/** Conservative footprint follows the body's current pose, including a tipped wreck. */
+/** Conservative bounds follow the body's pose and elevation, including a tipped wreck. */
 export function vehicleFootprint(c:CivilianVehicle) {
   const p=c.body.translation(),q=c.body.rotation(),s=VEHICLES[c.model];
-  return {x:p.x,z:p.z,
+  const h=Math.abs(2*(q.x*q.y+q.w*q.z))*s.width+Math.abs(1-2*(q.x*q.x+q.z*q.z))*s.height+Math.abs(2*(q.y*q.z-q.w*q.x))*s.length;
+  return {x:p.x,z:p.z,y:p.y-h/2,h,
     w:Math.abs(1-2*(q.y*q.y+q.z*q.z))*s.width+Math.abs(2*(q.x*q.y-q.w*q.z))*s.height+Math.abs(2*(q.x*q.z+q.w*q.y))*s.length,
     d:Math.abs(2*(q.x*q.z-q.w*q.y))*s.width+Math.abs(2*(q.y*q.z+q.w*q.x))*s.height+Math.abs(1-2*(q.x*q.x+q.y*q.y))*s.length};
 }

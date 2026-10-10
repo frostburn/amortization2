@@ -180,9 +180,11 @@ async function start() {
 
   function configureMenu() {
     document.getElementById("menu-title")!.textContent = sim.mission ? sim.mission.definition.title
+      : sim.range === "concourse" ? "Raised concourse"
       : sim.range === "port" ? "Marine port" : sim.range === "city" ? "City district"
       : sim.arena ? "Endless arena" : sim.range === "long" ? "Long range" : "Proving ground";
     document.getElementById("menu-intro")!.textContent = sim.mission ? sim.mission.definition.summary
+      : sim.range === "concourse" ? "Explore the pedestrian loop above the street. Broad ramps connect the bridge and upper gallery; target stands test firing between elevations. Right-click the paving to move. Shift+R restores the district."
       : sim.range === "port" ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
       : sim.range === "city" ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
       : sim.arena ? "Survive incoming robot squads. Survivors repair and rearm between waves. Shift+R restarts."
@@ -554,7 +556,7 @@ async function start() {
       sim.move(ground);
       scene.markMove();
     }
-    moveDrag.lastGoal = { x: ground.x, z: ground.z };
+    moveDrag.lastGoal = { x: ground.x, y: ground.y, z: ground.z };
     moveDrag.lastTime = sim.time;
   }
   // Mouse events retain per-button transitions when firing and steering together.
@@ -884,6 +886,7 @@ async function start() {
         render: {
           calls: scene.renderer.info.render.calls,
           triangles: scene.renderer.info.render.triangles,
+          surfaces: scene.inspectSurfaces(),
         },
       }),
       project: (p: Vec3) => scene.project(p),

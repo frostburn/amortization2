@@ -30,6 +30,7 @@ import { SecurityResponse, WATCH, type SecurityFlight } from "./security";
 import { vehicleFootprint } from "./traffic";
 import { dryGround } from "./city";
 import { NavigationGrid, segmentClear } from "./navigation";
+import { WalkTerrain, SurfaceNavigation, surfacePrism } from "./walk-surfaces";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat } from "./arena";
 import type { EnemyBrain } from "./enemies";
@@ -158,6 +159,8 @@ export class Simulation {
   hauling?: SquadHauling;
   escort?: HumanEscort;
   city?: CityLife;
+  terrain?: WalkTerrain;
+  readonly surfaceColliders = new Map<number, string>();
   security?: SecurityResponse;
   time = 0;
   shots = 0;
@@ -172,7 +175,7 @@ export class Simulation {
   private rifleAim?: Vec3;
   private randomState = 1729;
   private nextId = 100;
-  private navigation!: NavigationGrid;
+  private navigation!: NavigationGrid | SurfaceNavigation;
 
   static async create(range: RangeId = "proving", fourthModel: RobotModel = "sniper") {
     await RAPIER.init();
@@ -195,13 +198,17 @@ export class Simulation {
     this.hauling = undefined;
     this.escort = undefined;
     this.security = undefined;
-    this.navigation = new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
+    this.terrain = this.layout.walkSurfaces ? new WalkTerrain(this.layout.walkSurfaces,
+      this.layout.walkVolumes ?? [], [...this.layout.barriers, ...this.layout.platforms], this.layout.bounds) : undefined;
+    this.navigation = this.terrain ? new SurfaceNavigation(this.terrain)
+      : new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
     this.world.timestep = STEP;
     this.actors = [];
     this.props = [];
     this.lowCover.clear();
+    this.surfaceColliders.clear();
     this.grenades = [];
     this.events = [];
     this.selected = new Set((range === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
@@ -250,6 +257,14 @@ export class Simulation {
       );
       if ((box.y ?? 0) + box.h < AUTOMATIC_AIM.height)
         this.lowCover.add(collider.handle);
+    }
+    for (const surface of [...this.layout.walkSurfaces ?? [], ...this.layout.walkVolumes ?? []]) {
+      const mesh = surfacePrism(surface), body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+      const collider = this.world.createCollider(RAPIER.ColliderDesc.trimesh(mesh.vertices, mesh.indices).setFriction(0.65), body);
+      if (this.layout.walkSurfaces?.includes(surface)) this.surfaceColliders.set(collider.handle, surface.id);
+      // Parapets are low cover relative to their deck. The assisted line must
+      // still clear their actual geometry; the deck itself never qualifies.
+      else if (surface.thickness < AUTOMATIC_AIM.height) this.lowCover.add(collider.handle);
     }
     this.layout.players.forEach((p, i) =>
       this.addActor(i + 1, "player", p.x, p.z),
@@ -616,6 +631,7 @@ export class Simulation {
         z: p.body.translation().z,
         w: p.w,
         d: p.d,
+        y: p.body.translation().y - p.h / 2, h: p.h,
       })),
       ...(includeTargets
         ? this.actors
@@ -625,6 +641,7 @@ export class Simulation {
               z: a.body.translation().z,
               w: this.range === "long" ? 0.6 : 0.96,
               d: this.range === "long" ? 0.96 : 0.6,
+              y: a.body.translation().y - .96, h: 1.92,
             }))
         : []),
     ];
@@ -667,13 +684,23 @@ export class Simulation {
       x: clamp(point.x, minX, maxX),
       z: clamp(point.z, minZ, maxZ),
     };
+    const requestedHeight = this.terrain?.resolve({ ...requested, y: point.y }).y;
     const boxes = this.navigationBoxes();
-    const free = (p: Vec2) =>
-      boxes.every(
+    const free = (p: Vec2) => {
+      if (this.terrain) {
+        const center = this.terrain.resolve({ ...p, y: requestedHeight });
+        return Math.abs(center.y - requestedHeight!) < .6 && offsets.every(offset => {
+          const slot = this.terrain!.resolve({ x: p.x + offset.x, z: p.z + offset.z, y: center.y });
+          return Math.abs(slot.y - center.y) <= Math.hypot(offset.x, offset.z) * .3 + .05 &&
+            this.terrain!.canStand(slot, .55, this.dynamicNavigationBoxes());
+        });
+      }
+      return boxes.every(
         (b) =>
           Math.abs(p.x - b.x) >= b.w / 2 + extentX + 0.55 ||
           Math.abs(p.z - b.z) >= b.d / 2 + extentZ + 0.55,
       );
+    };
     let center = requested;
     if (!free(center)) {
       // The nearest clear footprint lies on an expanded obstacle edge or corner.
@@ -684,6 +711,13 @@ export class Simulation {
           xs.add(clamp(b.x + sign * (b.w / 2 + extentX + 0.57), minX, maxX));
           zs.add(clamp(b.z + sign * (b.d / 2 + extentZ + 0.57), minZ, maxZ));
         }
+      for (const s of this.layout.walkSurfaces ?? []) {
+        xs.add(s.x); zs.add(s.z);
+        for (const sign of [-1, 1]) {
+          xs.add(clamp(s.x + sign * (s.w / 2 - extentX - .75), minX, maxX));
+          zs.add(clamp(s.z + sign * (s.d / 2 - extentZ - .75), minZ, maxZ));
+        }
+      }
       let best = Infinity;
       for (const x of xs)
         for (const z of zs) {
@@ -698,7 +732,8 @@ export class Simulation {
     }
     return active.map((actor, i) => ({
       actor: actor.id,
-      position: { x: center.x + offsets[i].x, z: center.z + offsets[i].z },
+      position: this.terrain ? this.terrain.resolve({ x: center.x + offsets[i].x,
+        z: center.z + offsets[i].z, y: requestedHeight }) : { x: center.x + offsets[i].x, z: center.z + offsets[i].z },
     }));
   }
 
@@ -721,13 +756,20 @@ export class Simulation {
     }
   }
   navigate(actor: Actor, point: Vec2, queue = false, bridgePass = false) {
-    const start = queue ? this.mission?.bridge?.queuedGoal(actor) ?? actor.path.at(-1) ?? actor.body.translation() : actor.body.translation();
+    const current = this.walkingPoint(actor);
+    const start = queue ? this.mission?.bridge?.queuedGoal(actor) ?? actor.path.at(-1) ?? current : current;
     const path = this.navigation.findPath(start, point, this.dynamicNavigationBoxes(true, actor));
     if (!bridgePass && this.mission?.bridge?.route(actor, path, queue)) return;
     actor.replanAt = this.time;
     actor.moveTarget = path.at(-1);
     actor.path = queue ? [...actor.path, ...path] : path;
   }
+
+  walkingPoint(actor: Actor): Vec3 {
+    const p = actor.body.translation();
+    return { x: p.x, y: p.y - (actor.kind === "human" ? HUMAN.height / 2 : .93), z: p.z };
+  }
+  walkingHeight(point: Vec2) { return this.terrain?.resolve(point).y ?? 0; }
 
   haulCargo(id?: number) { return this.hauling?.command(id) ?? null; }
   escortHuman() { return this.escort?.command() ?? null; }
@@ -1389,8 +1431,10 @@ export class Simulation {
       v = a.body.linvel();
     // Recover the assigned corner if another hull or an impact displaces an arrival.
     const recoveryGoal = this.mission?.bridge?.waitingGoal(a) ?? a.moveTarget;
-    if (!a.path.length && recoveryGoal && distance2(p, recoveryGoal) > 0.15 && this.time >= (a.replanAt ?? 0)) {
-      a.path = this.navigation.findPath(p, recoveryGoal, this.dynamicNavigationBoxes(true, a));
+    const foot = this.walkingPoint(a);
+    if (!a.path.length && recoveryGoal && (distance2(p, recoveryGoal) > 0.15 || this.terrain &&
+        Math.abs(foot.y - (recoveryGoal.y ?? 0)) > .22) && this.time >= (a.replanAt ?? 0)) {
+      a.path = this.navigation.findPath(this.terrain ? foot : p, recoveryGoal, this.dynamicNavigationBoxes(true, a));
       // Failed recovery must not repeat an unreachable search every physics tick.
       a.replanAt = this.time + (a.path.length ? 0 : 0.5);
     }
@@ -1398,11 +1442,14 @@ export class Simulation {
     // waypoint instead of doubling back into a squadmate already at that corner.
     if (a.path.length > 1) {
       const boxes = this.navigationBoxes();
-      while (a.path.length > 1 && segmentClear(p, a.path[1], boxes)) a.path.shift();
+      while (a.path.length > 1 && (this.terrain
+        ? this.terrain.segmentClear(foot, a.path[1], .55, this.dynamicNavigationBoxes(true, a))
+        : segmentClear(p, a.path[1], boxes))) a.path.shift();
     }
     while (
       a.path.length &&
-      distance2(p, a.path[0]) < (a.path.length === 1 ? 0.08 : 0.14)
+      distance2(p, a.path[0]) < (a.path.length === 1 ? 0.08 : 0.14) &&
+      (!this.terrain || Math.abs(foot.y - (a.path[0].y ?? 0)) < .22)
     )
       a.path.shift();
     let dx = 0,
@@ -1423,7 +1470,9 @@ export class Simulation {
       iz = dz + a.knockback.z - v.z,
       length = Math.hypot(ix, iz) || 1;
     const amount = Math.min(length, acceleration * STEP) * a.body.mass();
-    if (p.y < 1.1)
+    const support = this.terrain && this.ray(p, { ...p, y: p.y - 1.13 }, a.body,
+      collider => collider.parent()?.isFixed() ?? false);
+    if (this.terrain ? !!support && support.normal.y > .6 : p.y < 1.1)
       a.body.applyImpulse(
         { x: (ix / length) * amount, y: 0, z: (iz / length) * amount },
         true,
@@ -1445,7 +1494,7 @@ export class Simulation {
           // During collection, wrecks yield through real hull contacts rather
           // than steering away forever from a grip occupied by a fallen hand.
           !(collecting && other.dead) &&
-          (!other.flight || Math.abs(other.body.translation().y - p.y) < 1.3) &&
+          Math.abs(other.body.translation().y - p.y) < 1.3 &&
           distance2(p, other.body.translation()) < 5,
       )
       .map((other) => {
@@ -1481,6 +1530,14 @@ export class Simulation {
               preferred.z * Math.cos(radians)) *
             scale,
         };
+        // Score first: once a safe preferred velocity wins, most alternatives
+        // cannot improve it. Avoid their expensive surface/support queries.
+        const score =
+          (candidate.x - preferred.x) ** 2 +
+          (candidate.z - preferred.z) ** 2 +
+          0.05 * ((candidate.x - velocity.x) ** 2 + (candidate.z - velocity.z) ** 2) +
+          (angle < 0 ? 0.01 : 0);
+        if (score >= bestScore) continue;
         // Predict only as far as this turn; the controller brakes and changes direction there.
         const horizon = Math.min(0.65, remaining / (speed * scale));
         const next = {
@@ -1492,7 +1549,8 @@ export class Simulation {
           (next.x > BOUNDS.right - 0.37 && next.x >= p.x) ||
           (next.z < BOUNDS.back + 0.37 && next.z <= p.z) ||
           (next.z > BOUNDS.front - 0.37 && next.z >= p.z) ||
-          !segmentClear(p, next, boxes, 0.36)
+          !(this.terrain ? this.terrain.segmentClear(this.walkingPoint(a), next, .36,
+            this.dynamicNavigationBoxes(false, a)) : segmentClear(p, next, boxes, 0.36))
         )
           continue;
         if (
@@ -1525,13 +1583,6 @@ export class Simulation {
           })
         )
           continue;
-        const score =
-          (candidate.x - preferred.x) ** 2 +
-          (candidate.z - preferred.z) ** 2 +
-          0.05 *
-            ((candidate.x - velocity.x) ** 2 +
-              (candidate.z - velocity.z) ** 2) +
-          (angle < 0 ? 0.01 : 0);
         if (score < bestScore) {
           bestScore = score;
           best = candidate;
@@ -1541,6 +1592,7 @@ export class Simulation {
   }
 
   private checkDrills() {
+    if (this.range === "concourse") return;
     const plates = this.actors.filter((a) => a.kind === "plate"),
       blast = this.actors.filter((a) => a.kind === "blast"),
       precision = this.actors.filter((a) => a.kind === "precision");

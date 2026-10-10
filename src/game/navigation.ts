@@ -40,7 +40,7 @@ export function segmentClear(
 type Obstacle = Pick<BoxSpec, "x" | "z" | "w" | "d">;
 
 /** Binary heap: choose the next A* cell without scanning the whole frontier. */
-class Frontier {
+export class Frontier {
   private ids: number[] = [];
   private scores: number[] = [];
   get length() { return this.ids.length; }

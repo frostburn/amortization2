@@ -32,6 +32,7 @@ import { PorterFleet, makeTote } from "./porters";
 import { TrafficFleet } from "./traffic";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
+import { ConcourseView } from "./concourse";
 import { TACTICAL_CAMERA_OFFSET, tacticalHalfHeight, tacticalPan } from "./tactical-camera";
 
 const MINT = 0x9be6cd,
@@ -189,6 +190,7 @@ export class RangeScene {
   private sun!: THREE.DirectionalLight;
   private environment = new THREE.Group();
   private cityView?: CityView;
+  private concourseView?: ConcourseView;
   private missionView?: MissionView;
   private coverView?: CoverOrderView;
   private cartFleet?: CartFleet;
@@ -455,6 +457,10 @@ export class RangeScene {
       floorMat.dispose();
       this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
       this.environment.add(this.cityView.root);
+      if (this.sim.range === "concourse") {
+        this.concourseView = new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false);
+        this.environment.add(this.concourseView.root);
+      }
       if (this.sim.mission) {
         this.missionView = new MissionView(this.sim, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.missionView.root);
@@ -798,6 +804,7 @@ export class RangeScene {
       }
     this.environment.clear();
     this.cityView = undefined;
+    this.concourseView = undefined;
     this.missionView = undefined;
     this.environmentLabels.clear();
     this.entryMarkers.clear();
@@ -1096,14 +1103,15 @@ export class RangeScene {
         ? (this.sim.rifleOperator ?? this.sim.primary)
         : this.sim.primary
     ).body.translation();
-    this.cameraTarget.set(p.x, 0, p.z);
+    this.cameraTarget.set(p.x, this.sim.walkingHeight(this.sim.walkingPoint(
+      this.sim.weapon === "rifle" ? this.sim.rifleOperator ?? this.sim.primary : this.sim.primary)), p.z);
     this.updateCamera();
   }
   resetCamera() {
     this.cameraTarget.set(
       this.sim.range === "long" ? 54 : 0,
-      0,
-      this.sim.range === "proving" ? -3 : 0,
+      this.sim.range === "concourse" ? 3 : 0,
+      this.sim.range === "proving" ? -3 : this.sim.range === "concourse" ? -8 : 0,
     );
     this.zoom = 1;
     this.resize();
@@ -1128,6 +1136,7 @@ export class RangeScene {
       return null;
     const origin = this.raycaster.ray.origin,
       dir = this.raycaster.ray.direction;
+    if (this.sim.terrain) ground.copy(this.sim.terrain.pick(origin, dir));
     const cutaway = this.sim.mission?.cutawayColliders;
     const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,
       cutaway?.size ? collider => !cutaway.has(collider.handle) : undefined);
@@ -1136,7 +1145,7 @@ export class RangeScene {
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
     const automatic = this.sim.weapon === "gun" || this.sim.weapon === "minigun";
     const braced = this.sim.active.some(a => a.braced && this.sim.followsOrder(a, this.sim.weapon));
-    let aim: Vec3 = { x: ground.x, y: braced && !grenade ? 0 : automatic ? AUTOMATIC_AIM.height : 1.25, z: ground.z };
+    let aim: Vec3 = { x: ground.x, y: ground.y + (braced && !grenade ? 0 : automatic ? AUTOMATIC_AIM.height : 1.25), z: ground.z };
     if (!grenade && hit && actor) {
       aim = origin.clone().addScaledVector(dir, hit.timeOfImpact);
       // Unbraced automatic bursts clear low cover; bracing gives precise
@@ -1166,7 +1175,7 @@ export class RangeScene {
       this.sim.props.some(p => p.body.handle === hit.collider.parent()?.handle)))) {
       const p = actor?.body.translation();
       const raised = p ? { x: p.x, y: p.y + (actor?.flight ? 0 : AUTOMATIC_AIM.bodyOffset), z: p.z }
-        : { x: aim.x, y: AUTOMATIC_AIM.height, z: aim.z };
+        : { x: aim.x, y: ground.y + AUTOMATIC_AIM.height, z: aim.z };
       if (aim.y < raised.y && this.sim.active.some(a => a.braced &&
         this.sim.followsOrder(a, this.sim.weapon) && this.sim.clearsLowCover(a, aim, raised))) aim = raised;
     }
@@ -1213,6 +1222,7 @@ export class RangeScene {
     return { target: { x: this.cameraTarget.x, y: this.cameraTarget.y, z: this.cameraTarget.z },
       zoom: this.zoom, halfHeight: this.camera.top, right: this.listenerRight };
   }
+  inspectSurfaces() { return this.concourseView?.inspect() ?? []; }
   markMove() {
     this.destinationPreview = null;
     this.destinationAge = 0;
@@ -1246,7 +1256,7 @@ export class RangeScene {
     for (const target of targets) {
       const marker = this.destinationMarkers[target.actor - 1];
       marker.root.visible = true;
-      marker.root.position.set(target.position.x, 0, target.position.z);
+      marker.root.position.set(target.position.x, target.position.y ?? 0, target.position.z);
       for (const mesh of [marker.ring, marker.number]) {
         mesh.material.color.setHex(color);
         mesh.material.opacity = fade * 0.9;
@@ -1274,7 +1284,7 @@ export class RangeScene {
     if (this.destinationOutline.visible) {
       const positions =
         this.destinationOutline.geometry.getAttribute("position");
-      p.forEach((point, i) => positions.setXYZ(i, point.x, 0.055, point.z));
+      p.forEach((point, i) => positions.setXYZ(i, point.x, (point.y ?? 0) + 0.055, point.z));
       this.destinationOutline.geometry.setDrawRange(0, p.length);
       positions.needsUpdate = true;
       this.destinationOutline.material.color.setHex(color);
@@ -1296,9 +1306,10 @@ export class RangeScene {
       const aim = this.sim.aim;
       this.aimRing.position.copy(aim);
       this.aimRing.quaternion.copy(this.camera.quaternion);
-      this.aimGround.position.set(aim.x, 0.07, aim.z);
+      const floor = this.sim.walkingHeight({ x: aim.x, z: aim.z, y: ground.y });
+      this.aimGround.position.set(aim.x, floor + 0.07, aim.z);
       const height = this.aimHeight.geometry.getAttribute("position");
-      height.setXYZ(0, aim.x, 0.07, aim.z);
+      height.setXYZ(0, aim.x, floor + 0.07, aim.z);
       height.setXYZ(1, aim.x, aim.y, aim.z);
       height.needsUpdate = true;
       const guides = this.aimGuides.geometry.getAttribute("position");
@@ -1316,7 +1327,7 @@ export class RangeScene {
       guides.needsUpdate = true;
       return;
     }
-    this.aimRing.position.set(ground.x, 0.07, ground.z);
+    this.aimRing.position.set(ground.x, ground.y + 0.07, ground.z);
     this.aimRing.rotation.set(-Math.PI / 2, 0, 0);
     if (!actor) return;
     const from = this.sim.grenadeOrigin(actor, ground);
@@ -1346,8 +1357,9 @@ export class RangeScene {
     this.arc.geometry = new THREE.BufferGeometry().setFromPoints(points);
     this.arc.computeLineDistances();
     const end = points.at(-1)!;
-    this.blastPreview.position.set(end.x, 0.07, end.z);
-    this.aimRing.position.set(end.x, 0.08, end.z);
+    const floor = this.sim.walkingHeight({ x: end.x, z: end.z, y: end.y });
+    this.blastPreview.position.set(end.x, floor + 0.07, end.z);
+    this.aimRing.position.set(end.x, floor + 0.08, end.z);
   }
 
   inspectAim() {
@@ -1502,6 +1514,7 @@ export class RangeScene {
     this.renderer.info.reset();
     this.updateCamera();
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
+    this.concourseView?.update(this.sim, this.camera, paused ? 0 : delta);
     this.missionView?.update(this.sim, this.reducedMotion);
     this.coverView?.update(this.sim);
     this.cartFleet?.update(alpha, paused ? 0 : delta, this.sim.time);
@@ -1613,7 +1626,7 @@ export class RangeScene {
       v.ring.visible =
         !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)) || (a.kind === "human" &&
           !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2)));
-      v.ring.position.set(v.root.position.x, 0.047, v.root.position.z);
+      v.ring.position.set(v.root.position.x, this.sim.walkingHeight(this.sim.walkingPoint(a)) + 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
         stagger > 0 ? 0xffd28a : a.kind === "enemy" ? a.ai?.state === "aiming" || a.firing ? 0xef9a64 : ORANGE : a.braced || a.haul ? AMBER : MINT,
       );
