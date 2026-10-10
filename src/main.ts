@@ -1,4 +1,5 @@
 import "./style.css";
+import { loading } from "./loading";
 import { mountUI, updateUI } from "./ui";
 import { showComms } from "./mission-ui";
 import {
@@ -20,7 +21,8 @@ import { pointerAction, type PointerAction, type PointerHit } from "./game/inter
 const { canvas, dialog, resultDialog } = mountUI();
 const audio = new RangeAudio();
 
-async function start() {
+export async function start() {
+  await loading.show("Starting the 3D engine…");
   const [{ Simulation }, { RangeScene }] = await Promise.all([
     import("./game/simulation"),
     import("./render/scene"),
@@ -30,10 +32,15 @@ async function start() {
     const saved = JSON.parse(localStorage.getItem("amortization2.settings.v1") ?? "{}");
     if (["sniper", "minigunner", "assault"].includes(saved.fourthModel)) fourthModel = saved.fourthModel;
   } catch { /* Optional local preferences. */ }
-  let sim = await Simulation.create("receiving", fourthModel);
+  await loading.show("Preparing physics and district routes…");
+  const [initialSim, texture] = await Promise.all([
+    Simulation.create("receiving", fourthModel), RangeScene.loadTexture(),
+  ]);
+  let sim = initialSim;
   const recordedSim = sim;
   let viewer: ReplayViewer | undefined;
-  const scene = await RangeScene.create(canvas, sim);
+  await loading.show("Preparing the view…");
+  const scene = await RangeScene.create(canvas, sim, texture);
   let replay: HumanReplayRecorder | undefined;
   if (import.meta.env.DEV) {
     const { HumanReplayRecorder } = await import("./game/replay");
@@ -215,18 +222,26 @@ async function start() {
     document.getElementById("menu-title")!.textContent = title ?? (sim.mission ? "Contract paused" : "Range paused");
     if (!dialog.open) dialog.showModal();
   }
-  async function resume() {
-    if (viewer?.active) return;
-    const button = document.querySelector<HTMLButtonElement>("#resume")!;
-    button.disabled = true;
+  async function prepareAudio() {
+    const indicator = document.getElementById("audio-loading")!;
+    const bar = document.getElementById("audio-loading-progress") as HTMLProgressElement;
     try {
-      await audio.unlock();
+      await audio.unlock((loaded, total) => {
+        indicator.hidden = audio.failed || loaded >= total;
+        bar.max = total; bar.value = loaded;
+        document.getElementById("audio-loading-status")!.textContent = `Preparing sound · ${loaded} / ${total}`;
+      });
+      if (audio.failed) toast("Sound could not load. You can continue playing.", true);
     } catch (error) {
       console.warn("Audio context unavailable", error);
       audio.failed = true;
-    }
-    button.disabled = false;
+      toast("Audio is unavailable in this browser. You can continue playing.", true);
+    } finally { indicator.hidden = true; }
+  }
+  function resume() {
     if (viewer?.active) return;
+    // Start the audio context in the user gesture; decoding runs alongside play.
+    if (!audio.muted) void prepareAudio();
     dialog.close();
     if (sim.mission?.phase === "briefing") replay?.action(sim, { type: "deploy" });
     sim.mission?.deploy();
@@ -302,32 +317,57 @@ async function start() {
     updateUI(sim, audio);
     if (!paused) canvas.focus();
   }
+  let preparingChange = false;
+  async function prepareChange(work: () => void, message: string) {
+    if (preparingChange || viewer?.active) return;
+    preparingChange = true;
+    const app = document.getElementById("app")!;
+    const menuOpen = dialog.open;
+    if (menuOpen) dialog.close();
+    app.inert = true;
+    sim.release(); audio.stop(); keys.clear(); cancelDrags();
+    try {
+      await loading.show(message);
+      work();
+      scene.render(1, 0, sim.time, paused);
+      app.inert = false;
+      loading.hide();
+      if (menuOpen && !dialog.open && !resultDialog.open) dialog.showModal();
+      if (dialog.open) document.getElementById("resume")!.focus();
+      else canvas.focus();
+    } catch (error) {
+      console.error(error);
+      loading.fail();
+    } finally { preparingChange = false; last = performance.now(); accumulator = 0; }
+  }
   for (const id of ["range-select", "menu-range"])
     document
       .getElementById(id)!
       .addEventListener("change", (e) =>
-        switchRange((e.target as HTMLSelectElement).value as RangeId),
+        void prepareChange(() => switchRange((e.target as HTMLSelectElement).value as RangeId), "Preparing the selected district…"),
       );
   for (const id of ["loadout-select", "menu-loadout"])
     document.getElementById(id)!.addEventListener("change", (e) => {
       if (viewer?.active || sim.mission && (!sim.mission.definition.selectableSquad || sim.mission.phase !== "briefing")) return;
       const model = (e.target as HTMLSelectElement).value as RobotModel;
       if (!["sniper", "minigunner", "assault"].includes(model) || model === sim.fourthModel) return;
-      exitSniping();
-      cancelDrags();
-      keys.clear();
-      audio.stop();
-      sim.reset(sim.range, model);
-      scene.resetEnvironment();
-      scene.resetDynamic();
-      scene.resetCamera();
-      pointer.inside = false;
-      accumulator = 0;
-      updateUI(sim, audio);
-      saveSettings();
-      toast(sim.mission ? "Squad prepared for deployment." : "Squad changed. Combat floor restarted.");
-      configureMenu();
-      if (!paused) canvas.focus();
+      void prepareChange(() => {
+        exitSniping();
+        cancelDrags();
+        keys.clear();
+        audio.stop();
+        sim.reset(sim.range, model);
+        scene.resetEnvironment();
+        scene.resetDynamic();
+        scene.resetCamera();
+        pointer.inside = false;
+        accumulator = 0;
+        updateUI(sim, audio);
+        saveSettings();
+        toast(sim.mission ? "Squad prepared for deployment." : "Squad changed. Combat floor restarted.");
+        configureMenu();
+        if (!paused) canvas.focus();
+      }, "Preparing the selected squad…");
     });
   for (const button of document.querySelectorAll<HTMLButtonElement>(
     "[data-sight]",
@@ -368,26 +408,17 @@ async function start() {
   document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
   document.getElementById("mission-next")!.addEventListener("click", () => {
     const next = NEXT_CONTRACT[sim.range as keyof typeof NEXT_CONTRACT];
-    if (next) switchRange(next);
+    if (next) void prepareChange(() => switchRange(next), "Preparing the next contract…");
   });
   document.getElementById("mission-debug")!.addEventListener("click", () => {
-    switchRange("proving");
-    pause("Proving ground");
+    void prepareChange(() => { switchRange("proving"); pause("Proving ground"); }, "Preparing the proving ground…");
   });
   resultDialog.addEventListener("cancel", event => event.preventDefault());
-  document.getElementById("sound")!.addEventListener("click", async () => {
-    try {
-      await audio.unlock();
-      audio.setMuted(!audio.muted);
-      saveSettings();
-    } catch {
-      audio.failed = true;
-      toast(
-        "Audio is unavailable in this browser. The range is still playable.",
-        true,
-      );
-    }
+  document.getElementById("sound")!.addEventListener("click", () => {
+    audio.setMuted(!audio.muted);
+    saveSettings();
     updateUI(sim, audio);
+    if (!audio.muted) void prepareAudio();
   });
   document
     .getElementById("gun")!
@@ -743,6 +774,7 @@ async function start() {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement;
   window.addEventListener("keydown", (e) => {
+    if (preparingChange) return;
     pointerModifiers = { forceFire: e.ctrlKey, selecting: e.shiftKey };
     if (viewer?.active) {
       if (e.code === "Escape") { e.preventDefault(); viewer.close(); }
@@ -915,11 +947,14 @@ async function start() {
   console.info(
     "Welcome to Amortization II. window.amortization2: inspect(), project({x,y,z}), reset(), exportReport().",
   );
-  document.getElementById("loading")!.classList.add("hidden");
   configureMenu();
   updateUI(sim, audio);
+  await loading.show("Preparing lighting and materials…");
+  scene.render(1, 0, sim.time, true);
+  loading.hide();
   dialog.showModal();
   function frame(now: number) {
+    if (preparingChange) { last = now; requestAnimationFrame(frame); return; }
     const delta = Math.min((now - last) / 1000, 0.1);
     last = now;
     if (viewer?.active) {
@@ -1035,9 +1070,3 @@ async function start() {
   }
   requestAnimationFrame(frame);
 }
-
-start().catch((error) => {
-  console.error(error);
-  document.getElementById("loading")!.textContent =
-    "The range could not start. This game needs WebGL 2 and WebAssembly. Reload to retry.";
-});

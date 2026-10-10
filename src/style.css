@@ -369,21 +369,6 @@ dialog.mission-menu { width: 640px; max-width: min(640px, 92vw); }
   opacity: 1;
   transform: translate(-50%, 0);
 }
-#loading {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: #162024;
-  color: var(--mint);
-  font:
-    14px ui-monospace,
-    monospace;
-  letter-spacing: 2px;
-}
-#loading.hidden {
-  display: none;
-}
 .bottom-bar {
   display: flex;
   align-items: center;

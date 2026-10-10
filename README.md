@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL Vite prints, then select **Deploy squad** to start the contract and enable sound, or choose a practice floor. Keyboard and mouse are recommended. The renderer requires WebGL 2 and WebAssembly.
+Open the URL Vite prints, then select **Deploy squad** to start the contract and enable sound, or choose a practice floor. Keyboard and mouse are recommended. The renderer requires WebGL 2 and WebAssembly. A loading screen appears before the engine downloads and reports file loading, physics/routes, view and lighting preparation. District and squad changes use the same screen. Deployment begins without waiting for sound; a sample counter shows background audio loading. Failed startup offers a reload button, and failed sound leaves the game playable.
 
 ```sh
 npm test            # headless tests against the actual physics simulation

@@ -328,11 +328,11 @@ export class RangeScene {
   private shake = 0;
   private resizeObserver: ResizeObserver;
 
-  static async create(canvas: HTMLCanvasElement, sim: Simulation) {
-    const texture = await new THREE.TextureLoader().loadAsync(
-      `${import.meta.env.BASE_URL}textures/concrete.webp`,
-    );
-    return new RangeScene(canvas, sim, texture);
+  static loadTexture() {
+    return new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}textures/concrete.webp`);
+  }
+  static async create(canvas: HTMLCanvasElement, sim: Simulation, texture?: THREE.Texture) {
+    return new RangeScene(canvas, sim, texture ?? await this.loadTexture());
   }
 
   private constructor(

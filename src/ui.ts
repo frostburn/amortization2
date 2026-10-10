@@ -38,7 +38,7 @@ export function mountUI() {
     <header class="topbar">
       <div class="brand"><h1>AMORTIZATION <span>II</span></h1><p>FUTURES CONTRACT</p></div>
       <div class="range-title"><select id="range-select" aria-label="Choose mission or debug floor">${rangeOptions}</select><label class="header-loadout">SQUAD <select id="loadout-select" aria-label="Choose squad configuration; restarts combat floor" title="Changing the squad restarts the combat floor">${loadoutOptions}</select></label></div>
-      <nav aria-label="Game controls"><button id="reset" title="Reset the range (Shift+R)">RESET RANGE</button><button id="sound" aria-pressed="false" title="Toggle sound">SOUND ON</button><button id="help" aria-label="Help and settings">?</button></nav>
+      <nav aria-label="Game controls"><span id="audio-loading" class="audio-loading" role="status" hidden><span id="audio-loading-status">Preparing sound…</span><progress id="audio-loading-progress" aria-label="Loading sound samples"></progress></span><button id="reset" title="Reset the range (Shift+R)">RESET RANGE</button><button id="sound" aria-pressed="false" title="Toggle sound">SOUND ON</button><button id="help" aria-label="Help and settings">?</button></nav>
     </header>
     <main id="field">
       <canvas id="range" tabindex="0" aria-label="3D target practice range. Hold left mouse to fire, shift-drag to select a group, right-drag to steer, Q for automatic weapons or NEEDLE pistol, G for assault grenades, E for sniper rifle. Space toggles braced first-person sniping with the rifle; move the mouse to aim horizontally and vertically. Select robots with 1 to 4, or the squad with 5."></canvas><div id="selection-box" aria-hidden="true" hidden></div><div id="scope-label" aria-label="First-person rifle status" hidden></div>
@@ -57,7 +57,6 @@ export function mountUI() {
       <aside class="stats panel aux-label" aria-label="Shooting statistics"><div><span>HITS</span><strong id="hits">0</strong></div><div><span>SHOTS</span><strong id="shots">0</strong></div><div><span>ACCURACY</span><strong id="accuracy">—</strong></div></aside>
       <div id="toast" role="status" aria-live="polite"></div>
       <div id="mode-hint" class="aux-label">MACHINE GUN · HOLD LMB TO FIRE</div>
-      <div id="loading">Preparing district…</div>
     </main>
     <footer class="bottom-bar">
       <div class="squad" aria-label="Select robots">${SQUAD_NAMES.map((name, i) => `<button class="unit ${i === 0 ? "selected" : ""} ${i === 3 ? "sniper-unit" : ""}" data-unit="${i + 1}" aria-label="Select ${name}, robot ${i + 1}${i === 3 ? ", light sniper, 64 integrity" : ""}" aria-pressed="${i === 0}"><span class="unit-key">${i + 1}</span>${robotIcon}<span class="unit-role aux-label"${i === 3 ? "" : " hidden"}>${i === 3 ? "SNIPER" : ""}</span><span class="unit-name">${name}</span><span class="integrity"><i></i></span></button>`).join("")}<button id="all" title="Select all robots (5)" aria-label="Select whole squad">ALL<span>5</span></button></div>
