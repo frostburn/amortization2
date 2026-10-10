@@ -45,7 +45,7 @@ export class PriorityView {
       const roller = tube(kit, .08, 1.45, loading.x + dx, .6, loading.z - 3.5, dark);
       roller.rotation.x = Math.PI / 2;
     }
-    for (const p of [PRIORITY_SITES.loading, PRIORITY_SITES.exit]) for (const sign of [-1, 1]) {
+    for (const p of [PRIORITY_SITES.exit]) for (const sign of [-1, 1]) {
       block(kit, p.radius * 2, .006, .1, p.x, .047, p.z + sign * p.radius, paint);
       block(kit, .1, .006, p.radius * 2, p.x + sign * p.radius, .047, p.z, paint);
     }

@@ -1,6 +1,10 @@
 # Recorded verification runs
 
-## Priority Access: four machinegunners
+## Priority Access: four machinegunners (archived flow)
+
+The current mission admits the technicians automatically after perimeter clearance.
+This recording predates that change; use its source commit below for matching playback.
+It is retained as an archived verification run, not a current-build verification.
 
 [priority-access-assault.json](priority-access-assault.json) is the unchanged
 current-attempt export from a complete Playwright/Chromium run of Contract 05.
@@ -24,7 +28,7 @@ The JSON records revision `a6fc8e9`.
 
 1. Run `npm ci` if needed, then `npm run dev`.
 2. Open **Controls & settings → View replay** and choose
-   `docs/replays/priority-access-assault.json` from this checkout.
+   `docs/replays/priority-access-assault.json` from a checkout of the capture’s source commit.
 3. Press Play, or seek with the time slider. At the end, the viewer reports
    **combat and robot positions match the capture**.
 

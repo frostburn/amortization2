@@ -92,9 +92,7 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines · ${priority.removal === "secured" ? "Equipment secured" : "Equipment in contractor van"}`
-    : mission.phase === "seizure" ? "Bring a robot beside the yellow contractor van"
-    : mission.phase === "dispatch" ? "Bring a robot to the service door"
+  setText("mission-detail", priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines remaining`
     : mission.phase === "restore" ? priority.restoredAt !== undefined ? `${priority.response.length} response machines remaining`
       : priority.contested ? "Restart paused · Clear the service-door approach"
       : priority.repairing.length ? `${priority.repairing.length} technicians working · ${priority.response.length} response machines`
@@ -120,8 +118,7 @@ export function updateMissionUI(sim: Simulation) {
   progress.value = mission.phase === "breach" ? 1 - rescue.doorHp / rescue.doorMaxHp : (mission.phase === "dispatch" || mission.phase === "delivery") ? mission.releaseProgress : mission.returnProgress;
   if (priority) {
     progress.hidden = mission.phase === "yard" || mission.finished;
-    progress.value = mission.phase === "seizure" ? priority.stopProgress : mission.phase === "dispatch" ? priority.accessProgress
-      : mission.phase === "restore" ? priority.repairProgress : mission.returnProgress;
+    progress.value = mission.phase === "restore" ? priority.repairProgress : mission.returnProgress;
   }
   if (escort && mission.phase === "breach") progress.hidden = false;
 

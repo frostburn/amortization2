@@ -24,8 +24,7 @@ describe("Priority Access", () => {
   };
   const open = async (model: "sniper" | "minigunner" | "assault" = "sniper") => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
-    place(sim.squad[0], { x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 }); ticks(1.1);
-    place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(1.6);
+    sim.step();
     expect(mission().phase).toBe("restore");
   };
 
@@ -72,6 +71,8 @@ describe("Priority Access", () => {
 
   test("all four ramps are connected and a street order stays below the concourse", async () => {
     sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
+    // Isolate floor routing from the response now triggered by perimeter clearance.
+    mission().updateCombat = () => {};
     sim.select(1);
     sim.move({ x: -42, z: -10, y: 4.8 });
     until(() => !sim.primary.path.length && Math.abs(sim.walkingPoint(sim.primary).y - 4.8) < .15, 30);
@@ -82,27 +83,26 @@ describe("Priority Access", () => {
     sim.move({ x: 10, z: -10, y: 0 });
     until(() => !sim.primary.path.length && distance2(sim.primary.body.translation(), { x: 10, z: -10 }) < .2, 35);
     expect(sim.primary.body.translation().y).toBeCloseTo(.93, 1);
-    // A ground robot under the objective's X/Z must never operate an upper pad.
-    place(sim.primary, { ...PRIORITY_SITES.loading, y: 4.8 }); ticks(.4);
-    expect(mission().removal).not.toBe("secured");
   });
 
-  test("equipment stays in the loading bay through a long approach and leaves the service lane usable", async () => {
-    sim = await Simulation.create("priority"); sim.mission!.deploy(); disable(mission().guards);
-    ticks(85);
-    expect(mission().finished).toBe(false); expect(mission().phase).toBe("seizure");
-    expect(mission().removal).toBe("held");
-    expect(distance2(mission().recovery.body.translation(), PRIORITY_SITES.loading)).toBeLessThan(.1);
-    expect(mission().recovery.parked).toBe(true); expect(mission().recovery.arrival).toBeUndefined();
-    expect(mission().gateOpen).toBe(false);
-    place(sim.squad[0], { x: mission().equipmentSite.x, z: mission().equipmentSite.z - 4 }); ticks(1.1);
-    expect(mission().removal).toBe("secured"); expect(mission().phase).toBe("dispatch");
-    place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(1.6);
+  test("clearing the perimeter admits the service van without visiting any objective", async () => {
+    sim = await Simulation.create("priority"); sim.mission!.deploy();
+    expect(mission().service).toBeUndefined();
+    const vehicles = sim.city!.traffic.cars.length;
+    disable(mission().guards.slice(1)); sim.step();
+    expect(mission().phase).toBe("yard"); expect(mission().service).toBeUndefined();
+    expect(mission().gateOpen).toBe(false); expect(mission().responseAt).toBeUndefined();
+    disable(mission().guards); sim.step();
+    expect(mission().phase).toBe("restore"); expect(mission().objective).toBe(1);
+    expect(mission().gateOpen).toBe(true); expect(mission().responseAt).toBe(sim.time);
+    expect(mission().service).toBeDefined(); expect(sim.city!.traffic.cars).toHaveLength(vehicles + 1);
+    expect(sim.squad.every(a => distance2(a.body.translation(), PRIORITY_SITES.exit) < 3)).toBe(true);
     for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {
       disable(mission().response); sim.step();
     }
-    expect(distance2(mission().service.body.translation(), PRIORITY_SITES.serviceStop)).toBeLessThan(2);
-    expect(mission().service.parked).toBe(true);
+    expect(sim.city!.traffic.cars).toHaveLength(vehicles + 1);
+    expect(distance2(mission().service!.body.translation(), PRIORITY_SITES.serviceStop)).toBeLessThan(2);
+    expect(mission().service!.parked).toBe(true);
     expect(mission().inspect().serviceBlockedSeconds).toBe(0);
     expect(mission().repairing).toHaveLength(2);
     expect(mission().phase, JSON.stringify(mission().inspect())).toBe("return");
@@ -114,17 +114,9 @@ describe("Priority Access", () => {
     for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {
       disable(mission().response); sim.step();
     }
-    expect(mission().service.body.translation().x).toBeGreaterThan(PRIORITY_SITES.serviceStop.x + 8);
+    expect(mission().service!.body.translation().x).toBeGreaterThan(PRIORITY_SITES.serviceStop.x + 8);
     expect(mission().repairing).toHaveLength(2);
     expect(mission().phase, JSON.stringify(mission().inspect())).toBe("return");
-  });
-
-  test("a loading-bay visit does not open access through a live perimeter", async () => {
-    sim = await Simulation.create("priority"); sim.mission!.deploy();
-    place(sim.squad[0], { x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 }); ticks(1.1);
-    expect(mission().removal).toBe("secured"); expect(mission().phase).toBe("yard");
-    place(sim.squad[0], PRIORITY_SITES.dispatch); ticks(2);
-    expect(mission().gateOpen).toBe(false); expect(mission().responseAt).toBeUndefined();
   });
 
   test("street and concourse reinforcements arrive once, physically below their access ramp", async () => {
@@ -174,9 +166,7 @@ describe("Priority Access", () => {
   // route deadlines and all outcome assertions remain bounded below.
   test.each(["sniper", "minigunner", "assault"] as const)("%s contract can restart service with real vehicle/crew navigation, then recover the whole squad", async model => {
     sim = await Simulation.create("priority", model); sim.mission!.deploy(); disable(mission().guards);
-    sim.select(1); sim.move({ x: PRIORITY_SITES.loading.x, z: PRIORITY_SITES.loading.z - 4 });
-    until(() => mission().removal === "secured", 45);
-    sim.move(PRIORITY_SITES.dispatch); until(() => mission().phase === "restore", 25);
+    sim.step(); expect(mission().phase).toBe("restore");
     // Resolve the finite combat encounters to isolate access, crew routing and
     // completion. Combat itself is exercised separately with actual bullets.
     for (let i = 0; i < 90 / STEP && mission().phase !== "return"; i++) {

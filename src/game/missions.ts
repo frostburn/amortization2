@@ -5,7 +5,7 @@ import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
 export type Contact = "morrow" | "vale" | "rook" | "sable" | "quill";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "seizure" | "restore" | "complete" | "failed";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "restore" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];

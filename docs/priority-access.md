@@ -9,7 +9,7 @@ remain available independently.
 
 Gannet's recovery contractor has occupied a neighbourhood exchange and seized
 the independent owners' dispatch equipment. Quill's recovered records
-establish ownership. Morrow accepts the owners' request to stop removal, admit
+establish ownership. Morrow accepts the owners' request to clear the occupying machines, admit
 their service crew and hold access until dispatch works again. Rook prepares
 the chosen configuration; Vale supplies observations from local contacts.
 Sable confirms the restored connection. Meridian's subsequent offer attaches
@@ -42,22 +42,15 @@ ramp's filled base to begin climbing.
    deployment lies beyond its notice and firing range. There is time to orient
    and move out before engaging. The guards fire single shots at a 2.2-second
    cadence, with ordinary recoil, stagger, ammunition and physical navigation.
-2. **Secure the equipment.** Hold a ground-level robot beside the yellow
-   contractor van for a second to reclaim its load. This can happen during the
-   perimeter fight. The van stays in the loading bay beside the exchange, clear
-   of the frontage firing line and the technicians' arrival lane. There is no
-   removal timer or gate drive. A wrecked van
-   still leaves the equipment recoverable at its position, with ordinary
-   collateral/security consequences.
-3. **Open access.** Once the perimeter and equipment are secure, occupy the pad
-   beside the exchange service door. Its 1.5-second release opens the east gate
-   physically, admits the service van and starts the response.
-4. **Protect the restart.** Four street attackers enter after seven seconds.
+   Defeating the last guard opens the east gate, spawns the green service van
+   at the eastern approach and starts its drive into the yard. No equipment
+   visit or access-pad interaction is required; the yellow contractor van is removed.
+2. **Protect the restart.** Four street attackers enter after seven seconds.
    Two concourse attackers enter at ground level after sixteen seconds and climb
    the eastern north ramp. Both arrivals have sourced radio reports and an audible
    arrival cue. Both groups carry pistols, fire at a 2.4-second cadence and have
    no grenades. This is one finite response, with no repeated waves or refits.
-5. **Recover the squad.** After restoration and defeat of the response, every
+3. **Recover the squad.** After restoration and defeat of the response, every
    surviving chassis must reach the pickup bay beside the west ramp. The squad
    deploys here too; van, formation and extraction area all clear the street.
 
@@ -89,9 +82,9 @@ to friendly robots and people. Technicians and civilian vehicles can be harmed.
 
 ## Inspection
 
-`window.amortization2.inspect().mission` includes equipment-seizure state, vehicle
-IDs, gate state, repair progress, contest status, response groups and technician
-positions. Human replay capture and playback record the chosen configuration
+`window.amortization2.inspect().mission` includes the service vehicle ID (absent
+before perimeter clearance), gate state, repair progress, contest status, response
+groups and technician positions. Human replay capture and playback record the chosen configuration
 and the resolved movement/weapon inputs through the existing format.
 
 Focused tests cover configuration restrictions, supported routes and thin railing
@@ -101,5 +94,5 @@ technician navigation, survivor recovery for all three squads and replay
 reconstruction. Native browser checks exercise selection, movement, weapon fire,
 scoping, restart and rendered UI at desktop and laptop sizes.
 
-The [recorded assault-squad verification run](replays/README.md) includes a
-viewable JSON export, capture provenance and playback instructions.
+The [archived assault-squad verification run](replays/README.md) covers the earlier
+equipment-visit flow; its source revision and playback instructions are documented.
