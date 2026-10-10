@@ -240,7 +240,15 @@ export class RecoveryMission extends Mission {
     if (this.phase === "return") {
       const p = this.case.prop.body.translation();
       if (!this.case.delivered && this.case.carriedOnce && p.y > .2 && p.y < 1.3 && distance2(p, RECOVERY_SITES.exit) < RECOVERY_SITES.exit.radius) {
+        const destination = this.case.goal;
+        const arriving = living.filter(a => a.haul === this.case.prop.id || a.escort === this.case.prop.id && !a.cover);
         this.sim.hauling!.drop(this.case); this.case.delivered = true; this.deliveredAt = this.sim.time;
+        // Unloading must not cancel a carrier's final steps into the bay, or
+        // leave its wide escort slots outside the extraction circle. Preserve
+        // an existing return order; held rear guards still need a move order.
+        if (destination && distance2(destination, RECOVERY_SITES.exit) < RECOVERY_SITES.exit.radius)
+          for (const order of this.sim.moveDestinations(RECOVERY_SITES.exit, arriving))
+            this.sim.navigate(arriving.find(a => a.id === order.actor)!, order.position);
         this.sim.events.push({ type: "cargo", phase: "accept", position: { ...p }, heavy: false });
         this.sim.events.push({ type: "comms", speaker: "rook", message: "Case aboard. Bring every surviving chassis into the bay; we can leave the patrol behind." });
       }

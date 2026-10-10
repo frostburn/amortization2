@@ -222,6 +222,17 @@ describe("Recovery Fee", () => {
     expect(distance2(a.body.translation(), { x: -48, z: 20 })).toBeLessThan(.5);
   });
 
+  test("one loaded return order unloads the case and brings carrier and escorts inside the bay", async () => {
+    sim = await Simulation.create("recovery", "assault"); sim.mission!.deploy();
+    hit(RECOVERY_DRIVE_HP); sim.step(); killGuards(); place(sim.squad[0], { x: -76, z: -19 }); sim.step();
+    const m = mission(); collectCase();
+    m.pursuitDue = Infinity; // Isolate physical hauling/navigation from combat here.
+    sim.select(5); sim.move(RECOVERY_SITES.exit);
+    for (let i = 0; i < 70 / STEP && !m.finished; i++) sim.step();
+    expect(m.case.delivered).toBe(true); expect(m.phase).toBe("complete");
+    expect(sim.squad.every(a => distance2(a.body.translation(), RECOVERY_SITES.exit) < RECOVERY_SITES.exit.radius)).toBe(true);
+  });
+
   test("normal fire and convoy response replay even when the renderer drains events", async () => {
     sim = await Simulation.create("recovery", "sniper");
     const r = new HumanReplayRecorder("recovery-test"); r.begin(sim);

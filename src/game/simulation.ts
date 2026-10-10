@@ -654,8 +654,7 @@ export class Simulation {
     ];
   }
 
-  moveDestinations(point: Vec2): MoveDestination[] {
-    const active = this.active;
+  moveDestinations(point: Vec2, active = this.active): MoveDestination[] {
     if (!active.length) return [];
     const hauling = this.hauling?.destinations(point);
     if (hauling) return hauling;
