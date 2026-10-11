@@ -1,5 +1,50 @@
 # Recorded verification runs
 
+## Endless Arena: Receiving with twin miniguns
+
+[arena-receiving-minigunners.json](arena-receiving-minigunners.json) is the unchanged
+current-attempt export from native keyboard/mouse play. Gameplay source:
+[`fda4562f3056b1b9093c1a1c6f62b641aaec5cae`](https://github.com/frostburn/amortization2/commit/fda4562f3056b1b9093c1a1c6f62b641aaec5cae).
+The capture explicitly records `mode: "arena"` and `range: "receiving"`.
+
+| Result | Recorded value |
+| --- | --- |
+| Duration | 17.08 seconds / 1,025 ticks |
+| Wave result | Waves 1 and 2 cleared; wave 3 warning |
+| Hostiles disabled | 7 |
+| Squad | 4 alive, fully repaired and rearmed |
+| Player combat | 238 shots, 189 hits, no grenades |
+| Enemy shots | 19 |
+| Capture | One attempt, 53 inputs, 38 snapshots, four camera observations |
+
+The squad moves off its deployment bay into the open yard, then braces and
+fires at incoming squads. Wave one enters from the north; wave two uses the east
+approach. The next warning names south and west. All deaths, damage, recoil,
+movement and survivor repairs come from the ordinary fixed-step simulation.
+There are no contract guards, cargo objectives or tutorial weapon restrictions.
+
+QA used installed Playwright with Chromium because the Browser plugin was not
+available. Its virtual clock advances normal fixed ticks; only rendered frames
+are skipped for speed. `inspect()` and `project()` supply read-only coordinates.
+Gameplay state, health, ammunition, kills and wave completion were not injected.
+Browser import, seeking to the end, rewinding and returning to the original live
+arena pass; the viewer reports matching combat and robot positions. The offline
+inspector also reproduces the capture within two centimetres.
+
+Run `npm run dev`, open **Controls & settings → View replay**, and select the
+JSON. For textual inspection:
+
+```sh
+npm run inspect:replay -- docs/replays/arena-receiving-minigunners.json
+```
+
+This verifies two early waves on Receiving with twin miniguns. Simulation tests
+cover all twelve maps' entrances, other loadouts, later waves, casualties,
+grenades, defeat/restart, physical interiors and replay compatibility. The menu
+was also checked on all maps at 1440 × 900 and 1280 × 720. This is functional
+Chromium verification rather than a hardware-performance or difficulty study.
+
+
 ## Recovery Fee: hauling and pursuit
 
 [recovery-fee-pursuit-assault.json](recovery-fee-pursuit-assault.json) is the
