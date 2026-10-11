@@ -352,9 +352,11 @@ export async function start() {
   for (const id of ["range-select", "menu-range"])
     document
       .getElementById(id)!
-      .addEventListener("change", (e) =>
-        void prepareChange(() => switchRange((e.target as HTMLSelectElement).value as RangeId), "Preparing the selected district…"),
-      );
+      .addEventListener("change", (e) => {
+        // The render loop synchronizes both selectors while loading is shown.
+        const range = (e.target as HTMLSelectElement).value as RangeId;
+        void prepareChange(() => switchRange(range), "Preparing the selected district…");
+      });
   for (const id of ["loadout-select", "menu-loadout"])
     document.getElementById(id)!.addEventListener("change", (e) => {
       if (viewer?.active || sim.mission && (!sim.mission.definition.selectableSquad || sim.mission.phase !== "briefing")) return;
@@ -420,7 +422,7 @@ export async function start() {
     if (next) void prepareChange(() => switchRange(next, "mission"), "Preparing the next contract…");
   });
   document.getElementById("mission-debug")!.addEventListener("click", () => {
-    void prepareChange(() => { switchRange("proving"); pause("Proving ground"); }, "Preparing the proving ground…");
+    void prepareChange(() => { switchRange("proving", "practice"); pause("Proving ground"); }, "Preparing the proving ground…");
   });
   resultDialog.addEventListener("cancel", event => event.preventDefault());
   document.getElementById("sound")!.addEventListener("click", () => {
