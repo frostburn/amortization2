@@ -41,6 +41,7 @@ import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
 import { PriorityMission } from "./priority-mission";
+import { ForestMission } from "./forest-mission";
 import { RecoveryMission } from "./recovery-mission";
 import type { HumanEscort } from "./human-escort";
 import type { SquadHauling } from "./hauling";
@@ -215,8 +216,8 @@ export class Simulation {
     this.hauling = undefined;
     this.escort = undefined;
     this.security = undefined;
-    this.terrain = this.layout.walkSurfaces ? new WalkTerrain(this.layout.walkSurfaces,
-      this.layout.walkVolumes ?? [], [...this.layout.barriers, ...this.layout.platforms], this.layout.bounds) : undefined;
+    this.terrain = this.layout.walkSurfaces || this.layout.ground ? new WalkTerrain(this.layout.walkSurfaces ?? [],
+      this.layout.walkVolumes ?? [], [...this.layout.barriers, ...this.layout.platforms], this.layout.bounds, this.layout.ground) : undefined;
     this.navigation = this.terrain ? new SurfaceNavigation(this.terrain)
       : new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
@@ -251,7 +252,11 @@ export class Simulation {
     this.drill = { gun: false, impulse: false, grenade: false, rifle: false };
     const bounds = this.layout.bounds;
     const extent = { left: bounds.left - 24, right: bounds.right + 24, back: bounds.back - 24, front: bounds.front + 24 };
-    for (const piece of dryGround(extent, this.layout.city?.water ?? [])) {
+    if (this.layout.ground) {
+      const field = this.layout.ground;
+      this.world.createCollider(RAPIER.ColliderDesc.trimesh(field.vertices, field.indices).setFriction(.8), this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
+    }
+    for (const piece of this.layout.ground ? [] : dryGround(extent, this.layout.city?.water ?? [])) {
       const floor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(
         (piece.left + piece.right) / 2, -0.5, (piece.back + piece.front) / 2));
       this.world.createCollider(RAPIER.ColliderDesc.cuboid((piece.right - piece.left) / 2, 0.5,
@@ -267,7 +272,8 @@ export class Simulation {
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, (box.y ?? 0) + box.h / 2, box.z),
       );
       const collider = this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2).setFriction(
+        (box.cylinder ? RAPIER.ColliderDesc.cylinder(box.h / 2, box.w / 2)
+          : RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2)).setFriction(
           0.8,
         ),
         body,
@@ -315,7 +321,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    if (mode === "mission") this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "mission") this.mission = range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
     if (mode === "arena") this.arenaLandmarks = new ArenaLandmarks(this);
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
@@ -327,7 +333,7 @@ export class Simulation {
   canSpawnAt(point: Vec2) {
     const b = this.layout.bounds;
     if (point.x < b.left + .6 || point.x > b.right - .6 || point.z < b.back + .6 || point.z > b.front - .6) return false;
-    return this.terrain ? this.terrain.canStand({ ...point, y: 0 }, .6, this.dynamicNavigationBoxes())
+    return this.terrain ? this.terrain.canStand(this.terrain.resolve({ ...point, y: point.y ?? 0 }), .6, this.dynamicNavigationBoxes())
       : segmentClear(point, point, [...this.layout.barriers, ...this.layout.platforms, ...this.dynamicNavigationBoxes()], .6);
   }
   routeBetween(start: Vec2, goal: Vec2) { return this.navigation.findPath(start, goal, this.dynamicNavigationBoxes()); }
@@ -337,9 +343,10 @@ export class Simulation {
     kind: ActorKind,
     x: number,
     z: number,
-    elevation = 0,
+    elevation?: number,
     enemyModel?: RobotModel,
   ) {
+    elevation ??= this.layout.ground?.heightAt({ x, z }) ?? 0;
     const player = kind === "player";
     const robot = player || kind === "enemy";
     const model: RobotModel | null = robot
@@ -425,7 +432,7 @@ export class Simulation {
   }
 
   addEnemy(model: RobotModel, position: Vec2) {
-    return this.addActor(this.nextId++, "enemy", position.x, position.z, position.y ?? 0, model);
+    return this.addActor(this.nextId++, "enemy", position.x, position.z, position.y, model);
   }
   addHuman(position: Vec2, appearance?: Actor["human"]) {
     const a = this.addActor(this.nextId++, "human", position.x, position.z);
@@ -1321,6 +1328,7 @@ export class Simulation {
     }
     this.city?.blast(origin, source, team);
     this.city?.windows.blast(origin, source);
+    this.mission?.blastFixtures(origin, source);
     this.events.push({ type: "explosion", position: origin, affected, team, ...(vehicle === undefined ? {} : { vehicle }) });
   }
 

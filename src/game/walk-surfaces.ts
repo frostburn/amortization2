@@ -1,4 +1,5 @@
 import { distance2, type BoxSpec, type RangeBounds, type Vec2, type Vec3 } from "./config";
+import type { HeightField } from "./height-field";
 import { Frontier } from "./navigation";
 
 /** Rectangular walking plane. Slopes are rise/metre along the world axes. */
@@ -31,8 +32,14 @@ export function surfacePrism(s: WalkSurface) {
 export class WalkTerrain {
   private hulls: WalkSurface[];
   private surfaceGroups: number[];
+  private obstacleCells = new Map<string, Obstacle[]>();
   constructor(readonly surfaces: WalkSurface[], readonly volumes: WalkSurface[],
-    readonly boxes: Obstacle[], readonly bounds: RangeBounds) {
+    readonly boxes: Obstacle[], readonly bounds: RangeBounds, readonly ground?: HeightField) {
+    for (const b of boxes) for (let x = Math.floor((b.x - b.w / 2 - 1) / 8); x <= Math.floor((b.x + b.w / 2 + 1) / 8); x++)
+      for (let z = Math.floor((b.z - b.d / 2 - 1) / 8); z <= Math.floor((b.z + b.d / 2 + 1) / 8); z++) {
+        const key = `${x},${z}`, cell = this.obstacleCells.get(key) ?? [];
+        cell.push(b); this.obstacleCells.set(key, cell);
+      }
     this.hulls = [...surfaces, ...volumes];
     this.surfaceGroups = surfaces.map((_, i) => i);
     // Raised paths are connected only where their paving actually meets at
@@ -50,7 +57,7 @@ export class WalkTerrain {
     }
   }
   heights(p: Vec2) {
-    const heights = [0];
+    const heights = [this.ground?.heightAt(p) ?? 0];
     for (const s of this.surfaces) if (contains(s, p, 0.001)) {
       const y = surfaceHeight(s, p);
       if (!heights.some(h => Math.abs(y - h) < 0.02)) heights.push(y);
@@ -108,7 +115,7 @@ export class WalkTerrain {
     const b = this.bounds;
     if (p.x < b.left + radius || p.x > b.right - radius ||
         p.z < b.back + radius || p.z > b.front - radius ||
-        this.blocked(p, this.boxes, radius) || this.blocked(p, dynamic, radius)) return false;
+        this.blocked(p, this.ground && radius <= 1 ? this.obstacleCells.get(`${Math.floor(p.x / 8)},${Math.floor(p.z / 8)}`) ?? [] : this.boxes, radius) || this.blocked(p, dynamic, radius)) return false;
     // A thin railing can lie between all five footprint samples. Check the
     // whole footprint against its sloped volume, retaining clearance below it.
     for (const s of this.volumes) {
@@ -139,7 +146,7 @@ export class WalkTerrain {
     // Long flat corridors change support only at rectangle boundaries. Sweep
     // those boundaries instead of repeating footprint queries every 25 cm.
     // Slopes near the body's height retain the continuous sampled check below.
-    if (b.y !== undefined && Math.abs(height - b.y) < .001 && distance2(a, b) > 4) {
+    if (!this.ground && b.y !== undefined && Math.abs(height - b.y) < .001 && distance2(a, b) > 4) {
       const clear = this.flatSegmentClear({ ...a, y: height }, { ...b, y: height }, radius, dynamic);
       if (clear !== undefined) return clear;
     }
@@ -205,7 +212,8 @@ export class WalkTerrain {
   /** Pick only walking planes, independently of robots, railings and roofs. */
   pick(origin: Vec3, direction: Vec3) {
     let t = -origin.y / direction.y;
-    let result = { x: origin.x + direction.x * t, y: 0, z: origin.z + direction.z * t };
+    let result = this.ground?.pick(origin, direction) ?? { x: origin.x + direction.x * t, y: 0, z: origin.z + direction.z * t };
+    if (this.ground) t = Math.hypot(result.x - origin.x, result.y - origin.y, result.z - origin.z) / Math.hypot(direction.x, direction.y, direction.z);
     for (const s of this.surfaces) {
       const sx = s.slopeX ?? 0, sz = s.slopeZ ?? 0;
       const divisor = direction.y - sx * direction.x - sz * direction.z;
@@ -240,7 +248,7 @@ export class SurfaceNavigation {
     const b = terrain.bounds;
     this.width = Math.floor((b.right - b.left) / CELL);
     this.height = Math.floor((b.front - b.back) / CELL);
-    const signature = JSON.stringify([terrain.surfaces, terrain.volumes, terrain.boxes, b, radius]);
+    const signature = JSON.stringify([terrain.surfaces, terrain.volumes, terrain.boxes, b, radius, terrain.ground?.vertices]);
     const graph = staticGraphs.get(terrain.surfaces);
     if (graph?.signature === signature) {
       this.cells = graph.cells; this.nodes = graph.nodes; this.links = graph.links;

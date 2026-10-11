@@ -2,7 +2,7 @@ import { RANGES, type RangeId } from "./ranges";
 
 export const GAME_MODES = { mission: "CONTRACTS", arena: "ENDLESS ARENA", practice: "PRACTICE / DEBUG" } as const;
 export type GameMode = keyof typeof GAME_MODES;
-export const LEVEL_ORDER: RangeId[] = ["receiving", "crossing", "handling", "escort", "priority", "recovery",
+export const LEVEL_ORDER: RangeId[] = ["receiving", "crossing", "handling", "escort", "priority", "recovery", "forest",
   "arena", "proving", "long", "city", "concourse", "port"];
 export function defaultMode(range: RangeId): GameMode {
   return range === "arena" ? "arena" : RANGES[range].contract ? "mission" : "practice";

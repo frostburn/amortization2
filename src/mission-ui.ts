@@ -2,6 +2,7 @@ import { NEXT_CONTRACT, type Contact } from "./game/missions";
 import { RANGES } from "./game/ranges";
 import type { EscortMission } from "./game/escort-mission";
 import { PriorityMission } from "./game/priority-mission";
+import { ForestMission } from "./game/forest-mission";
 import { RecoveryMission } from "./game/recovery-mission";
 import { RECOVERY_DRIVE_HP } from "./game/recovery";
 import { squadName } from "./game/config";
@@ -90,6 +91,7 @@ export function updateMissionUI(sim: Simulation) {
   const load = sim.hauling?.available();
   const escort = sim.escort, rescue = mission as EscortMission;
   const priority = mission instanceof PriorityMission ? mission : undefined;
+  const forest = mission instanceof ForestMission ? mission : undefined;
   const recovery = mission instanceof RecoveryMission ? mission : undefined;
   if (escort) {
     const guide = escort.leader;
@@ -98,7 +100,13 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", recovery ? mission.phase === "briefing" ? "Choose squad · Intercept the sand-coloured truck"
+  setText("mission-detail", forest ? mission.phase === "briefing" ? "Choose squad · Stop the illegal clearance"
+    : mission.phase === "intercept" ? `${forest.stoppedRigs} / 2 felling rigs stopped`
+    : mission.phase === "secure" ? forest.contested ? "Terminal contested · Clear its approach" : "Bring a robot to the amber terminal"
+    : mission.phase === "hold" ? `${Math.round(forest.holdProgress * 100)}% secured · ${forest.enemies.length} security machines${forest.contested ? " · Clearing contested" : " · Keep a robot in the clearing"}`
+    : mission.phase === "return" ? `${near} / ${living.length} at the layby`
+    : mission.phase === "complete" ? "Stop-work enforced · Squad recovered" : "Squad recovery required"
+    : recovery ? mission.phase === "briefing" ? "Choose squad · Intercept the sand-coloured truck"
     : mission.phase === "intercept" ? !recovery.rolling ? "Convoy preparing to leave · Set your ambush"
       : recovery.engagedAt === undefined ? "Convoy moving · Shoot the truck's drive housing"
       : `${recovery.enemies.length} security machines · Truck still moving`
@@ -140,6 +148,11 @@ export function updateMissionUI(sim: Simulation) {
     progress.hidden = !["intercept", "return"].includes(mission.phase);
     progress.value = mission.phase === "intercept" ? recovery.truck.driveHp! / RECOVERY_DRIVE_HP : mission.returnProgress;
   }
+  if (forest) {
+    progress.hidden = mission.phase === "intercept" || mission.finished;
+    progress.value = mission.phase === "secure" ? mission.releaseProgress : mission.phase === "hold" ? forest.holdProgress : mission.returnProgress;
+    progress.setAttribute("aria-label", "Site control progress");
+  }
   if (escort && mission.phase === "breach") progress.hidden = false;
 
   if (mission.finished) {
@@ -147,7 +160,10 @@ export function updateMissionUI(sim: Simulation) {
     setText("mission-result-state", complete ? "CONTRACT COMPLETE" : "RECOVERY REQUIRED");
     const civilians = [...sim.city!.carts, ...sim.city!.kites, ...sim.city!.porters, ...sim.city!.vehicles];
     const damaged = civilians.filter(c => c.hp <= 0 && !("path" in c && c.team === "enemy")).length;
-    const message = recovery ? !complete
+    const message = forest ? complete
+      ? "The logging has stopped, the work order is preserved and the inspectors have the site. The instruction called protected-buffer clearance 'drainage preparation'. Meridian's application still goes to a public decision; this contractor no longer gets to decide it with a felling rig."
+      : "Rook is arranging chassis recovery. The water cooperative still has its stop-work order; Vale is keeping the inspectors clear of the armed site."
+      : recovery ? !complete
       ? `${mission.failureReason ?? "Recovery required"}. Vale is keeping the cooperative's collection crew clear. Rook will arrange squad recovery.`
       : recovery.loadCondition === "intact"
         ? "Charging racks and drive assemblies secured. The cooperative can put its fleet back to work. Gannet sold the equipment before its seizure was authorised; Quill found an extra payment for delivery today. Someone else wanted that truck gone."

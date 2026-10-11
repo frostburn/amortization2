@@ -47,6 +47,10 @@ Four basic chassis carry pistols; heavy equipment is unavailable for this job. C
 
 **06 · Recovery Fee** reverses the escort role: intercept Gannet's convoy before its cargo truck escapes. Choose any squad, set an ambush along the dogleg road or its raised walkway, then disable the truck's drive with rifle or automatic fire. The security van deploys two machinegunners and three pistol robots; their finite response uses bracing, stagger and ordinary navigation. A stopped truck remains physical cover. Destroying it leaves a poorer salvage result. Defeat security, secure the bulk load, then carry its dispatch case back to the maintenance-yard van. One carrier has its hands full; the others cover against a single chasing patrol of one machinegunner and two pistol robots. The west service entrance shortens the return. Deliver the case and recover every survivor; you can leave pursuers alive. Priority Access's debrief leads here; the deployment selector also opens it directly. See [Recovery Fee](docs/recovery-fee.md).
 
+## Timber Rights
+
+**07 · Timber Rights** moves into rolling woodland beside a proposed data-center plot. Disable two felling rigs, seal their illegal work order, and hold the clearing through two finite response squads before inspectors arrive. Recover every survivor at the layby. Physical ridges, trunks and logs shape the fight. Choose any squad; the woodland also works in Endless Arena. See [Timber Rights and natural terrain](docs/timber-rights.md).
+
 ## Proving Ground
 
 - **Ballistics:** clear six orange plate targets with the machine gun or minigun. Sustained fire has recoil, spread, a 90-round magazine, and a 2.2-second reload.
@@ -147,6 +151,7 @@ Open **`/model-room.html`** (or **Controls & settings → Model room**) to orbit
 - [Release — human rescue and escort](docs/escort.md)
 - [Priority Access — selectable armed squads](docs/priority-access.md)
 - [Isometric camera and kinetic combat](docs/combat-feel.md)
+- [Timber Rights and natural terrain](docs/timber-rights.md)
 - [Sniper model, scope, and long range](docs/sniper-range.md)
 - [Arena waves and enemy combat](docs/arena.md)
 - [Squad choice, minigun and edited audio](docs/minigun.md)

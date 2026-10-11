@@ -21,7 +21,10 @@ import type { WalkSurface } from "./walk-surfaces";
 import { PRIORITY_DISTRICT, PRIORITY_FIXTURES, PRIORITY_RAILS, PRIORITY_SITES, PRIORITY_SURFACES } from "./priority";
 import { RECOVERY_DISTRICT, RECOVERY_FIXTURES, RECOVERY_RAILS, RECOVERY_SITES, RECOVERY_SURFACES } from "./recovery";
 
-export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
+import { FOREST_DISTRICT, FOREST_FIXTURES, FOREST_GROUND, FOREST_SITES } from "./forest";
+import type { HeightField } from "./height-field";
+
+export type RangeId = "forest" | "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -35,6 +38,7 @@ type RangeDefinition = {
   pistolsOnly?: boolean;
   city?: CityDistrict;
   shelters?: RoofedArea[];
+  ground?: HeightField;
   walkSurfaces?: WalkSurface[];
   walkVolumes?: WalkSurface[];
   bounds: RangeBounds;
@@ -46,6 +50,12 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  forest: {
+    name: "07 · TIMBER RIGHTS", contract: true, city: FOREST_DISTRICT, bounds: FOREST_DISTRICT.bounds,
+    ground: FOREST_GROUND, walkSurfaces: [], barriers: FOREST_FIXTURES, platforms: [],
+    players: [[-1.1, 1.1], [-1.1, -1.1], [1.1, -1.1], [1.1, 1.1]].map(([x, z]) =>
+      ({ x: FOREST_SITES.entry.x + x, z: FOREST_SITES.entry.z + z })), targets: [], props: [],
+  },
   recovery: {
     name: "06 · RECOVERY FEE", contract: true, city: RECOVERY_DISTRICT, bounds: RECOVERY_DISTRICT.bounds,
     barriers: RECOVERY_FIXTURES, platforms: [], walkSurfaces: RECOVERY_SURFACES, walkVolumes: RECOVERY_RAILS,

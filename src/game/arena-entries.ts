@@ -7,6 +7,7 @@ export type ArenaEntry = Vec2 & { name: string; dx: number; dz: number };
 // Dry street/yard approaches rather than the visual rectangle's edges (which
 // may be buildings or sea). The long range has entries inside its perimeter.
 const APPROACHES: Record<RangeId, readonly Vec2[]> = {
+  forest: [{ x: -66, z: -8 }, { x: 66, z: -24 }, { x: 66, z: 25 }, { x: -65, z: 26 }],
   arena: ARENA_ENTRIES,
   proving: [{ x: 0, z: -23 }, { x: 29, z: 0 }, { x: 0, z: 17 }, { x: -29, z: 0 }],
   long: [{ x: 112, z: 8 }, { x: 85, z: -10 }, { x: 50, z: 10 }, { x: 20, z: -10 }],
@@ -54,6 +55,6 @@ export function entrySlots(sim: Simulation, gate: ArenaEntry, slot: number) {
     [side, -side, -3.3, 3.3, -5.5, 5.5].map(offset => ({
       x: gate.x + gate.dz * offset + gate.dx * row, z: gate.z - gate.dx * offset + gate.dz * row,
     }))).filter(p => sim.canSpawnAt(p) && (sim.terrain
-      ? sim.terrain.segmentClear({ ...gate, y: 0 }, { ...p, y: 0 }, .6)
+      ? sim.terrain.segmentClear(sim.terrain.resolve({ ...gate, y: gate.y ?? 0 }), sim.terrain.resolve({ ...p, y: 0 }), .6)
       : segmentClear(gate, p, [...sim.layout.barriers, ...sim.layout.platforms], .6)));
 }
