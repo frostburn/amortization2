@@ -1140,7 +1140,8 @@ export class RangeScene {
     clientX: number,
     clientY: number,
     grenade = false,
-    movementLevel?: number,
+    movementFrom?: Vec3,
+    movementFromOrder = false,
   ): { aim: Vec3; ground: Vec3; actor?: number; cargo?: number } | null {
     if (this.sim.sniping) return null;
     const rect = this.canvas.getBoundingClientRect();
@@ -1158,7 +1159,7 @@ export class RangeScene {
       dir = this.raycaster.ray.direction;
     if (this.sim.terrain) {
       const point = this.sim.terrain.pick(origin, dir);
-      ground.copy(movementLevel === undefined ? point : this.sim.terrain.movementPoint(point, movementLevel));
+      ground.copy(movementFrom === undefined ? point : this.sim.terrain.movementPoint(point, movementFrom, movementFromOrder));
     }
     const cutaway = this.sim.cutawayColliders;
     const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,

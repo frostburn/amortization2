@@ -71,19 +71,20 @@ describe("raised debug district", () => {
 
   test("movement chooses the current floor under open decks without changing weapon picking", () => {
     const t = terrain(), bridge = t.pick({ x: 0, y: 30, z: -16 }, { x: 0, y: -1, z: 0 });
-    expect(t.movementPoint(bridge, 0)).toEqual({ x: 0, y: 0, z: -16 });
-    expect(t.movementPoint(bridge, 4.8)).toEqual({ ...bridge, y: 4.8 });
-    expect(t.movementPoint({ x: 0, y: 8.4, z: -45 }, 0).y).toBe(0);
-    expect(t.movementPoint({ x: -26, y: 2.4, z: 3 }, 0).y).toBe(2.4);
-    expect(t.movementPoint({ x: -26, y: 4.8, z: -16 }, 0).y).toBe(4.8);
+    const street = { x: 0, y: 0, z: 10 };
+    expect(t.movementPoint(bridge, street)).toEqual({ x: 0, y: 0, z: -16 });
+    expect(t.movementPoint(bridge, { ...bridge, x: -10 })).toEqual(bridge);
+    expect(t.movementPoint({ x: 0, y: 8.4, z: -45 }, street).y).toBe(0);
+    expect(t.movementPoint({ x: -26, y: 2.4, z: 3 }, street).y).toBe(2.4);
+    expect(t.movementPoint({ x: -26, y: 4.8, z: -16 }, street).y).toBe(4.8);
     // A support pillar below the click must nudge the ground order, not lift it.
-    expect(t.movementPoint({ x: 14, y: 4.8, z: -16 }, 0).y).toBe(0);
+    expect(t.movementPoint({ x: 14, y: 4.8, z: -16 }, street).y).toBe(0);
     expect(bridge.y).toBeCloseTo(4.8);
   });
 
   test("a ground squad clicking a bridge approaches its underpass and never climbs the deck", async () => {
     sim = await Simulation.create("concourse");
-    const point = sim.terrain!.movementPoint({ x: 0, y: 4.8, z: -16 }, sim.walkingPoint(sim.primary).y);
+    const point = sim.terrain!.movementPoint({ x: 0, y: 4.8, z: -16 }, sim.walkingPoint(sim.primary));
     sim.move(point);
     expect(sim.active.every(a => a.moveTarget?.y === 0)).toBe(true);
     for (let i = 0; i < 24 / STEP && sim.active.some(a => a.path.length); i++) {

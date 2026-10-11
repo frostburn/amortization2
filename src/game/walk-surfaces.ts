@@ -30,8 +30,25 @@ export function surfacePrism(s: WalkSurface) {
 /** A point can have both a street floor and an overhead pedestrian deck. */
 export class WalkTerrain {
   private hulls: WalkSurface[];
+  private surfaceGroups: number[];
   constructor(readonly surfaces: WalkSurface[], readonly volumes: WalkSurface[],
-    readonly boxes: Obstacle[], readonly bounds: RangeBounds) { this.hulls = [...surfaces, ...volumes]; }
+    readonly boxes: Obstacle[], readonly bounds: RangeBounds) {
+    this.hulls = [...surfaces, ...volumes];
+    this.surfaceGroups = surfaces.map((_, i) => i);
+    // Raised paths are connected only where their paving actually meets at
+    // the same height. The street beneath them is a separate walking layer.
+    for (let i = 0; i < surfaces.length; i++) for (let j = 0; j < i; j++) {
+      const a = surfaces[i], b = surfaces[j];
+      const left = Math.max(a.x - a.w / 2, b.x - b.w / 2), right = Math.min(a.x + a.w / 2, b.x + b.w / 2);
+      const back = Math.max(a.z - a.d / 2, b.z - b.d / 2), front = Math.min(a.z + a.d / 2, b.z + b.d / 2);
+      if (left > right + .001 || back > front + .001) continue;
+      const differences = [[left, back], [right, back], [right, front], [left, front]].map(([x, z]) =>
+        surfaceHeight(a, { x, z }) - surfaceHeight(b, { x, z }));
+      if (Math.min(...differences) > .03 || Math.max(...differences) < -.03) continue;
+      const group = this.surfaceGroups[i], joined = this.surfaceGroups[j];
+      this.surfaceGroups = this.surfaceGroups.map(g => g === joined ? group : g);
+    }
+  }
   heights(p: Vec2) {
     const heights = [0];
     for (const s of this.surfaces) if (contains(s, p, 0.001)) {
@@ -46,15 +63,23 @@ export class WalkTerrain {
       : heights.reduce((best, h) => Math.abs(h - p.y!) < Math.abs(best - p.y!) ? h : best);
     return { x: p.x, y, z: p.z };
   }
-  /** Movement keeps the selected floor beneath an open deck. Filled ramps
-   * have no lower floor, so clicking them still allows a change of level. */
-  movementPoint(p: Vec3, level: number): Vec3 {
+  /** Ramp clicks request the ramp, including sections with a street below.
+   * Once on a raised path, continue along its connected paving. Ground orders
+   * beneath flat overhead decks still request the underpass. */
+  movementPoint(p: Vec3, from: Vec3, fromOrder = false): Vec3 {
+    const picked = this.surfaces.map((s, i) => ({ s, group: this.surfaceGroups[i] }))
+      .filter(({ s }) => contains(s, p, .001) && Math.abs(surfaceHeight(s, p) - p.y) < .03);
+    // An ordered ramp point can be at street height. Its explicit surface
+    // intent survives there; ordinary physical positions keep their tolerance.
+    const groups = fromOrder || from.y > .15 ? this.surfaces.flatMap((s, i) =>
+      contains(s, from, .001) && Math.abs(surfaceHeight(s, from) - from.y) < (fromOrder ? .03 : .22) ? [this.surfaceGroups[i]] : []) : [];
+    if (picked.some(({ s, group }) => s.slopeX || s.slopeZ || groups.includes(group))) return { ...p };
     const floors = this.heights(p).filter(y => this.surfaces.every(s => {
       if (!contains(s, p, -.001)) return true;
       const top = surfaceHeight(s, p), bottom = s.filled ? -.12 : top - s.thickness;
       return y >= top - .03 || y + 1.86 <= bottom + .03;
     }));
-    const y = floors.reduce((best, h) => Math.abs(h - level) < Math.abs(best - level) ? h : best, floors[0] ?? p.y);
+    const y = floors.reduce((best, h) => Math.abs(h - from.y) < Math.abs(best - from.y) ? h : best, floors[0] ?? p.y);
     return { x: p.x, y, z: p.z };
   }
   private blocked(p: Vec3, boxes: Obstacle[], radius: number) {

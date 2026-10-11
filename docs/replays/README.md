@@ -1,5 +1,40 @@
 # Recorded verification runs
 
+## Recovery Fee: bridge access
+
+[recovery-fee-bridge.json](recovery-fee-bridge.json) is the unchanged development
+recorder export from native mouse/keyboard play at gameplay source
+[`382248cc714b0fbafe24248ec90390a6d22cdd21`](https://github.com/frostburn/amortization2/commit/382248cc714b0fbafe24248ec90390a6d22cdd21).
+It records one 19.5-second attempt (1,170 ticks), 17 inputs, 41 snapshots and
+four camera observations. All four robots arrive on the 4.8-metre deck in a
+square formation at full health. The contract remains in its interception
+stage; this is a navigation check, not a complete mission playthrough.
+
+The player selects the squad, holds RMB on the open upper ramp and drags onto
+the bridge before any robot has reached the ramp. The squad climbs the south
+approach and stays above the road. Native controls drive the ordinary fixed
+simulation; read-only `inspect()` and `project()` provide coordinates. No
+positions, health or mission outcomes are injected. Installed Playwright/
+Chromium was used because the Browser plugin was unavailable; its virtual
+clock skips rendered frames while advancing normal physics ticks.
+
+Separate browser checks verify a second bridge click before the climb begins,
+Shift+RMB queueing and a fresh street order beneath the flat span. Tests cover
+both open ramps, low-ramp continuation, disconnected paths, concourse levels,
+and the full squad's ascent and descent. Desktop/laptop screenshots were
+inspected at 1440 × 900 and 1280 × 720 with no header clipping or console errors.
+
+Open **Controls & settings → View replay** in development mode and select the
+JSON. Browser import and seeking to the end report matching combat and robot
+positions. For textual reconstruction:
+
+```sh
+npm run inspect:replay -- docs/replays/recovery-fee-bridge.json
+```
+
+The offline inspector reproduces the recording within two centimetres. Later
+physics/gameplay changes may diverge; use the linked source when comparing.
+
 ## Endless Arena: Receiving with twin miniguns
 
 [arena-receiving-minigunners.json](arena-receiving-minigunners.json) is the unchanged

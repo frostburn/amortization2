@@ -82,8 +82,9 @@ export async function start() {
     actor?: number;
     dragged: boolean;
   } | null = null;
-  let moveDrag: { queued: boolean; lastGoal: Vec2; lastTime: number } | null =
+  let moveDrag: { queued: boolean; lastGoal: Vec2; lastTime: number; intent: Vec3 } | null =
     null;
+  const moveIntents = new Map<number, { point: Vec3; destination: Vec2 }>();
   let covering = false;
   const coverButton = document.getElementById("cover-order") as HTMLButtonElement;
   function armCover(enabled: boolean) {
@@ -506,14 +507,26 @@ export async function start() {
       scene.scope.aim(sim);
       return null;
     }
+    const walking = sim.walkingPoint(sim.primary);
+    // A follow-up bridge click can refine an existing climb before the robot
+    // reaches the ramp. Once elevated, its actual paving is the stronger cue.
+    const intent = moveIntents.get(sim.primary.id);
+    // Near a ramp mouth, a formation corner can still be on the street. Keep
+    // the player's chosen paving while that corner's order remains current.
+    const endpoint = queued || walking.y <= .15
+      ? (intent?.destination === sim.primary.moveTarget ? intent?.point : undefined) ?? sim.primary.path.at(-1) ?? sim.primary.moveTarget
+      : undefined;
+    const movementFrom = moveDrag?.intent ?? (endpoint ? { ...endpoint, y: endpoint.y ?? 0 } : walking);
     const result = scene.pick(
       pointer.x,
       pointer.y,
       sim.weapon === "grenade" || groundOnly,
-      groundOnly ? (queued ? sim.primary.path.at(-1)?.y : undefined) ?? sim.walkingPoint(sim.primary).y : undefined,
+      groundOnly ? movementFrom : undefined,
+      !!moveDrag || !!endpoint,
     );
     if (result) {
       ground = result.ground;
+      if (moveDrag) moveDrag.intent = { ...ground };
       sim.aim = result.aim;
     }
     updateInteraction(result);
@@ -598,11 +611,19 @@ export async function start() {
     if (force && distance2(ground, moveDrag.lastGoal) < 0.01 && Math.abs(ground.y - (moveDrag.lastGoal.y ?? ground.y)) < .01) return;
     if (moveDrag.queued) scene.previewMove(sim.moveDestinations(ground));
     else {
-      sim.move(ground);
+      moveToPointer();
       scene.markMove();
     }
     moveDrag.lastGoal = { x: ground.x, y: ground.y, z: ground.z };
     moveDrag.lastTime = sim.time;
+  }
+  function moveToPointer(queued = false) {
+    sim.move(ground, queued);
+    for (const actor of sim.active) {
+      if (actor.moveTarget && !actor.haul)
+        moveIntents.set(actor.id, { point: { ...ground }, destination: actor.moveTarget });
+      else moveIntents.delete(actor.id);
+    }
   }
   // Mouse events retain per-button transitions when firing and steering together.
   window.addEventListener("mousemove", (e) => {
@@ -692,12 +713,13 @@ export async function start() {
       selectionBox.hidden = true;
       moveDrag = {
         queued: e.shiftKey,
+        intent: { ...ground },
         lastGoal: { x: ground.x, y: ground.y, z: ground.z },
         lastTime: sim.time,
       };
       if (e.shiftKey) scene.previewMove(sim.moveDestinations(ground));
       else {
-        sim.move(ground);
+        moveToPointer();
         scene.markMove();
       }
     } else if (e.button === 1) middleDrag = { x: e.clientX, y: e.clientY };
@@ -767,7 +789,7 @@ export async function start() {
     if (e.button === 2 && moveDrag) {
       aimAtPointer(true, moveDrag.queued);
       if (moveDrag.queued) {
-        sim.move(ground, true);
+        moveToPointer(true);
         scene.markMove();
       } else updateMove(true);
       moveDrag = null;
