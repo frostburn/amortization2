@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { RIFLE } from "../game/config";
 import type { Actor } from "../game/simulation";
 import { makeWatch } from "./security";
 
@@ -116,6 +117,7 @@ export function makeActorBody(a: Pick<Actor, "kind" | "model" | "flight" | "weap
     if (a.model) {
       primaryGun = new THREE.Group();
       torso.add(primaryGun);
+      if (sniper) primaryGun.position.y = RIFLE.mountHeight - .42;
       box(
         primaryGun,
         sniper ? 0.16 : 0.22,
@@ -209,6 +211,7 @@ export function makeActorBody(a: Pick<Actor, "kind" | "model" | "flight" | "weap
     box(torso, 0.04, 0.38, 0.012, 0, 0.28, 0.13, dark);
     box(torso, 0.38, 0.04, 0.012, 0, 0.28, 0.13, dark);
   }
+  if (sniper && arms) arms.position.y = RIFLE.mountHeight - .42;
   // Keep animated joints separate; batch rigid pieces by material within each joint.
   for (const part of [torso, ...legs, model]) batchJoint(part);
   return { root, model, torso, legs, bipod, primaryGun, pistol, arms, carryArms, barrels, rotors, beacon };

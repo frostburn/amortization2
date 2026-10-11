@@ -1,0 +1,2970 @@
+{
+  "format": "amortization2-human-replay",
+  "version": 1,
+  "step": 0.016666666666666666,
+  "revision": "9ba018b",
+  "createdAt": "2026-10-11T11:00:52.331Z",
+  "exportedAt": "2026-10-11T11:00:57.665Z",
+  "stopReason": null,
+  "sessions": [
+    {
+      "range": "long",
+      "mode": "practice",
+      "fourthModel": "sniper",
+      "seed": 1729,
+      "endTick": 256,
+      "initial": {
+        "tick": 0,
+        "mission": null,
+        "arena": null,
+        "selected": [
+          4
+        ],
+        "aim": {
+          "x": 58,
+          "y": 3.25,
+          "z": 0
+        },
+        "trigger": false,
+        "sniping": false,
+        "shots": 0,
+        "hits": 0,
+        "throws": 0,
+        "actors": [
+          {
+            "id": 1,
+            "kind": "player",
+            "model": "assault",
+            "hp": 160,
+            "position": {
+              "x": -4,
+              "y": 0.978,
+              "z": -4
+            },
+            "yaw": 1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 2,
+            "kind": "player",
+            "model": "assault",
+            "hp": 160,
+            "position": {
+              "x": -4,
+              "y": 0.978,
+              "z": -2
+            },
+            "yaw": 1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 3,
+            "kind": "player",
+            "model": "assault",
+            "hp": 160,
+            "position": {
+              "x": -4,
+              "y": 0.978,
+              "z": 3
+            },
+            "yaw": 1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 4,
+            "kind": "player",
+            "model": "sniper",
+            "hp": 64,
+            "position": {
+              "x": -2,
+              "y": 0.978,
+              "z": 0
+            },
+            "yaw": 1.571,
+            "weapon": "rifle",
+            "ammo": 5,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 10,
+            "kind": "precision",
+            "model": null,
+            "hp": 84,
+            "position": {
+              "x": 28,
+              "y": 0.978,
+              "z": -3
+            },
+            "yaw": -1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 11,
+            "kind": "precision",
+            "model": null,
+            "hp": 84,
+            "position": {
+              "x": 58,
+              "y": 2.978,
+              "z": 0
+            },
+            "yaw": -1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 12,
+            "kind": "precision",
+            "model": null,
+            "hp": 84,
+            "position": {
+              "x": 88,
+              "y": 5.978,
+              "z": 3
+            },
+            "yaw": -1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          }
+        ],
+        "civilians": []
+      },
+      "final": {
+        "tick": 256,
+        "mission": null,
+        "arena": null,
+        "selected": [
+          4
+        ],
+        "aim": {
+          "x": -59.87127728711741,
+          "y": 1.25,
+          "z": 15.891687575790172
+        },
+        "trigger": false,
+        "sniping": false,
+        "shots": 3,
+        "hits": 3,
+        "throws": 0,
+        "actors": [
+          {
+            "id": 1,
+            "kind": "player",
+            "model": "assault",
+            "hp": 160,
+            "position": {
+              "x": -4,
+              "y": 0.93,
+              "z": -4
+            },
+            "yaw": 1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 2,
+            "kind": "player",
+            "model": "assault",
+            "hp": 160,
+            "position": {
+              "x": -4,
+              "y": 0.93,
+              "z": -2
+            },
+            "yaw": 1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 3,
+            "kind": "player",
+            "model": "assault",
+            "hp": 160,
+            "position": {
+              "x": -4,
+              "y": 0.93,
+              "z": 3
+            },
+            "yaw": 1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 4,
+            "kind": "player",
+            "model": "sniper",
+            "hp": 64,
+            "position": {
+              "x": -2,
+              "y": 0.93,
+              "z": 0
+            },
+            "yaw": 0.637,
+            "weapon": "rifle",
+            "ammo": 2,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 10,
+            "kind": "precision",
+            "model": null,
+            "hp": 0,
+            "position": {
+              "x": 29.365,
+              "y": 0.3,
+              "z": -2.997
+            },
+            "yaw": -1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 11,
+            "kind": "precision",
+            "model": null,
+            "hp": 0,
+            "position": {
+              "x": 59.347,
+              "y": 2.3,
+              "z": 0.008
+            },
+            "yaw": -1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          },
+          {
+            "id": 12,
+            "kind": "precision",
+            "model": null,
+            "hp": 0,
+            "position": {
+              "x": 88.785,
+              "y": 5.923,
+              "z": 3.008
+            },
+            "yaw": -1.571,
+            "weapon": "gun",
+            "ammo": 90,
+            "reload": 0,
+            "braced": false,
+            "hauling": null,
+            "firing": false,
+            "stagger": 0,
+            "goal": null,
+            "ai": null
+          }
+        ],
+        "civilians": []
+      },
+      "inputs": [
+        {
+          "tick": 0,
+          "wallMs": -1425,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 58,
+              "y": 3.25,
+              "z": 0
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": -24.944720784860856,
+              "y": -5.126018081114125e-7,
+              "z": 39.26123001994404
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "type": "select",
+            "id": 4,
+            "additive": false
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "type": "release"
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "type": "weapon",
+            "weapon": "rifle"
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 28,
+              "y": 1.2099999785423279,
+              "z": -3
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "type": "scope",
+            "enabled": true
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1325,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2143116345088343,
+              "z": -2.970000216548101
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 12,
+          "wallMs": -1225,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2216343035380701,
+              "z": -2.9700002555535345
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 18,
+          "wallMs": -1125,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2228432645480494,
+              "z": -2.970000261993098
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 24,
+          "wallMs": -1025,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2230523576419214,
+              "z": -2.970000263107151
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 30,
+          "wallMs": -925,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2230911006610254,
+              "z": -2.970000263312974
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 36,
+          "wallMs": -825,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2230987300555567,
+              "z": -2.9700002633537803
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 42,
+          "wallMs": -725,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231003989856104,
+              "z": -2.970000263362854
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 48,
+          "wallMs": -625,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.9700002633663782
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 54,
+          "wallMs": -525,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.970000263369924
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 60,
+          "wallMs": -425,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.970000263373512
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 66,
+          "wallMs": -394,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.9700002633772637
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 67,
+          "wallMs": -378,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.970000263377889
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 68,
+          "wallMs": -362,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.9700002633785143
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 69,
+          "wallMs": -346,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.9700002633791396
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 70,
+          "wallMs": -330,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.970000263379765
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 71,
+          "wallMs": -225,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 27.70000216372361,
+              "y": 1.2231005181949,
+              "z": -2.97000026338039
+            },
+            "trigger": true
+          }
+        },
+        {
+          "tick": 77,
+          "wallMs": -125,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 28.05193424086389,
+              "y": 1.218042448246658,
+              "z": -3.0051934708919994
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 83,
+          "wallMs": -125,
+          "data": {
+            "type": "scope",
+            "enabled": false
+          }
+        },
+        {
+          "tick": 83,
+          "wallMs": -25,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": -59.87127728711741,
+              "y": 1.25,
+              "z": 15.891687575790172
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": -18.659327174313766,
+              "y": -5.126018081114125e-7,
+              "z": 32.97583640939695
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "type": "select",
+            "id": 4,
+            "additive": false
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "type": "release"
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "type": "weapon",
+            "weapon": "rifle"
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 58,
+              "y": 3.2099757194519043,
+              "z": 3.681468232201981e-18
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "type": "scope",
+            "enabled": true
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": 75,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 57.700001036052996,
+              "y": 3.2021756556355667,
+              "z": -3.220850693442433e-10
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 95,
+          "wallMs": 175,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 57.700001036052996,
+              "y": 3.2021756556355667,
+              "z": -3.258367349890566e-10
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 101,
+          "wallMs": 275,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 57.700001036052996,
+              "y": 3.2021756556355667,
+              "z": -3.2896312302640107e-10
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 154,
+          "wallMs": 1175,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 57.700001036052996,
+              "y": 3.2021756556355667,
+              "z": -3.2896312302640107e-10
+            },
+            "trigger": true
+          }
+        },
+        {
+          "tick": 160,
+          "wallMs": 1275,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 58.0534734987109,
+              "y": 3.2113660465948435,
+              "z": 4.678658676607816e-11
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 166,
+          "wallMs": 1275,
+          "data": {
+            "type": "scope",
+            "enabled": false
+          }
+        },
+        {
+          "tick": 166,
+          "wallMs": 1375,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": -59.87127728711741,
+              "y": 1.25,
+              "z": 15.891687575790172
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": -12.27255624746752,
+              "y": -5.126018081114125e-7,
+              "z": 26.58906548255071
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "type": "select",
+            "id": 4,
+            "additive": false
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "type": "release"
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "type": "weapon",
+            "weapon": "rifle"
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 88,
+              "y": 6.209981441497803,
+              "z": 3
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "type": "scope",
+            "enabled": true
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1475,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 87.69998909595743,
+              "y": 6.194780809447246,
+              "z": 2.989999636317118
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 178,
+          "wallMs": 1575,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 87.69998909595743,
+              "y": 6.194780809447246,
+              "z": 2.9899996363133665
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 184,
+          "wallMs": 1675,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 87.69998909595743,
+              "y": 6.194780809447246,
+              "z": 2.98999963631024
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 238,
+          "wallMs": 2575,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 87.69998909595743,
+              "y": 6.194780809447246,
+              "z": 2.98999963631024
+            },
+            "trigger": true
+          }
+        },
+        {
+          "tick": 244,
+          "wallMs": 2675,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": 88.0545165073635,
+              "y": 6.212743625664936,
+              "z": 3.001817216940518
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 250,
+          "wallMs": 2675,
+          "data": {
+            "type": "scope",
+            "enabled": false
+          }
+        },
+        {
+          "tick": 250,
+          "wallMs": 2775,
+          "data": {
+            "type": "control",
+            "aim": {
+              "x": -59.87127728711741,
+              "y": 1.25,
+              "z": 15.891687575790172
+            },
+            "trigger": false
+          }
+        },
+        {
+          "tick": 256,
+          "wallMs": 2775,
+          "data": {
+            "type": "release"
+          }
+        }
+      ],
+      "events": [
+        {
+          "tick": 72,
+          "wallMs": -225,
+          "data": {
+            "type": "down",
+            "actor": 10,
+            "position": {
+              "x": 28,
+              "y": 0.9599795937538147,
+              "z": -3
+            }
+          }
+        },
+        {
+          "tick": 72,
+          "wallMs": -225,
+          "data": {
+            "type": "shot",
+            "actor": 4,
+            "weapon": "rifle",
+            "from": {
+              "x": -2,
+              "y": 1.6499575686454773,
+              "z": -6.440700417442713e-8
+            },
+            "to": {
+              "x": 27.700002163723614,
+              "y": 1.2231005181949,
+              "z": -2.9700002633803906
+            },
+            "hit": true,
+            "impact": true,
+            "material": "metal",
+            "normal": {
+              "x": -1.0000001192092896,
+              "y": 0,
+              "z": 0
+            }
+          }
+        },
+        {
+          "tick": 155,
+          "wallMs": 1175,
+          "data": {
+            "type": "down",
+            "actor": 11,
+            "position": {
+              "x": 58,
+              "y": 2.9599757194519043,
+              "z": 3.681468232201981e-18
+            }
+          }
+        },
+        {
+          "tick": 155,
+          "wallMs": 1175,
+          "data": {
+            "type": "shot",
+            "actor": 4,
+            "weapon": "rifle",
+            "from": {
+              "x": -2,
+              "y": 1.6499575686454773,
+              "z": -6.442513722504373e-8
+            },
+            "to": {
+              "x": 57.70000103605299,
+              "y": 3.2021756556355667,
+              "z": -3.289631230264143e-10
+            },
+            "hit": true,
+            "impact": true,
+            "material": "metal",
+            "normal": {
+              "x": -1.0000001192092896,
+              "y": 0,
+              "z": 0
+            }
+          }
+        },
+        {
+          "tick": 239,
+          "wallMs": 2575,
+          "data": {
+            "type": "down",
+            "actor": 12,
+            "position": {
+              "x": 88,
+              "y": 5.959981441497803,
+              "z": 3
+            }
+          }
+        },
+        {
+          "tick": 239,
+          "wallMs": 2575,
+          "data": {
+            "type": "shot",
+            "actor": 4,
+            "weapon": "rifle",
+            "from": {
+              "x": -2,
+              "y": 1.6499575686454773,
+              "z": -6.444327027566032e-8
+            },
+            "to": {
+              "x": 87.69998909595743,
+              "y": 6.194780809447246,
+              "z": 2.98999963631024
+            },
+            "hit": true,
+            "impact": true,
+            "material": "metal",
+            "normal": {
+              "x": -1.0000001192092896,
+              "y": 0,
+              "z": 0
+            }
+          }
+        },
+        {
+          "tick": 239,
+          "wallMs": 2575,
+          "data": {
+            "type": "drill",
+            "message": "Long-range drill complete. Three precision targets down."
+          }
+        }
+      ],
+      "snapshots": [
+        {
+          "tick": 0,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 58,
+            "y": 3.25,
+            "z": 0
+          },
+          "trigger": false,
+          "sniping": false,
+          "shots": 0,
+          "hits": 0,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.978,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.978,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.978,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.978,
+                "z": 0
+              },
+              "yaw": 1.571,
+              "weapon": "rifle",
+              "ammo": 5,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 28,
+                "y": 0.978,
+                "z": -3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 58,
+                "y": 2.978,
+                "z": 0
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.978,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 30,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 27.70000216372361,
+            "y": 1.2230523576419214,
+            "z": -2.970000263107151
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 0,
+          "hits": 0,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.67,
+              "weapon": "rifle",
+              "ammo": 5,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 28,
+                "y": 0.96,
+                "z": -3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 58,
+                "y": 2.96,
+                "z": 0
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 60,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 27.70000216372361,
+            "y": 1.2231005181949,
+            "z": -2.970000263369924
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 0,
+          "hits": 0,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.67,
+              "weapon": "rifle",
+              "ammo": 5,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 28,
+                "y": 0.96,
+                "z": -3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 58,
+                "y": 2.96,
+                "z": 0
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 90,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 57.700001036052996,
+            "y": 3.2021756556355667,
+            "z": -3.220850693442433e-10
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 1,
+          "hits": 1,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 0.92,
+              "weapon": "rifle",
+              "ammo": 4,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 28.813,
+                "y": 0.914,
+                "z": -2.997
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 58,
+                "y": 2.96,
+                "z": 0
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 120,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 57.700001036052996,
+            "y": 3.2021756556355667,
+            "z": -3.2896312302640107e-10
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 1,
+          "hits": 1,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.571,
+              "weapon": "rifle",
+              "ammo": 4,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 29.365,
+                "y": 0.3,
+                "z": -2.997
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 58,
+                "y": 2.96,
+                "z": 0
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 150,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 57.700001036052996,
+            "y": 3.2021756556355667,
+            "z": -3.2896312302640107e-10
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 1,
+          "hits": 1,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.571,
+              "weapon": "rifle",
+              "ammo": 4,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 29.365,
+                "y": 0.3,
+                "z": -2.997
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 58,
+                "y": 2.96,
+                "z": 0
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 180,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 87.69998909595743,
+            "y": 6.194780809447246,
+            "z": 2.9899996363133665
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 2,
+          "hits": 2,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.537,
+              "weapon": "rifle",
+              "ammo": 3,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 29.365,
+                "y": 0.3,
+                "z": -2.997
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 59.024,
+                "y": 2.773,
+                "z": 0.007
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 210,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 87.69998909595743,
+            "y": 6.194780809447246,
+            "z": 2.98999963631024
+          },
+          "trigger": false,
+          "sniping": true,
+          "shots": 2,
+          "hits": 2,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.537,
+              "weapon": "rifle",
+              "ammo": 3,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 29.365,
+                "y": 0.3,
+                "z": -2.997
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 59.347,
+                "y": 2.3,
+                "z": 0.008
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 84,
+              "position": {
+                "x": 88,
+                "y": 5.96,
+                "z": 3
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        },
+        {
+          "tick": 240,
+          "mission": null,
+          "arena": null,
+          "selected": [
+            4
+          ],
+          "aim": {
+            "x": 87.69998909595743,
+            "y": 6.194780809447246,
+            "z": 2.98999963631024
+          },
+          "trigger": true,
+          "sniping": true,
+          "shots": 3,
+          "hits": 3,
+          "throws": 0,
+          "actors": [
+            {
+              "id": 1,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -4
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 2,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": -2
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 3,
+              "kind": "player",
+              "model": "assault",
+              "hp": 160,
+              "position": {
+                "x": -4,
+                "y": 0.93,
+                "z": 3
+              },
+              "yaw": 1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 4,
+              "kind": "player",
+              "model": "sniper",
+              "hp": 64,
+              "position": {
+                "x": -2,
+                "y": 0.93,
+                "z": 0
+              },
+              "yaw": 1.537,
+              "weapon": "rifle",
+              "ammo": 2,
+              "reload": 0,
+              "braced": true,
+              "hauling": null,
+              "firing": true,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 10,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 29.365,
+                "y": 0.3,
+                "z": -2.997
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 11,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 59.347,
+                "y": 2.3,
+                "z": 0.008
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            },
+            {
+              "id": 12,
+              "kind": "precision",
+              "model": null,
+              "hp": 0,
+              "position": {
+                "x": 88.108,
+                "y": 5.993,
+                "z": 3.003
+              },
+              "yaw": -1.571,
+              "weapon": "gun",
+              "ammo": 90,
+              "reload": 0,
+              "braced": false,
+              "hauling": null,
+              "firing": false,
+              "stagger": 0,
+              "goal": null,
+              "ai": null
+            }
+          ],
+          "civilians": []
+        }
+      ],
+      "views": [
+        {
+          "tick": 0,
+          "wallMs": -1525,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.7071067811865477,
+                "z": -0.7071067811865474
+              }
+            },
+            "scope": {
+              "visible": false,
+              "fov": 12,
+              "yaw": 0,
+              "pitch": 0,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": true,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 6,
+          "wallMs": -1425,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.7071067811865477,
+                "z": -0.7071067811865474
+              }
+            },
+            "scope": {
+              "visible": false,
+              "fov": 12,
+              "yaw": 0,
+              "pitch": 0,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 12,
+          "wallMs": -1325,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.09950371844385364,
+                "z": 0.9950371902677038
+              }
+            },
+            "scope": {
+              "visible": false,
+              "fov": 12,
+              "yaw": 1.670464978706035,
+              "pitch": -0.014299988459111415,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 18,
+          "wallMs": -1225,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.09950371844385364,
+                "z": 0.9950371902677038
+              }
+            },
+            "scope": {
+              "visible": true,
+              "fov": 12,
+              "yaw": 1.670464978706035,
+              "pitch": -0.014299988459111415,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 89,
+          "wallMs": -25,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.7071067811865477,
+                "z": -0.7071067811865474
+              }
+            },
+            "scope": {
+              "visible": true,
+              "fov": 12,
+              "yaw": 1.670464978706035,
+              "pitch": -0.014299988459111415,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 95,
+          "wallMs": 75,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": -1.0736378452946838e-9,
+                "z": 1
+              }
+            },
+            "scope": {
+              "visible": false,
+              "fov": 12,
+              "yaw": 1.570796325721259,
+              "pitch": 0.02599444601753887,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 101,
+          "wallMs": 175,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": -1.0736378452946838e-9,
+                "z": 1
+              }
+            },
+            "scope": {
+              "visible": true,
+              "fov": 12,
+              "yaw": 1.570796325721259,
+              "pitch": 0.02599444601753887,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 172,
+          "wallMs": 1375,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.7071067811865477,
+                "z": -0.7071067811865474
+              }
+            },
+            "scope": {
+              "visible": true,
+              "fov": 12,
+              "yaw": 1.570796325721259,
+              "pitch": 0.02599444601753887,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 178,
+          "wallMs": 1475,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": -0.033314830947406726,
+                "z": 0.9994449069553287
+              }
+            },
+            "scope": {
+              "visible": false,
+              "fov": 12,
+              "yaw": 1.537475330201484,
+              "pitch": 0.05059558935828447,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 184,
+          "wallMs": 1575,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": -0.033314830947406726,
+                "z": 0.9994449069553287
+              }
+            },
+            "scope": {
+              "visible": true,
+              "fov": 12,
+              "yaw": 1.537475330201484,
+              "pitch": 0.05059558935828447,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 256,
+          "wallMs": 2775,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.7071067811865477,
+                "z": -0.7071067811865474
+              }
+            },
+            "scope": {
+              "visible": true,
+              "fov": 12,
+              "yaw": 1.537475330201484,
+              "pitch": 0.05059558935828447,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": false,
+            "width": 1280,
+            "height": 558
+          }
+        },
+        {
+          "tick": 256,
+          "wallMs": 2875,
+          "data": {
+            "camera": {
+              "target": {
+                "x": 54,
+                "y": 0,
+                "z": 0
+              },
+              "zoom": 1,
+              "halfHeight": 40,
+              "right": {
+                "x": 0.7071067811865477,
+                "z": -0.7071067811865474
+              }
+            },
+            "scope": {
+              "visible": false,
+              "fov": 12,
+              "yaw": 1.537475330201484,
+              "pitch": 0.05059558935828447,
+              "invertX": false,
+              "invertY": false
+            },
+            "paused": true,
+            "width": 1280,
+            "height": 558
+          }
+        }
+      ]
+    }
+  ]
+}

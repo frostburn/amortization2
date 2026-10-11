@@ -841,8 +841,15 @@ export class Simulation {
     return !hit || hit.timeOfImpact >= Math.hypot(raised.x - upper.x, raised.y - upper.y, raised.z - upper.z) - 0.05 ||
       this.actors.some(target => !target.dead && target.collider.handle === hit.collider.handle);
   }
+  /** Shared optical and ballistic origin: visible scope targets have no muzzle parallax.
+   * Start behind nearby cover so the rifle cannot skip an obstruction at barrel reach. */
+  rifleSight(a: Actor): Vec3 {
+    const p = a.body.translation();
+    return { x: p.x, y: p.y + RIFLE.mountHeight, z: p.z };
+  }
   muzzle(a: Actor, toward: Vec3 = this.actorAim(a), weapon: Firearm = a.weapon): Vec3 {
     const p = a.body.translation();
+    if (weapon === "rifle" && this.sniping && a === this.rifleOperator) return this.rifleSight(a);
     if (a.flight) {
       const dy = toward.y - p.y + .28, dx = toward.x - p.x, dz = toward.z - p.z;
       const length = Math.hypot(dx, dy, dz) || 1;
@@ -852,11 +859,12 @@ export class Simulation {
       dz = toward.z - p.z,
       length = Math.hypot(dx, dz) || 1;
     const reach = FIREARMS[weapon].muzzle;
-    const dy = toward.y - p.y - 0.42;
+    const height = weapon === "rifle" ? RIFLE.mountHeight : 0.42;
+    const dy = toward.y - p.y - height;
     const pitchedLength = Math.hypot(dx, dy, dz) || 1;
     return {
       x: p.x + (dx / pitchedLength) * reach + (dz / length) * 0.27,
-      y: p.y + 0.42 + (dy / pitchedLength) * reach,
+      y: p.y + height + (dy / pitchedLength) * reach,
       z: p.z + (dz / pitchedLength) * reach - (dx / length) * 0.27,
     };
   }

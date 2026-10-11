@@ -284,3 +284,27 @@ npm run inspect:replay -- docs/replays/priority-access-alert-resimulation.json
 ```
 
 Later gameplay changes may diverge; use the documented source commit to compare.
+
+## Scoped firing line: focused range verification
+
+[scope-firing-line.json](scope-firing-line.json) records a focused Playwright
+browser check at gameplay commit
+[`9ba018b7aebfea87fac234c139e846d055a65d7f`](https://github.com/frostburn/amortization2/commit/9ba018b7aebfea87fac234c139e846d055a65d7f).
+At 1280 × 720, NEEDLE uses the normal 30 / 60 / 90 m sight buttons, enters the
+braced scope, settles and fires once at each target. All three shots hit, including
+the elevated targets. The 256-tick capture takes 4.27 seconds of simulation time.
+This is a range check, not a complete mission playthrough or difficulty assessment.
+
+Navigation and keyboard controls use Playwright input. Scoped firing dispatches
+ordinary mouse button events on the canvas because headless pointer capture
+leaves the automation cursor on the sight button; no simulation state, health or
+hit results are injected. The development recorder exports the unmodified run.
+Import it through **Controls & settings → View replay**, or inspect it with:
+
+```sh
+npm run inspect:replay -- docs/replays/scope-firing-line.json
+```
+
+Physics regression tests separately exercise visible targets above low rails and
+beside wall corners, nearby cover blocking the optical line, and friendly rifle
+interception. Later gameplay changes may diverge from the documented source commit.
