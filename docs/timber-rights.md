@@ -51,6 +51,10 @@ that same surface. Height lookup interpolates triangles rather than inventing a
 bilinear surface between them. Natural ground replaces the flat district slab.
 Navigation retains the existing 30% grade limit and uses spatially indexed static
 forest obstacles; the graph is built during loading and cached across resets.
+The ground motor follows the physical support plane, so uphill force does not
+press the hull into the slope and stall against friction. Route queries use the
+ground beneath a supported capsule rather than its slightly raised rounded
+bottom; the hull itself still moves through ordinary physics.
 
 `NaturalTerrainView` draws vertex-colored earth and instanced pine/birch trees.
 The forest continues outside the playable 160 × 120 m area. The eastern plot is
@@ -64,7 +68,8 @@ objectives and response squads are absent there; rigs remain inactive solid map
 landmarks, and arena robots spawn on their actual terrain height. Existing
 practice districts and contracts remain available.
 
-The full four-machinegun verification run is available in
-[Recorded verification runs](replays/README.md#timber-rights-four-machinegunners).
-Load its JSON in the development replay viewer to watch the approach, both
-responses and recovery.
+The current uphill navigation and failed-attempt export captures are available
+in [Recorded verification runs](replays/README.md#timber-rights-slope-movement-and-failed-attempt-controls).
+An earlier complete four-machinegun mission run is also retained at its linked
+source, before the slope-motor correction. Load the JSONs in the development
+replay viewer to inspect the routes and outcomes.
