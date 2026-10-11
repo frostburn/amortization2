@@ -3,28 +3,31 @@
 ## Timber Rights: four machinegunners
 
 [timber-rights-assault.json](timber-rights-assault.json) is the unchanged
-development recorder export from a complete keyboard/mouse playthrough.
-Gameplay source:
-[`65c78158b08148c374da74d9fc878e2cb314ae45`](https://github.com/frostburn/amortization2/commit/65c78158b08148c374da74d9fc878e2cb314ae45).
-The capture records revision `65c7815`, `range: "forest"` and `mode: "mission"`.
+development recorder export from a complete keyboard/mouse playthrough after
+the pressure retune. Gameplay source:
+[`9fc991a90394b54037eb2f4df9aff7183d1c1874`](https://github.com/frostburn/amortization2/commit/9fc991a90394b54037eb2f4df9aff7183d1c1874).
+The capture records revision `9fc991a`, `range: "forest"` and `mode: "mission"`.
 
 | Result | Recorded value |
 | --- | --- |
-| Simulated duration | 139.65 seconds / 8,379 ticks |
+| Simulated duration | 131.77 seconds / 7,906 ticks |
 | Outcome | Complete; both rigs disabled; work order sealed; clearing secured |
-| Security defeated | Four guards and two three-robot response squads |
-| Squad recovered | 4 / 4 |
-| Robot health, IDs 1–4 | 108, 160, 26, 16 / 160 |
-| Player combat | 986 shots; 190 robot hits; no grenades |
-| Enemy shots | 41 |
-| Work order sealed / inspectors take possession | 83.38 s / 112.95 s |
-| Capture | One attempt; 465 inputs; 285 snapshots; 11 camera observations |
+| Security defeated | Four guards and two four-robot response squads |
+| Squad recovered | 2 / 4 |
+| Robot health, IDs 1–4 | 0, 160, 76, 0 / 160 |
+| Manual player combat | 589 shots; 203 robot hits; no grenades |
+| Automated covering fire | 61 shots; 61 robot hits |
+| Enemy shots | 58 |
+| Work order sealed / inspectors take possession | 79.88 s / 107.67 s |
+| Capture | One recorded attempt; 394 inputs; 269 snapshots; 10 camera observations |
 
 The squad climbs the approach track, fights security from the western logging
-lane, stops both rigs, then advances downhill to the work-order terminal.
-It returns to the clearing for both contractor responses, defeats them and
-retraces the woodland track to the layby. Two badly damaged robots survive
-the return. Commands use the regular movement, brace, fire and reload controls.
+lane and stops both rigs. It establishes two cover sectors in the clearing
+before sending ANCHOR alone to seal the terminal. The other three keep covering
+while ANCHOR returns. The squad engages the northern response, then the southern
+response. BOLT and ANCHOR are lost during the hold; BREACH and LATCH defeat the
+remaining gunner and retrace the woodland track to the layby. Commands use the
+regular selection, movement, cover, brace, fire and reload controls.
 
 Installed Playwright/Chromium was used because the Browser plugin was not
 available. Its virtual clock advances the ordinary fixed simulation while
@@ -42,14 +45,19 @@ npm run inspect:replay -- docs/replays/timber-rights-assault.json
 
 The offline inspector and browser viewer reproduce recorded combat and final
 robot positions within two centimetres. Browser checks import, seek to the end,
-rewind, play and exit to the live game. Later gameplay/physics changes may
-diverge; compare against the source above.
+rewind, play and exit to the live game without console errors. Later
+gameplay/physics changes may diverge; compare against the source above.
 
 This verifies the four-machinegun mission route. Tests separately cover all
 three loadouts, terrain/physics agreement, uphill/downhill formation movement,
-rifle and grenade damage to rigs, contested objectives, exactly two response
-squads, recovery and terrain-aware arena entries. It does not establish human
-difficulty or performance on physical graphics hardware.
+rifle and grenade damage to rigs, actual firing/blast locations for guard alerts,
+contested objectives, opposed responses firing during their approach, pressure
+on a lone braced SPINDLE, recovery and terrain-aware arena entries. Human play
+remains the difficulty check; this run uses precise scripted aiming.
+
+The [pre-retune capture](https://github.com/frostburn/amortization2/blob/f38bc43b36dbae08517104872472d334a81e48c9/docs/replays/timber-rights-assault.json)
+is retained in git history. It completed at gameplay source `65c7815` with four
+survivors against ten security robots; it is not a current-build verification.
 
 ## Recovery Fee: bridge access
 

@@ -79,7 +79,7 @@ The 30 m target stands on the ground; the 60 and 90 m targets stand on solid **2
 
 ## Endless Arena
 
-Endless Arena has its own **Game mode** selector in the header and pause menu. Its **Level** selector includes all twelve implemented maps, from the original Training Arena to every contract district. Choose any of the three squad configurations, then **Start arena**. Contract objectives and pistol-only restrictions apply in Contracts; Practice / debug retains the existing drills and civilian sandboxes. Mode switching remembers the last selected level for the session. See [arena map rules](docs/arena.md).
+Endless Arena has its own **Game mode** selector in the header and pause menu. Its **Level** selector includes all thirteen implemented maps, from the original Training Arena to every contract district. Choose any of the three squad configurations, then **Start arena**. Contract objectives and pistol-only restrictions apply in Contracts; Practice / debug retains the existing drills and civilian sandboxes. Mode switching remembers the last selected level for the session. See [arena map rules](docs/arena.md).
 
 Choose the **Endless Arena** game mode in the entry menu or header. The whole squad starts selected in a square. Four marked entrances and a four-second warning precede the first three-robot assault squad. Clearing a wave gives surviving robots full integrity and ammunition, followed by a six-second warning for the next entrances. Disabled squad members stay down until **Shift+R** or **Restart arena** restores the whole squad.
 

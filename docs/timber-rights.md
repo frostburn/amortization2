@@ -33,10 +33,11 @@ Morrow defines the job and Rook prepares the squad and recovery.
 Four initial guards carry two machine guns and two pistols, retaining their
 original 38 m / 22 m engagement ranges and slower reactions. Gunners have 160 HP;
 settled rifle fire needs two hits. Response machine guns engage out to 50 m and
-their pistols to 28 m. Faster response reactions, overlapping squads and the southern approach make
-covering both angles useful instead of feeding one specialist a single file of
-passive targets. Entry is sheltered,
-with a broad sloping forestry track leading toward the western rig. The clearing
+their pistols to 28 m. Faster response reactions, overlapping squads and the
+southern approach make covering both angles useful. Set cover sectors before
+sending one robot to seal the terminal, then bring that robot back to help with
+the hold. Entry is sheltered, with a broad sloping forestry track leading toward
+the western rig. The clearing
 and lateral tracks leave room for formation movement and bullet pressure. Logs
 and boulders supply low cover; ridge crests offer sight lines for NEEDLE. Tree
 trunks and terrain block actual bullets. Foliage supplies visual concealment,
