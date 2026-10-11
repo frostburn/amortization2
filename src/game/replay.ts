@@ -1,5 +1,6 @@
 import { STEP, type Vec2, type Vec3, type Weapon } from "./config";
 import { RANGES, type RangeId } from "./ranges";
+import { defaultMode, GAME_MODES, levelsForMode, type GameMode } from "./modes";
 import type { GameEvent, Simulation } from "./simulation";
 
 export type ReplayAction =
@@ -35,7 +36,7 @@ export function replaySnapshot(sim: Simulation) {
   };
 }
 export type ReplaySession = {
-  range: RangeId; fourthModel: Simulation["fourthModel"]; seed: number;
+  range: RangeId; mode?: GameMode; fourthModel: Simulation["fourthModel"]; seed: number;
   endTick: number; initial: ReturnType<typeof replaySnapshot>; final: ReturnType<typeof replaySnapshot>;
   inputs: Timed<ReplayAction>[]; events: Timed<GameEvent>[];
   snapshots: ReturnType<typeof replaySnapshot>[]; views: Timed<ReplayView>[];
@@ -76,7 +77,7 @@ export class HumanReplayRecorder {
     if (this.stopReason) return;
     if (this.sessions.length >= 32) { this.stopReason = "session limit"; return; }
     const initial = replaySnapshot(sim);
-    this.sessions.push({ range: sim.range, fourthModel: sim.fourthModel, seed: 1729,
+    this.sessions.push({ range: sim.range, mode: sim.mode, fourthModel: sim.fourthModel, seed: 1729,
       endTick: tick(sim), initial, final: initial, inputs: [], events: [], snapshots: [initial], views: [] });
     this.controls = this.view = ""; this.observedEvents = 0;
   }
@@ -211,7 +212,7 @@ export function readHumanReplay(value: unknown): HumanReplay {
 }
 
 export function validateSession(session: ReplaySession) {
-  if (!session || !Object.hasOwn(RANGES, session.range) || !["sniper", "minigunner", "assault"].includes(session.fourthModel) ||
+  if (!session || !Object.hasOwn(RANGES, session.range) || (session.mode !== undefined && (!Object.hasOwn(GAME_MODES, session.mode) || !levelsForMode(session.mode).includes(session.range))) || !["sniper", "minigunner", "assault"].includes(session.fourthModel) ||
       session.seed !== 1729 || !Number.isInteger(session.endTick) || session.endTick < 0 || session.endTick > 20 * 60 / STEP)
     throw new Error("Unsupported replay session");
   if (session.initial?.tick !== 0 || !Array.isArray(session.inputs) || session.inputs.length > 60000 || session.inputs.some((input, i) =>
@@ -227,7 +228,7 @@ export function playRecordedSession(sim: Simulation, session: ReplaySession) {
   const onInput = sim.onInput, onReset = sim.onReset;
   sim.onInput = sim.onReset = undefined;
   try {
-    sim.reset(session.range, session.fourthModel);
+    sim.reset(session.range, session.fourthModel, session.mode ?? defaultMode(session.range));
     let cursor = 0;
     for (let at = 0; at <= session.endTick; at++) {
       while (cursor < session.inputs.length && session.inputs[cursor].tick === at)

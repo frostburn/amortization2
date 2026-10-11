@@ -1,6 +1,14 @@
 # Endless Arena
 
-The arena provides repeated live fights for tuning combat before campaign missions. It uses a 112 × 80 m yard with four broad entrances, tall crates, low barriers, loose crates and clear flanking lanes. Outer cover breaks up the expanded space. The player starts with the chosen four-robot squad selected in a square, viewed through the wider isometric camera.
+Endless Arena is a game mode alongside **Contracts** and **Practice / debug**. Choose it in the header or pause menu, then select a level and squad before **Start arena**. All twelve implemented maps are available: Receiving, Crossing, Handling, Release, Priority Access, Recovery Fee, Training Arena, Proving Ground, Long Range, City District, Raised Concourse and Marine Port. Each mode remembers its last selected level during the session. Changing a map or squad starts a fresh run; Shift+R also restarts the current arena.
+
+The original 112 × 80 m yard is now named **Training Arena** in the level selector. Contract districts retain their reusable scenery, navigable raised paths, water, physics, breakable windows and civilian life. Arena does not start their contract objectives, guards, scripted reinforcements, convoy, cargo deliveries or human escort. Tutorial maps allow all three armed squad configurations. Practice targets are omitted from arena play; their original drills remain in Practice / debug.
+
+Handling's loading gate and Release's two office doors are open. Their roofs, full-height walls, glass collision and camera cutaways remain active. Priority Access's gate is open. Crossing uses a permanent reinforced deck: the narrow canal crossing remains a choke point, but collapse cannot strand incoming waves. The contract's single-load restriction and pursuit alarm are unchanged in Contracts.
+
+Every map has four authored dry approaches, validated against its navigation on setup. A bounded nearby search accounts for surrounding fixtures; navigation checks are not repeated every frame. Enemy formation slots must clear the map, ground layer and occupied hulls. A blocked entrance keeps its pending robots outside the fight until space is available, and pending entries prevent a false wave clear. The warning HUD and ground pulses use those same entrance positions. Long Range's entrances lie inside its sealed perimeter; the port never uses sea as an entrance. Large-map arena cameras start over the squad.
+
+Civilian activity and the normal WATCH response remain active in city maps. Security drones use their own flight AI and lifetime; they do not become wave members or add to the arena score. This keeps civilian interference separate from the wave controller.
 
 ## Loadouts and orders
 
@@ -44,3 +52,10 @@ Dead hostile bodies persist briefly, then retire after eight seconds or before t
 The simulation test suite uses the actual Rapier simulation. Added checks cover restricted loadouts, mixed weapon cycling, independent pistol reload and reach, warm-up and physical squad entry, actual enemy damage and independent aim, cover-clipped fire, survivor refits and permanent casualties, enemy snipers, hostile grenades and separate statistics, waiting for live explosives, occupied entrance slots, fourteen clears into wave fifteen with bounded body counts, defeat/reset, and recovering through an open boundary. Further checks exercise both teams’ weapon-specific friendly fire, grenade damage and impulses to the owner and allies, unselected support executing queued move orders while firing, independent aim and accuracy, blocked target acquisition, suppression/reloading, casualty exclusion, scope exits and a teammate crossing the optical sight line. Existing drills still pass using assault robots for explosives. Browser validation checks contextual weapon controls, decoded pistol audio and native pistol fire, scope entry during pistol reload, arena bursts, player firing and wave clear, subsequent entry, pause, restart, and desktop/narrow framing. The support flow also checks native machine-gun/pistol immunity and friendly grenade damage, a scoped rifle hit on a visible teammate, cover bursts with idle LMB, steady scope orientation, queued movement continuing during sniping and after RMB exit, scope transitions, and cover indicators at desktop, laptop and narrow sizes. Captured aiming and aimed rifle shots use DOM mouse events to avoid headless cursor-recentering warps; keyboard capture, overhead fire, grenades and movement use native input.
 
 This is a starting balance for playtesting. Software-GPU Chromium checks establish functional behavior, not hardware frame rate or mix quality. Firefox/Safari and physical mouse/audio-device checks remain open.
+
+
+The first-class mode update is verified across all twelve maps and all three
+squad configurations. Replays record the mode independently from the map;
+older v1 captures infer their original contract, practice or arena mode.
+A [viewable Receiving arena run](replays/arena-receiving-minigunners.json) clears
+two waves with twin miniguns; see [recorded verification notes](replays/README.md).

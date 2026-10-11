@@ -1,3 +1,4 @@
+import { defaultMode } from "./modes";
 import { STEP } from "./config";
 import { applyReplayAction, validateSession, type ReplaySession } from "./replay";
 import type { Simulation } from "./simulation";
@@ -12,7 +13,7 @@ export class ReplayPlayback {
     this.rewind();
   }
   rewind() {
-    this.sim.reset(this.session.range, this.session.fourthModel);
+    this.sim.reset(this.session.range, this.session.fourthModel, this.session.mode ?? defaultMode(this.session.range));
     this.tick = this.cursor = 0;
     this.commands();
   }

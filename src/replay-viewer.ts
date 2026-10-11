@@ -1,3 +1,4 @@
+import { defaultMode } from "./game/modes";
 import "./replay-viewer.css";
 import { STEP } from "./game/config";
 import { readHumanReplay, replaySnapshot, type HumanReplay, type ReplayView } from "./game/replay";
@@ -71,7 +72,7 @@ export class ReplayViewer {
     if (!replay.sessions.length) throw new Error("Replay has no recorded attempts");
     // Allocate and validate before touching the live game or an existing viewer.
     const attempt = replay.sessions.length - 1, session = replay.sessions[attempt];
-    const sim = await Simulation.create(session.range, session.fourthModel);
+    const sim = await Simulation.create(session.range, session.fourthModel, session.mode);
     let playback: ReplayPlayback;
     try { playback = new ReplayPlayback(sim, session); }
     catch (error) { sim.world.free(); throw error; }
@@ -87,7 +88,7 @@ export class ReplayViewer {
     select.replaceChildren(...replay.sessions.map((session, i) => {
       const option = document.createElement("option");
       option.value = String(i);
-      option.textContent = `${i + 1} · ${session.range}`;
+      option.textContent = `${i + 1} · ${session.mode ?? defaultMode(session.range)} · ${session.range}`;
       return option;
     }));
     select.value = String(attempt);

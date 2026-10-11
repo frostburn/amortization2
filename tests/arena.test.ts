@@ -1,7 +1,9 @@
+import { RECORDS_PANES } from "../src/game/records-office";
+import { ESCORT_DOOR } from "../src/game/escort";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { FIREARMS, GRENADE_FUSE, PISTOL, RIFLE, STEP, distance2 } from "../src/game/config";
 import { Simulation } from "../src/game/simulation";
-import { ARENA_ENTRIES } from "../src/game/ranges";
+import { RANGES, ARENA_ENTRIES, type RangeId } from "../src/game/ranges";
 
 function ticks(sim: Simulation, seconds: number) {
   for (let i = 0; i < Math.ceil(seconds / STEP); i++) sim.step();
@@ -271,5 +273,100 @@ describe("endless arena", () => {
     ticks(sim, 3);
     expect(sim.primary.path).toHaveLength(0);
     expect(distance2(sim.primary.body.translation(), goal)).toBeLessThan(0.15);
+  });
+});
+
+
+describe("arena map selection", () => {
+  test.each(Object.keys(RANGES) as RangeId[])("%s hosts reachable waves without contract encounters", async range => {
+    const sim = await Simulation.create(range, "minigunner", "arena");
+    try {
+      expect(sim.mode).toBe("arena");
+      expect(sim.mission).toBeUndefined();
+      expect(sim.hauling).toBeUndefined();
+      expect(sim.escort).toBeUndefined();
+      expect(sim.pistolsOnly).toBe(false);
+      expect(sim.squad.map(a => a.model)).toEqual(["assault", "minigunner", "assault", "minigunner"]);
+      expect(sim.actors).toHaveLength(4);
+      expect(sim.arena!.gates.length).toBeGreaterThanOrEqual(3);
+      for (const [i, gate] of sim.arena!.gates.entries()) {
+        expect(sim.canSpawnAt(gate)).toBe(true);
+        const route = sim.routeBetween(gate, sim.layout.players[0]);
+        expect(route.length).toBeGreaterThan(0);
+        expect(distance2(route.at(-1)!, sim.layout.players[0])).toBeLessThan(1);
+        sim.arena!.entries = [i];
+        sim.arena!.phase = "incoming"; sim.arena!.countdown = STEP;
+        sim.arena!.wave = 0;
+        sim.step();
+        expect(sim.arena!.enemies).toHaveLength(3);
+        expect(sim.arena!.inspect().incoming).toBe(0);
+        for (const a of sim.arena!.enemies) {
+          expect(a.ai!.gate).toBe(gate.name);
+          expect(sim.canSpawnAt(a.spawn)).toBe(true);
+          expect(sim.routeBetween(a.spawn, sim.layout.players[0]).length).toBeGreaterThan(0);
+          sim.retireEnemy(a);
+        }
+      }
+      sim.reset();
+      expect(sim.mode).toBe("arena");
+      expect(sim.arena!.wave).toBe(0);
+      sim.reset(range, "sniper");
+      expect(sim.arena).toBeDefined();
+      expect(sim.squad[3].model).toBe("sniper");
+    } finally { sim.world.free(); }
+  }, 20000);
+
+  test.each(["handling", "escort"] as const)("%s keeps physical interior roofs and opens its entrance in arena", async range => {
+    const sim = await Simulation.create(range, "assault", "arena");
+    try {
+      expect(sim.roofs).toHaveLength(1);
+      const roof = sim.roofs[0], p = { x: roof.area.x, z: roof.area.z };
+      sim.squad[0].body.setTranslation({ ...p, y: .98 }, true);
+      expect(sim.cutawayRoofs).toContain(roof);
+      expect(sim.ray({ ...p, y: 9 }, { ...p, y: 0 })?.collider.handle).toBe(roof.collider);
+      if (range === "handling") expect(sim.ray({ x: 7, y: 1.4, z: 0 }, { x: 11, y: 1.4, z: 0 })).toBeNull();
+      else {
+        expect(RECORDS_PANES.every(p => sim.city!.windows.panes.some(pane => pane.spec.id === p.id))).toBe(true);
+        expect(sim.ray({ x: ESCORT_DOOR.x, y: 1.4, z: ESCORT_DOOR.z + 1 }, { x: ESCORT_DOOR.x, y: 1.4, z: ESCORT_DOOR.z - 1 })).toBeNull();
+      }
+    } finally { sim.world.free(); }
+  });
+
+  test("the arena canal deck remains physical", async () => {
+    const sim = await Simulation.create("crossing", "assault", "arena");
+    try {
+      const hit = sim.ray({ x: 0, y: 2, z: 0 }, { x: 0, y: -2, z: 0 });
+      expect(hit).not.toBeNull();
+      expect(hit!.timeOfImpact).toBeCloseTo(2);
+    } finally { sim.world.free(); }
+  });
+
+  test("civilian security remains independent of ground waves", async () => {
+    const sim = await Simulation.create("receiving", "assault", "arena");
+    try {
+      const drone = sim.security!.launch({ x: -10, y: 12, z: 15 }, 0)!;
+      expect(drone).toBeDefined();
+      expect(sim.arena!.enemies).not.toContain(drone);
+      ticks(sim, 4.1);
+      expect(sim.arena!.enemies).toHaveLength(3);
+      for (const a of sim.arena!.enemies) sim.damage(a, a.maxHp, noImpulse, a.body.translation(), "gun");
+      sim.step();
+      expect(sim.arena!.phase).toBe("intermission");
+      expect(sim.arena!.kills).toBe(3);
+      sim.damage(drone, drone.maxHp, noImpulse, drone.body.translation(), "gun");
+      expect(sim.arena!.kills).toBe(3);
+    } finally { sim.world.free(); }
+  });
+
+  test("contract selection restores tutorial equipment and encounters", async () => {
+    const sim = await Simulation.create("handling", "minigunner", "arena");
+    try {
+      sim.reset("handling", "minigunner", "mission");
+      expect(sim.arena).toBeUndefined();
+      expect(sim.pistolsOnly).toBe(true);
+      expect(sim.mission).toBeDefined();
+      expect(sim.hauling!.loads).toHaveLength(2);
+      expect(sim.squad.every(a => a.weapon === "pistol")).toBe(true);
+    } finally { sim.world.free(); }
   });
 });

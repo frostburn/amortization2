@@ -1102,3 +1102,9 @@ a:hover {
 
 .hauling-unit { border-color: #dbac5b; }
 .hauling-unit .unit-name::after { content: " ◇"; color: #dbac5b; }
+
+/* Mode and map share a compact header column; settings expose both explicitly. */
+.level-choice { display: grid; gap: 3px; min-width: 0; }
+.range-title #mode-select { font-size: 10px; letter-spacing: 1px; color: var(--mint); padding-block: 3px; }
+
+.level-menu { margin-top: 12px; }

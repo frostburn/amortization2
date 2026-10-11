@@ -62,7 +62,7 @@ export class HandlingView {
     }
     batchRigid(kit); batchRigid(this.gate);
     this.root.add(this.hall.root, kit, this.gate, van.root, this.delivery, this.exit);
-    for (const load of sim.hauling!.loads) {
+    for (const load of sim.hauling?.loads ?? []) {
       const group = new THREE.Group();
       for (let i = 0; i < load.hands; i++) {
         const dot = ring({ x: (i - (load.hands - 1) / 2) * 0.65, z: 0, radius: 0.24 }, 0xdbac5b);
@@ -73,12 +73,12 @@ export class HandlingView {
   }
   update(sim: Simulation, reducedMotion: boolean) {
     // Removing a visual roof never removes its physical collider.
-    this.hall.setCutaway(!!sim.mission!.cutawayRoofs.length);
-    this.gate.visible = !sim.mission!.cargoReleased;
-    this.lamp.color.setHex(sim.mission!.cargoReleased ? 0xa3e6d0 : 0xdbac5b);
-    this.delivery.visible = sim.mission!.phase === "delivery";
-    this.exit.visible = sim.mission!.phase === "haul" || sim.mission!.phase === "return";
-    for (const [i, load] of sim.hauling!.loads.entries()) {
+    this.hall.setCutaway(!!sim.cutawayRoofs.length);
+    this.gate.visible = !!sim.mission && !sim.mission.cargoReleased;
+    this.lamp.color.setHex(sim.mission?.cargoReleased ? 0xa3e6d0 : 0xdbac5b);
+    this.delivery.visible = sim.mission?.phase === "delivery";
+    this.exit.visible = sim.mission?.phase === "haul" || sim.mission?.phase === "return";
+    for (const [i, load] of (sim.hauling?.loads ?? []).entries()) {
       const group = this.grips[i], p = load.prop.body.translation();
       group.position.set(p.x, 0.015, p.z); group.rotation.y = load.orientation; group.visible = load.unlocked && !load.delivered;
       group.children.forEach((dot, slot) => {

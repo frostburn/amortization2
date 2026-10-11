@@ -108,6 +108,7 @@ class CrossingView {
   }
   update(sim: Simulation, reducedMotion: boolean) {
     const mission = sim.mission;
+    this.exit.visible = mission?.phase === "withdraw";
     if (!mission?.bridge) return;
     this.bridge.update(mission.bridge);
     this.beacon.color.setHex(mission.alarmAt === undefined ? 0x655d4d : reducedMotion || Math.sin(sim.time * 10) > 0 ? 0xff7259 : 0x712d26);
@@ -120,7 +121,7 @@ export class MissionView {
   private view: ReceivingView | CrossingView | HandlingView | EscortView | PriorityView | RecoveryView;
   readonly root: THREE.Group;
   constructor(sim: Simulation, coverage = true) {
-    this.view = sim.range === "recovery" ? new RecoveryView() : sim.range === "priority" ? new PriorityView() : sim.escort ? new EscortView(coverage) : sim.hauling ? new HandlingView(sim, coverage) : sim.mission?.bridge ? new CrossingView() : new ReceivingView();
+    this.view = sim.range === "recovery" ? new RecoveryView() : sim.range === "priority" ? new PriorityView() : sim.range === "escort" ? new EscortView(coverage) : sim.range === "handling" ? new HandlingView(sim, coverage) : sim.range === "crossing" ? new CrossingView() : new ReceivingView();
     this.root = this.view.root;
   }
   update(sim: Simulation, reducedMotion: boolean) { this.view.update(sim, reducedMotion); }

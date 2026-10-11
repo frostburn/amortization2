@@ -75,7 +75,9 @@ The 30 m target stands on the ground; the 60 and 90 m targets stand on solid **2
 
 ## Endless Arena
 
-Choose **Endless Arena** in the entry menu or header. The whole squad starts selected in a square. Four marked entrances and a four-second warning precede the first three-robot assault squad. Clearing a wave gives surviving robots full integrity and ammunition, followed by a six-second warning for the next entrances. Disabled squad members stay down until **Shift+R** or **Restart arena** restores the whole squad.
+Endless Arena has its own **Game mode** selector in the header and pause menu. Its **Level** selector includes all twelve implemented maps, from the original Training Arena to every contract district. Choose any of the three squad configurations, then **Start arena**. Contract objectives and pistol-only restrictions apply in Contracts; Practice / debug retains the existing drills and civilian sandboxes. Mode switching remembers the last selected level for the session. See [arena map rules](docs/arena.md).
+
+Choose the **Endless Arena** game mode in the entry menu or header. The whole squad starts selected in a square. Four marked entrances and a four-second warning precede the first three-robot assault squad. Clearing a wave gives surviving robots full integrity and ammunition, followed by a six-second warning for the next entrances. Disabled squad members stay down until **Shift+R** or **Restart arena** restores the whole squad.
 
 Enemy squads enter, acquire targets and move around blocked sight lines. **Waves 1–2 never brace**, making them easier to stagger and herd. Wave 3 introduces braced firing positions and fragile enemy snipers with the same rifle/pistol loadout as NEEDLE. Robots can return fire while sliding between staggers. Automatic aim clears low cover by default; tall cover needs a flank. From wave 4, assault robots lob grenades at clustered targets; orange ground rings and an incoming warning identify live enemy grenades. Cover blocks shots and blast pressure, and live explosives must resolve before the wave ends.
 

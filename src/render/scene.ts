@@ -437,6 +437,7 @@ export class RangeScene {
     this.scene.add(this.aiming, this.destinations);
     this.destinations.visible = false;
     this.buildEnvironment(texture);
+    this.buildArenaEntries();
     this.configureRangeLighting();
     this.resetDynamic();
     this.resetCamera();
@@ -470,7 +471,7 @@ export class RangeScene {
             : new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.concourseView.root);
       }
-      if (this.sim.mission) {
+      if (this.sim.layout.contract) {
         this.missionView = new MissionView(this.sim, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
         this.environment.add(this.missionView.root);
       }
@@ -747,8 +748,11 @@ export class RangeScene {
       }
     }
     this.batchEnvironment();
-    // Keep the entrance pulse separate from the static geometry batches.
-    ARENA_ENTRIES.forEach((gate, i) => {
+  }
+
+  private buildArenaEntries() {
+    // Each map uses the same announced entrances as its wave controller.
+    this.sim.arena?.gates.forEach((gate, i) => {
       const marker = new THREE.Mesh(new THREE.RingGeometry(2.8, 2.94, 48),
         new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.25, depthWrite: false }));
       marker.rotation.x = -Math.PI / 2;
@@ -818,6 +822,7 @@ export class RangeScene {
     this.environmentLabels.clear();
     this.entryMarkers.clear();
     this.buildEnvironment(this.texture);
+    this.buildArenaEntries();
     this.configureRangeLighting();
   }
 
@@ -1122,6 +1127,11 @@ export class RangeScene {
       this.sim.range === "concourse" ? 3 : this.sim.range === "priority" ? 2 : 0,
       this.sim.range === "proving" ? -3 : this.sim.range === "concourse" ? -8 : this.sim.range === "priority" ? -3 : 0,
     );
+    if (this.sim.arena && this.sim.range !== "arena") {
+      const spawns = this.sim.layout.players;
+      this.cameraTarget.set(spawns.reduce((n, p) => n + p.x, 0) / spawns.length, 0,
+        spawns.reduce((n, p) => n + p.z, 0) / spawns.length);
+    }
     this.zoom = 1;
     this.resize();
   }
@@ -1150,7 +1160,7 @@ export class RangeScene {
       const point = this.sim.terrain.pick(origin, dir);
       ground.copy(movementLevel === undefined ? point : this.sim.terrain.movementPoint(point, movementLevel));
     }
-    const cutaway = this.sim.mission?.cutawayColliders;
+    const cutaway = this.sim.cutawayColliders;
     const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,
       cutaway?.size ? collider => !cutaway.has(collider.handle) : undefined);
     const actor =
@@ -1559,8 +1569,8 @@ export class RangeScene {
       marker.material.opacity = pending && this.sim.arena!.entries.includes(id)
         ? 0.45 + Math.sin(elapsed * 6) * 0.25 : 0.12;
     }
-    const cutawayRoofs = new Set(this.sim.mission?.cutawayRoofs.map(roof => roof.collider));
-    const closedRoofs = this.sim.mission?.roofs.filter(roof => !cutawayRoofs.has(roof.collider)) ?? [];
+    const cutawayRoofs = new Set(this.sim.cutawayRoofs.map(roof => roof.collider));
+    const closedRoofs = this.sim.roofs.filter(roof => !cutawayRoofs.has(roof.collider)) ?? [];
     for (const a of this.sim.actors) {
       if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;

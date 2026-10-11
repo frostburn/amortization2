@@ -33,6 +33,8 @@ import { NavigationGrid, segmentClear } from "./navigation";
 import { WalkTerrain, SurfaceNavigation, surfacePrism } from "./walk-surfaces";
 import { RANGES, type RangeId, type TargetKind } from "./ranges";
 import { ArenaCombat } from "./arena";
+import { defaultMode, type GameMode } from "./modes";
+import { ArenaLandmarks } from "./arena-landmarks";
 import { alertEnemies, type EnemyBrain } from "./enemies";
 import { ReceivingMission, type Mission, type Contact } from "./missions";
 import { CrossingMission } from "./crossing-mission";
@@ -156,6 +158,8 @@ export class Simulation {
   sniping = false;
   weapon: Weapon = "gun";
   range: RangeId;
+  mode: GameMode;
+  private arenaLandmarks?: ArenaLandmarks;
   fourthModel: RobotModel;
   arena?: ArenaCombat;
   mission?: Mission;
@@ -180,25 +184,33 @@ export class Simulation {
   private nextId = 100;
   private navigation!: NavigationGrid | SurfaceNavigation;
 
-  static async create(range: RangeId = "proving", fourthModel: RobotModel = "sniper") {
+  static async create(range: RangeId = "proving", fourthModel: RobotModel = "sniper", mode: GameMode = defaultMode(range)) {
     await RAPIER.init();
-    return new Simulation(range, fourthModel);
+    return new Simulation(range, fourthModel, mode);
   }
-  private constructor(range: RangeId, fourthModel: RobotModel) {
+  private constructor(range: RangeId, fourthModel: RobotModel, mode: GameMode) {
     this.range = range;
+    this.mode = mode;
     this.fourthModel = fourthModel;
     this.reset();
   }
-  get pistolsOnly() { return !!this.layout.pistolsOnly; }
+  get pistolsOnly() { return this.mode === "mission" && !!this.layout.pistolsOnly; }
+  get roofs() { return this.mission?.roofs ?? this.arenaLandmarks?.roofs ?? []; }
+  get cutawayRoofs() { return this.mission?.cutawayRoofs ?? this.arenaLandmarks?.cutawayRoofs ?? []; }
+  get cutawayColliders() { return new Set(this.cutawayRoofs.flatMap(r => [r.collider, ...(r.walls ?? [])])); }
 
   get layout() {
     return RANGES[this.range];
   }
 
-  reset(range: RangeId = this.range, fourthModel: RobotModel = this.fourthModel) {
+  reset(range: RangeId = this.range, fourthModel: RobotModel = this.fourthModel,
+    mode: GameMode = range === this.range ? this.mode : defaultMode(range)) {
     this.onReset?.("before");
     this.range = range;
+    this.mode = mode;
     this.fourthModel = fourthModel;
+    this.arena = undefined;
+    this.arenaLandmarks = undefined;
     this.mission = undefined;
     this.hauling = undefined;
     this.escort = undefined;
@@ -216,10 +228,10 @@ export class Simulation {
     this.surfaceColliders.clear();
     this.grenades = [];
     this.events = [];
-    this.selected = new Set((range === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
+    this.selected = new Set((mode === "arena" || this.layout.city) ? [1, 2, 3, 4] : [range === "long" ? 4 : 1]);
     this.trigger = false;
     this.sniping = false;
-    this.weapon = this.pistolsOnly ? "pistol" : range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
+    this.weapon = this.pistolsOnly ? "pistol" : mode !== "arena" && range === "long" ? ROBOT_MODELS[fourthModel].weapon : "gun";
     this.aim =
       range === "long" ? { x: 58, y: 3.25, z: 0 }
         : range === "arena" ? { x: 0, y: 1.25, z: -14 }
@@ -274,7 +286,7 @@ export class Simulation {
     this.layout.players.forEach((p, i) =>
       this.addActor(i + 1, "player", p.x, p.z),
     );
-    this.layout.targets.forEach((p, i) =>
+    if (mode !== "arena") this.layout.targets.forEach((p, i) =>
       this.addActor(i + 10, p.kind, p.x, p.z, p.elevation),
     );
     for (const p of this.layout.props) {
@@ -303,13 +315,22 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "mission") this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "arena") this.arenaLandmarks = new ArenaLandmarks(this);
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
-    this.arena = range === "arena" ? new ArenaCombat(this) : undefined;
+    this.arena = mode === "arena" ? new ArenaCombat(this) : undefined;
     this.onReset?.("after");
   }
+
+  canSpawnAt(point: Vec2) {
+    const b = this.layout.bounds;
+    if (point.x < b.left + .6 || point.x > b.right - .6 || point.z < b.back + .6 || point.z > b.front - .6) return false;
+    return this.terrain ? this.terrain.canStand({ ...point, y: 0 }, .6, this.dynamicNavigationBoxes())
+      : segmentClear(point, point, [...this.layout.barriers, ...this.layout.platforms, ...this.dynamicNavigationBoxes()], .6);
+  }
+  routeBetween(start: Vec2, goal: Vec2) { return this.navigation.findPath(start, goal, this.dynamicNavigationBoxes()); }
 
   private addActor(
     id: number,
@@ -1034,7 +1055,7 @@ export class Simulation {
       if (covering) this.coverShots++;
       else this.shots++;
     }
-    else if (this.arena) this.arena.enemyShots++;
+    else if (this.arena && !a.flight) this.arena.enemyShots++;
     else if (this.mission) this.mission.enemyShots++;
     const recoil = rifle ? (a.braced ? 12 : RIFLE.recoil) : a.braced ? 1 : pistol || weapon === "minigun" ? 8 : 5;
     a.body.applyImpulse({ x: -dir.x * recoil, y: 0, z: -dir.z * recoil }, true);
@@ -1120,7 +1141,7 @@ export class Simulation {
       this.selected.delete(a.id);
       a.stagger = a.staggerDuration = a.staggerGrace = 0;
       a.deathTime = this.time;
-      if (a.kind === "enemy" && this.arena) this.arena.kills++;
+      if (a.kind === "enemy" && !a.flight && this.arena) this.arena.kills++;
       a.killedBy = source;
       a.firing = false;
       a.spin = 0;
@@ -1633,6 +1654,7 @@ export class Simulation {
   inspect() {
     return {
       range: this.range,
+      mode: this.mode,
       fourthModel: this.fourthModel,
       arena: this.arena?.inspect() ?? null,
       mission: this.mission?.inspect() ?? null,
