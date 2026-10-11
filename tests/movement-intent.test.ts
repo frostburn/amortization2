@@ -10,6 +10,15 @@ const recovery = () => new WalkTerrain(RECOVERY_SURFACES, RECOVERY_RAILS,
   RANGES.recovery.barriers, RANGES.recovery.bounds);
 const bridge = { x: -5, y: 4.8, z: -24 };
 
+test.each([13.5, 14, -61.5, -62])("ramp orders at z=%s retain the climb even at street height", z => {
+  const t = recovery(), ramp = t.resolve({ x: -5, z });
+  expect(ramp.y).toBeLessThan(.15);
+  const order = t.movementPoint(ramp, { x: -16, y: 0, z });
+  expect(t.movementPoint(bridge, order, true)).toEqual(bridge);
+  // A street order alongside the same ramp still means the underpass.
+  expect(t.movementPoint(bridge, { x: -16, y: 0, z }, true).y).toBe(0);
+});
+
 test.each([-5, -43])("clicking the open ramp at z=%s climbs it from street level", z => {
   const t = recovery(), ramp = t.resolve({ x: -5, z });
   expect(ramp.y).toBeCloseTo(3.8);

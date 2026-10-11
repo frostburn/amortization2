@@ -66,11 +66,13 @@ export class WalkTerrain {
   /** Ramp clicks request the ramp, including sections with a street below.
    * Once on a raised path, continue along its connected paving. Ground orders
    * beneath flat overhead decks still request the underpass. */
-  movementPoint(p: Vec3, from: Vec3): Vec3 {
+  movementPoint(p: Vec3, from: Vec3, fromOrder = false): Vec3 {
     const picked = this.surfaces.map((s, i) => ({ s, group: this.surfaceGroups[i] }))
       .filter(({ s }) => contains(s, p, .001) && Math.abs(surfaceHeight(s, p) - p.y) < .03);
-    const groups = from.y > .15 ? this.surfaces.flatMap((s, i) =>
-      contains(s, from, .001) && Math.abs(surfaceHeight(s, from) - from.y) < .22 ? [this.surfaceGroups[i]] : []) : [];
+    // An ordered ramp point can be at street height. Its explicit surface
+    // intent survives there; ordinary physical positions keep their tolerance.
+    const groups = fromOrder || from.y > .15 ? this.surfaces.flatMap((s, i) =>
+      contains(s, from, .001) && Math.abs(surfaceHeight(s, from) - from.y) < (fromOrder ? .03 : .22) ? [this.surfaceGroups[i]] : []) : [];
     if (picked.some(({ s, group }) => s.slopeX || s.slopeZ || groups.includes(group))) return { ...p };
     const floors = this.heights(p).filter(y => this.surfaces.every(s => {
       if (!contains(s, p, -.001)) return true;
