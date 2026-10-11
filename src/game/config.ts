@@ -11,6 +11,7 @@ export type BoxSpec = {
   h: number;
   y?: number;
   navigationOnly?: boolean;
+  cylinder?: boolean;
   building?: string;
   style: "wall" | "barrier" | "crate";
 };

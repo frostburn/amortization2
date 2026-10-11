@@ -1,5 +1,119 @@
 # Recorded verification runs
 
+## Timber Rights: slope movement and failed-attempt controls
+
+Two unchanged native keyboard/mouse captures verify the terrain correction and
+failed-attempt export flow at gameplay source
+[`fce02df333f13ad30266014d8607fa4534866ddf`](https://github.com/frostburn/amortization2/commit/fce02df333f13ad30266014d8607fa4534866ddf).
+Both record revision `fce02df` and `range: "forest", mode: "mission"`.
+
+| Capture | Result | Recorded data |
+| --- | --- | --- |
+| [timber-rights-terrain.json](timber-rights-terrain.json) | Twin-minigun squad clears the uphill approach with one movement order; all four at full health; first objective remains active | 18.60 s / 1,116 ticks; 13 inputs; 39 snapshots; 3 camera observations |
+| [timber-rights-failure.json](timber-rights-failure.json) | Four machinegunners deliberately take fire without shooting; all four disabled; exported from the retained failure dialog | 44.38 s / 2,663 ticks; 21 inputs; 91 snapshots; 5 camera observations; 65 enemy shots |
+
+The movement check uses the first destination from the supplied human replay.
+It needs no retreat/reissue order and records no stationary navigation snags.
+All three squad configurations also have a physical regression test for that
+approach. In the reproduced machinegun and twin-minigun cases, hulls spent over
+eleven seconds stationary with an active route before the fix. After the fix
+they arrive without a prolonged stop. The ground
+motor applies its impulse along the support plane, and route queries use the
+surface beneath the capsule's rounded bottom. Bodies still move through normal
+Rapier physics; no position snapping or teleporting is used.
+
+The failed run tests the UI, not mission difficulty. The player braces after
+security opens fire and deliberately does not fight back. Holding/repeating and
+releasing Space leaves the debrief open. Its native export button downloads the
+second JSON before any restart. Subsequent browser checks open the confirmation,
+block held Enter and Space, cancel through the button and Escape, then restart
+with a fresh Enter press. A second deliberate failure verifies click confirmation.
+Dialog confirmation/export remains fully visible at 1440 × 900 and 1280 × 720.
+These UI interactions are checked separately; the replay records game commands,
+not dialog button focus or raw key events.
+
+Installed Playwright/Chromium was used because the Browser plugin was not
+available. A virtual clock advances normal fixed ticks while skipping rendered
+frames. Only public read-only inspection/projection and terrain height queries
+supply coordinates; health, positions, damage, ammunition and objectives are
+not injected. Both captures reproduce within 2 cm in the offline inspector and
+browser viewer. Browser import, end seek, rewind, play and exit pass without
+console errors.
+
+Run `npm run dev`, open **Controls & settings → View replay**, and choose either
+JSON. Textual reconstruction:
+
+```sh
+npm run inspect:replay -- docs/replays/timber-rights-terrain.json
+npm run inspect:replay -- docs/replays/timber-rights-failure.json
+```
+
+These are focused navigation and failure-flow checks, not a fresh completed
+mission run. Movement changes affect earlier captures' trajectories; use each
+recording's linked gameplay source for matching playback.
+
+## Timber Rights: four machinegunners
+
+This complete run predates the slope-motor fix. Use its linked source for matching
+playback; the current focused checks are above.
+
+[timber-rights-assault.json](timber-rights-assault.json) is the unchanged
+development recorder export from a complete keyboard/mouse playthrough after
+the pressure retune. Gameplay source:
+[`9fc991a90394b54037eb2f4df9aff7183d1c1874`](https://github.com/frostburn/amortization2/commit/9fc991a90394b54037eb2f4df9aff7183d1c1874).
+The capture records revision `9fc991a`, `range: "forest"` and `mode: "mission"`.
+
+| Result | Recorded value |
+| --- | --- |
+| Simulated duration | 131.77 seconds / 7,906 ticks |
+| Outcome | Complete; both rigs disabled; work order sealed; clearing secured |
+| Security defeated | Four guards and two four-robot response squads |
+| Squad recovered | 2 / 4 |
+| Robot health, IDs 1–4 | 0, 160, 76, 0 / 160 |
+| Manual player combat | 589 shots; 203 robot hits; no grenades |
+| Automated covering fire | 61 shots; 61 robot hits |
+| Enemy shots | 58 |
+| Work order sealed / inspectors take possession | 79.88 s / 107.67 s |
+| Capture | One recorded attempt; 394 inputs; 269 snapshots; 10 camera observations |
+
+The squad climbs the approach track, fights security from the western logging
+lane and stops both rigs. It establishes two cover sectors in the clearing
+before sending ANCHOR alone to seal the terminal. The other three keep covering
+while ANCHOR returns. The squad engages the northern response, then the southern
+response. BOLT and ANCHOR are lost during the hold; BREACH and LATCH defeat the
+remaining gunner and retrace the woodland track to the layby. Commands use the
+regular selection, movement, cover, brace, fire and reload controls.
+
+Installed Playwright/Chromium was used because the Browser plugin was not
+available. Its virtual clock advances the ordinary fixed simulation while
+skipping rendered frames. Read-only `inspect()` and `project()` helpers supply
+coordinates; the shared terrain module supplies the ground height for movement
+clicks. Health, positions, ammunition, rig damage and objective progress were
+not injected. Desktop/laptop visual checks use 1440 × 900 and 1280 × 720.
+
+Run `npm run dev`, open **Controls & settings → View replay**, and select the
+JSON. For textual reconstruction:
+
+```sh
+npm run inspect:replay -- docs/replays/timber-rights-assault.json
+```
+
+The offline inspector and browser viewer reproduce recorded combat and final
+robot positions within two centimetres. Browser checks import, seek to the end,
+rewind, play and exit to the live game without console errors. Later
+gameplay/physics changes may diverge; compare against the source above.
+
+This verifies the four-machinegun mission route. Tests separately cover all
+three loadouts, terrain/physics agreement, uphill/downhill formation movement,
+rifle and grenade damage to rigs, actual firing/blast locations for guard alerts,
+contested objectives, opposed responses firing during their approach, pressure
+on a lone braced SPINDLE, recovery and terrain-aware arena entries. Human play
+remains the difficulty check; this run uses precise scripted aiming.
+
+The [pre-retune capture](https://github.com/frostburn/amortization2/blob/f38bc43b36dbae08517104872472d334a81e48c9/docs/replays/timber-rights-assault.json)
+is retained in git history. It completed at gameplay source `65c7815` with four
+survivors against ten security robots; it is not a current-build verification.
+
 ## Recovery Fee: bridge access
 
 [recovery-fee-bridge.json](recovery-fee-bridge.json) is the unchanged development

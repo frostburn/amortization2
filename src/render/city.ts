@@ -113,13 +113,13 @@ export class CityView {
   private reflection?: THREE.WebGLRenderTarget;
   private ray = new THREE.Ray();
   private intersection = new THREE.Vector3();
-  constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true) {
+  constructor(district: CityDistrict, texture: THREE.Texture, private coverage = true, naturalGround = false) {
     const ground = new THREE.Group(), paving = surface(0x9c9f94);
     paving.map = texture;
     const white = surface(0xd3cdbc), dark = surface(0x344347, 0.4);
     const leaf = surface(0x566f53), earth = surface(0x737767);
     const extent = district.ground;
-    for (const piece of dryGround(extent, district.water)) block(ground, piece.right - piece.left, 0.16, piece.front - piece.back,
+    for (const piece of naturalGround ? [] : dryGround(extent, district.water)) block(ground, piece.right - piece.left, 0.16, piece.front - piece.back,
       (piece.left + piece.right) / 2, -0.1, (piece.back + piece.front) / 2, earth);
     ground.add(makeStreets(district, texture));
     // Pad paint sits above paving; keep it out of the baked street surfaces.

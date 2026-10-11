@@ -33,6 +33,8 @@ import { PorterFleet, makeTote } from "./porters";
 import { TrafficFleet } from "./traffic";
 import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
+import { NaturalTerrainView } from "./natural-terrain";
+import { FOREST_TREES } from "../game/forest";
 import { ConcourseView } from "./concourse";
 import { PRIORITY_SUPPORTS } from "../game/priority";
 import { equipmentCase } from "./equipment";
@@ -195,6 +197,7 @@ export class RangeScene {
   private environment = new THREE.Group();
   private cityView?: CityView;
   private concourseView?: ConcourseView;
+  private naturalTerrain?: NaturalTerrainView;
   private missionView?: MissionView;
   private coverView?: CoverOrderView;
   private cartFleet?: CartFleet;
@@ -460,9 +463,13 @@ export class RangeScene {
     if (this.sim.city) {
       tex.repeat.set(30, 26);
       floorMat.dispose();
-      this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
+      this.cityView = new CityView(this.sim.city.district, tex, this.renderer.getContext().getContextAttributes()?.antialias ?? false, !!this.sim.layout.ground);
       this.environment.add(this.cityView.root);
-      if (this.sim.layout.walkSurfaces) {
+      if (this.sim.layout.ground) {
+        this.naturalTerrain = new NaturalTerrainView(this.sim.layout.ground, FOREST_TREES, this.renderer.getContext().getContextAttributes()?.antialias ?? false);
+        this.environment.add(this.naturalTerrain.root);
+      }
+      if (this.sim.layout.walkSurfaces?.length) {
         this.concourseView = this.sim.range === "priority"
           ? new ConcourseView(this.renderer.getContext().getContextAttributes()?.antialias ?? false,
             this.sim.layout.walkSurfaces, this.sim.layout.walkVolumes, PRIORITY_SUPPORTS)
@@ -819,6 +826,7 @@ export class RangeScene {
     this.environment.clear();
     this.cityView = undefined;
     this.concourseView = undefined;
+    this.naturalTerrain = undefined;
     this.missionView = undefined;
     this.environmentLabels.clear();
     this.entryMarkers.clear();
@@ -1128,9 +1136,9 @@ export class RangeScene {
       this.sim.range === "concourse" ? 3 : this.sim.range === "priority" ? 2 : 0,
       this.sim.range === "proving" ? -3 : this.sim.range === "concourse" ? -8 : this.sim.range === "priority" ? -3 : 0,
     );
-    if (this.sim.arena && this.sim.range !== "arena") {
+    if ((this.sim.arena && this.sim.range !== "arena") || this.sim.layout.ground) {
       const spawns = this.sim.layout.players;
-      this.cameraTarget.set(spawns.reduce((n, p) => n + p.x, 0) / spawns.length, 0,
+      this.cameraTarget.set(spawns.reduce((n, p) => n + p.x, 0) / spawns.length, this.sim.walkingHeight(spawns[0]),
         spawns.reduce((n, p) => n + p.z, 0) / spawns.length);
     }
     this.zoom = 1;
@@ -1538,6 +1546,7 @@ export class RangeScene {
     this.renderer.info.reset();
     this.updateCamera();
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
+    this.naturalTerrain?.update(this.sim, this.camera, paused ? 0 : delta);
     this.concourseView?.update(this.sim, this.camera, paused ? 0 : delta);
     this.missionView?.update(this.sim, this.reducedMotion);
     this.coverView?.update(this.sim);

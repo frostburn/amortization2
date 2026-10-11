@@ -2,7 +2,7 @@
 
 Campaign proposal for **2038**, twelve years after the first game's events. The
 original campaign did not establish a calendar year; this is the sequel's working
-chronology. These notes guide future missions and scenes. The playable build includes four tutorial contracts, two armed operations,
+chronology. These notes guide future missions and scenes. The playable build includes four tutorial contracts, three armed operations,
 and the combat, district and civilian prototypes.
 
 ## Continuity
@@ -245,3 +245,15 @@ End on the victory and the life it enables.
 
 Portrait production and generation prompts are recorded in
 [story artwork](story-art.md).
+
+## Timber Rights: Birchwater catchment
+
+The [seventh contract](timber-rights.md) moves outside the built district. A water
+cooperative has secured a stop-work order on logging in a protected buffer next
+to Meridian's proposed data-center plot. The subcontractor keeps clearing under
+an instruction that describes tree removal as drainage preparation. The squad
+stops the rigs, seals the work-order record and secures the clearing for
+inspectors, then leaves the application to the public process. Meridian's
+expansion remains a proposal, and its need for land does not erase the existing
+catchment protections. Sable preserves the instruction record; Vale gets the
+inspectors access; Morrow keeps the operation within its concrete purpose.

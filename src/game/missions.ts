@@ -1,11 +1,12 @@
-import { PISTOL, STEP, distance2, type BoxSpec, type RoofedArea } from "./config";
+import type RAPIER from "@dimforge/rapier3d-compat";
+import { PISTOL, STEP, distance2, type BoxSpec, type RoofedArea, type Vec3 } from "./config";
 import { updateEnemy, type EnemyProfile } from "./enemies";
 import { RECEIVING_GUARDS, RECEIVING_SITES } from "./receiving";
 import type { Simulation } from "./simulation";
 import type { SingleLoadBridge } from "./bridges";
 
 export type Contact = "morrow" | "vale" | "rook" | "sable" | "quill";
-export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "restore" | "intercept" | "secure" | "complete" | "failed";
+export type MissionPhase = "briefing" | "yard" | "dispatch" | "return" | "crossing" | "withdraw" | "delivery" | "facility" | "haul" | "breach" | "rescue" | "escort" | "restore" | "intercept" | "hold" | "secure" | "complete" | "failed";
 export type MissionDefinition = {
   id: string; number: string; title: string; location: string; summary: string;
   briefing: readonly { speaker: Contact; message: string }[];
@@ -43,7 +44,8 @@ export abstract class Mission {
   obstacles: BoxSpec[] = [];
   /** Pickable mission fixtures that accept weapon damage. */
   readonly breakables = new Set<number>();
-  damageFixture(_handle: number, _amount: number): boolean { return false; }
+  damageFixture(_handle: number, _amount: number, _origin?: Vec3): boolean { return false; }
+  blastFixtures(_origin: Vec3, _source?: RAPIER.RigidBody): void {}
   /** Roofs and their walls stay physical during camera cutaways. */
   readonly roofs: { area: RoofedArea; collider: number; walls?: number[]; revealDistance?: number }[] = [];
   get cutawayRoofs() {
@@ -93,7 +95,7 @@ export abstract class Mission {
   }
 }
 
-export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery" } as const;
+export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery", recovery: "forest" } as const;
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
 export class ReceivingMission extends Mission {

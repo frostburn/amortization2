@@ -41,6 +41,7 @@ import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
 import { PriorityMission } from "./priority-mission";
+import { ForestMission } from "./forest-mission";
 import { RecoveryMission } from "./recovery-mission";
 import type { HumanEscort } from "./human-escort";
 import type { SquadHauling } from "./hauling";
@@ -215,8 +216,8 @@ export class Simulation {
     this.hauling = undefined;
     this.escort = undefined;
     this.security = undefined;
-    this.terrain = this.layout.walkSurfaces ? new WalkTerrain(this.layout.walkSurfaces,
-      this.layout.walkVolumes ?? [], [...this.layout.barriers, ...this.layout.platforms], this.layout.bounds) : undefined;
+    this.terrain = this.layout.walkSurfaces || this.layout.ground ? new WalkTerrain(this.layout.walkSurfaces ?? [],
+      this.layout.walkVolumes ?? [], [...this.layout.barriers, ...this.layout.platforms], this.layout.bounds, this.layout.ground) : undefined;
     this.navigation = this.terrain ? new SurfaceNavigation(this.terrain)
       : new NavigationGrid([...this.layout.barriers, ...this.layout.platforms], 0.55, this.layout.bounds);
     this.world?.free();
@@ -251,7 +252,11 @@ export class Simulation {
     this.drill = { gun: false, impulse: false, grenade: false, rifle: false };
     const bounds = this.layout.bounds;
     const extent = { left: bounds.left - 24, right: bounds.right + 24, back: bounds.back - 24, front: bounds.front + 24 };
-    for (const piece of dryGround(extent, this.layout.city?.water ?? [])) {
+    if (this.layout.ground) {
+      const field = this.layout.ground;
+      this.world.createCollider(RAPIER.ColliderDesc.trimesh(field.vertices, field.indices).setFriction(.8), this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
+    }
+    for (const piece of this.layout.ground ? [] : dryGround(extent, this.layout.city?.water ?? [])) {
       const floor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(
         (piece.left + piece.right) / 2, -0.5, (piece.back + piece.front) / 2));
       this.world.createCollider(RAPIER.ColliderDesc.cuboid((piece.right - piece.left) / 2, 0.5,
@@ -267,12 +272,13 @@ export class Simulation {
         RAPIER.RigidBodyDesc.fixed().setTranslation(box.x, (box.y ?? 0) + box.h / 2, box.z),
       );
       const collider = this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2).setFriction(
+        (box.cylinder ? RAPIER.ColliderDesc.cylinder(box.h / 2, box.w / 2)
+          : RAPIER.ColliderDesc.cuboid(box.w / 2, box.h / 2, box.d / 2)).setFriction(
           0.8,
         ),
         body,
       );
-      if ((box.y ?? 0) + box.h < AUTOMATIC_AIM.height)
+      if (box.h < AUTOMATIC_AIM.height)
         this.lowCover.add(collider.handle);
     }
     for (const surface of [...this.layout.walkSurfaces ?? [], ...this.layout.walkVolumes ?? []]) {
@@ -315,7 +321,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    if (mode === "mission") this.mission = range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "mission") this.mission = range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
     if (mode === "arena") this.arenaLandmarks = new ArenaLandmarks(this);
     this.security = this.city ? new SecurityResponse(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
@@ -327,7 +333,7 @@ export class Simulation {
   canSpawnAt(point: Vec2) {
     const b = this.layout.bounds;
     if (point.x < b.left + .6 || point.x > b.right - .6 || point.z < b.back + .6 || point.z > b.front - .6) return false;
-    return this.terrain ? this.terrain.canStand({ ...point, y: 0 }, .6, this.dynamicNavigationBoxes())
+    return this.terrain ? this.terrain.canStand(this.terrain.resolve({ ...point, y: point.y ?? 0 }), .6, this.dynamicNavigationBoxes())
       : segmentClear(point, point, [...this.layout.barriers, ...this.layout.platforms, ...this.dynamicNavigationBoxes()], .6);
   }
   routeBetween(start: Vec2, goal: Vec2) { return this.navigation.findPath(start, goal, this.dynamicNavigationBoxes()); }
@@ -337,9 +343,10 @@ export class Simulation {
     kind: ActorKind,
     x: number,
     z: number,
-    elevation = 0,
+    elevation?: number,
     enemyModel?: RobotModel,
   ) {
+    elevation ??= this.layout.ground?.heightAt({ x, z }) ?? 0;
     const player = kind === "player";
     const robot = player || kind === "enemy";
     const model: RobotModel | null = robot
@@ -425,7 +432,7 @@ export class Simulation {
   }
 
   addEnemy(model: RobotModel, position: Vec2) {
-    return this.addActor(this.nextId++, "enemy", position.x, position.z, position.y ?? 0, model);
+    return this.addActor(this.nextId++, "enemy", position.x, position.z, position.y, model);
   }
   addHuman(position: Vec2, appearance?: Actor["human"]) {
     const a = this.addActor(this.nextId++, "human", position.x, position.z);
@@ -784,7 +791,7 @@ export class Simulation {
     }
   }
   navigate(actor: Actor, point: Vec2, queue = false, bridgePass = false) {
-    const current = this.walkingPoint(actor);
+    const current = this.navigationPoint(actor);
     const start = queue ? this.mission?.bridge?.queuedGoal(actor) ?? actor.path.at(-1) ?? current : current;
     const path = this.navigation.findPath(start, point, this.dynamicNavigationBoxes(true, actor));
     if (!bridgePass && this.mission?.bridge?.route(actor, path, queue)) return;
@@ -796,6 +803,15 @@ export class Simulation {
   walkingPoint(actor: Actor): Vec3 {
     const p = actor.body.translation();
     return { x: p.x, y: p.y - (actor.kind === "human" ? HUMAN.height / 2 : .93), z: p.z };
+  }
+  private navigationPoint(actor: Actor): Vec3 {
+    const foot = this.walkingPoint(actor);
+    const ground = this.layout.ground?.heightAt(foot);
+    // A capsule resting on a slope has its bottom above the ground directly
+    // beneath its centre. Use the walking surface for route/support queries,
+    // without moving the physical hull or treating airborne robots as grounded.
+    if (ground !== undefined && Math.abs(foot.y - ground) < .08) foot.y = ground;
+    return foot;
   }
   walkingHeight(point: Vec2) { return this.terrain?.resolve(point).y ?? 0; }
 
@@ -1009,7 +1025,7 @@ export class Simulation {
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
     const hitOpponent = !!target && !target.dead && this.team(target) !== this.team(a);
     const glass = !!hit && !!this.city?.windows.hit(hit.collider.handle, to, hit.normal);
-    const fixture = !!hit && !glass && !!this.mission?.damageFixture(hit.collider.handle, spec.damage);
+    const fixture = !!hit && !glass && !!this.mission?.damageFixture(hit.collider.handle, spec.damage, this.walkingPoint(a));
     if (!glass && !fixture && target && !target.dead) {
       if (a.kind === "player" && target.kind === "enemy") alertEnemies(this, this.walkingPoint(a));
       this.damage(
@@ -1321,6 +1337,7 @@ export class Simulation {
     }
     this.city?.blast(origin, source, team);
     this.city?.windows.blast(origin, source);
+    this.mission?.blastFixtures(origin, source);
     this.events.push({ type: "explosion", position: origin, affected, team, ...(vehicle === undefined ? {} : { vehicle }) });
   }
 
@@ -1469,7 +1486,7 @@ export class Simulation {
       v = a.body.linvel();
     // Recover the assigned corner if another hull or an impact displaces an arrival.
     const recoveryGoal = this.mission?.bridge?.waitingGoal(a) ?? a.moveTarget;
-    const foot = this.walkingPoint(a);
+    const foot = this.navigationPoint(a);
     if (!a.path.length && recoveryGoal && (distance2(p, recoveryGoal) > 0.15 || this.terrain &&
         Math.abs(foot.y - (recoveryGoal.y ?? 0)) > .22) && this.time >= (a.replanAt ?? 0)) {
       a.path = this.navigation.findPath(this.terrain ? foot : p, recoveryGoal, this.dynamicNavigationBoxes(true, a));
@@ -1510,11 +1527,17 @@ export class Simulation {
     const amount = Math.min(length, acceleration * STEP) * a.body.mass();
     const support = this.terrain && this.ray(p, { ...p, y: p.y - 1.13 }, a.body,
       collider => collider.parent()?.isFixed() ?? false);
-    if (this.terrain ? !!support && support.normal.y > .6 : p.y < 1.1)
+    if (this.terrain ? !!support && support.normal.y > .6 : p.y < 1.1) {
+      const impulse = { x: (ix / length) * amount, y: 0, z: (iz / length) * amount };
+      // Walk along natural slopes instead of driving horizontally into them.
+      // Contact friction can otherwise cancel the whole uphill motor impulse.
+      if (this.layout.ground && support && Math.abs(foot.y - this.layout.ground.heightAt(foot)) < .08)
+        impulse.y = -(support.normal.x * impulse.x + support.normal.z * impulse.z) / support.normal.y;
       a.body.applyImpulse(
-        { x: (ix / length) * amount, y: 0, z: (iz / length) * amount },
+        impulse,
         true,
       );
+    }
   }
 
   private walkVelocity(a: Actor, preferred: Vec2): Vec2 {
@@ -1587,7 +1610,7 @@ export class Simulation {
           (next.x > BOUNDS.right - 0.37 && next.x >= p.x) ||
           (next.z < BOUNDS.back + 0.37 && next.z <= p.z) ||
           (next.z > BOUNDS.front - 0.37 && next.z >= p.z) ||
-          !(this.terrain ? this.terrain.segmentClear(this.walkingPoint(a), next, .36,
+          !(this.terrain ? this.terrain.segmentClear(this.navigationPoint(a), next, .36,
             this.dynamicNavigationBoxes(false, a)) : segmentClear(p, next, boxes, 0.36))
         )
           continue;
