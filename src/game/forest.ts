@@ -28,10 +28,12 @@ export const FOREST_TREES: ForestTree[] = [];
 for (let z = -113; z <= 113; z += 9) for (let x = -131; x <= 131; x += 9) {
   const p = { x: x + (random() - .5) * 6, z: z + (random() - .5) * 6 };
   // Clear logging tracks and a legible clearing. No narrow random tree mazes.
-  if (approachTrack(p) || southTrack(p) || p.x > 20 && p.z > -42 && p.z < 30 || p.z > 32 && p.z < 43 ||
+  if (approachTrack(p) || p.x > 20 && p.z > -42 && p.z < 30 || p.z > 32 && p.z < 43 ||
     Math.abs(p.z + 8) < 6 || Math.abs(p.z + 22) < 5 && p.x > -35 ||
     p.x > -5 && p.x < 23 && p.z > -34 && p.z < 12) continue;
-  FOREST_TREES.push({ ...p, radius: .27 + random() * .17, height: 9 + random() * 7, broadleaf: random() > .78 });
+  // Keep the existing forest seed sequence when clearing a new service track.
+  const tree = { ...p, radius: .27 + random() * .17, height: 9 + random() * 7, broadleaf: random() > .78 };
+  if (!southTrack(p)) FOREST_TREES.push(tree);
 }
 export const FOREST_RIGS = [{ id: "west", x: -10, z: -8 }, { id: "east", x: 12, z: -22 }].map(p =>
   ({ ...p, y: FOREST_GROUND.heightAt(p), w: 5.8, d: 3.8, h: 2.7 }));

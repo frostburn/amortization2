@@ -30,9 +30,10 @@ Morrow defines the job and Rook prepares the squad and recovery.
    and chassis condition using the shared debrief. There is no cargo haul,
    escort, endless reinforcement loop or silent mission timer.
 
-Four initial guards carry two machine guns and two pistols. Gunners have 160 HP
-and can engage out to 50 m; settled rifle fire needs two hits. Pistols engage at
-28 m. Faster reactions, overlapping responses and the southern approach make
+Four initial guards carry two machine guns and two pistols, retaining their
+original 38 m / 22 m engagement ranges and slower reactions. Gunners have 160 HP;
+settled rifle fire needs two hits. Response machine guns engage out to 50 m and
+their pistols to 28 m. Faster response reactions, overlapping squads and the southern approach make
 covering both angles useful instead of feeding one specialist a single file of
 passive targets. Entry is sheltered,
 with a broad sloping forestry track leading toward the western rig. The clearing

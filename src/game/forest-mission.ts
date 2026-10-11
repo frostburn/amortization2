@@ -12,7 +12,7 @@ export const TIMBER_CONTRACT = {
   briefing: [
     { speaker: "morrow", message: "The water cooperative has an enforceable stop-work order. The clearing crew ignored it. Disable both felling rigs, seal their work-order terminal, and hold the site for the inspectors. Leave the standing forest and the plot alone." },
     { speaker: "vale", message: "Two active rigs, west and east of the clearing. The data center isn't built yet: survey stakes, cooling foundations and a site office. A ridge hides our approach from the layby. The logging tracks are wide enough for the squad." },
-    { speaker: "rook", message: "Two machine guns and two pistols on site. The gunners can reach across the clearing and take two settled rifle hits. Response squads bring two guns each, from opposite tracks. Put covering robots on both angles. Trees and ridgelines stop bullets; a stopped rig remains solid cover." },
+    { speaker: "rook", message: "Two machine guns and two pistols on site. The gunners need a follow-up rifle shot. Response squads bring two guns each, with longer reach, from opposite tracks. Put covering robots on both angles. Trees and ridgelines stop bullets; a stopped rig remains solid cover." },
     { speaker: "sable", message: "Shoot the rig's engine chassis, not the trees. Once both drives stop, bring a robot to the amber terminal beside the office. Sealing that instruction calls the contractor's response squads. Hold the marked clearing until the inspectors can take possession, then recover everyone at the layby." },
   ],
   objectives: ["Disable both felling rigs", "Seal the illegal work order at the terminal", "Secure the clearing for the inspectors", "Recover the surviving squad at the layby"],
@@ -20,9 +20,13 @@ export const TIMBER_CONTRACT = {
 } as const satisfies MissionDefinition;
 export const FOREST_HOLD_SECONDS = 24;
 export const FOREST_RESPONSE_DELAYS = [5, 10] as const;
-const GUNNERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: .32, attackInterval: 2.6,
-  reactionTime: .7, noticeRange: 80, automaticRange: 50, leash: 14 };
-const PISTOLS: EnemyProfile = { ...GUNNERS, brace: false, automaticBurst: .06, pistolRange: PISTOL.range, attackInterval: 1.4 };
+const GUNNERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: .28, attackInterval: 3,
+  reactionTime: 1.2, noticeRange: 65, leash: 14 };
+const PISTOLS: EnemyProfile = { ...GUNNERS, brace: false, automaticBurst: .06, pistolRange: 22, attackInterval: 1.9 };
+const RESPONSE_GUNNERS: EnemyProfile = { ...GUNNERS, automaticBurst: .32, attackInterval: 2.6,
+  reactionTime: .7, noticeRange: 80, automaticRange: 50 };
+const RESPONSE_PISTOLS: EnemyProfile = { ...PISTOLS, reactionTime: .7, noticeRange: 80,
+  pistolRange: PISTOL.range, attackInterval: 1.4 };
 export type FellingRig = typeof FOREST_RIGS[number] & { hp: number; maxHp: number; collider: number };
 
 /** Stop work, seize its command record, then defend the site through two finite responses. */
@@ -61,7 +65,7 @@ export class ForestMission extends Mission {
     const rally = response ? this.sim.terrain!.resolve({ x: 5 + slot * 5, z: north ? -17 : 8 }) : this.sim.terrain!.resolve(p);
     a.ai = { squad: response ? this.responseCount : 0, gate: response ? "CONTRACTOR RESPONSE" : "LOGGING SECURITY",
       rally, flank: slot % 2 ? .45 : -.45, target: null, aim: { ...rally, y: rally.y + 1.3 }, state: response ? "entering" : "holding",
-      nextThink: this.sim.time + slot * .06, nextRoute: 0, nextAttack: this.sim.time + .7,
+      nextThink: this.sim.time + slot * .06, nextRoute: 0, nextAttack: this.sim.time + (response ? .7 : 1.2),
       entryUntil: this.sim.time, nextGrenade: Infinity, burstUntil: 0, visible: false, fire: false };
     (response ? this.responseIds : this.guardIds).push(a.id);
     if (response) this.sim.navigate(a, rally);
@@ -114,7 +118,8 @@ export class ForestMission extends Mission {
       const response = this.responseIds.includes(guard.id);
       const targets = this.alertedAt !== undefined || response ? living
         : living.filter(a => distance2(a.body.translation(), guard.body.translation()) < 24);
-      const profile = guard.weapon === "gun" ? GUNNERS : PISTOLS;
+      const profile = response ? guard.weapon === "gun" ? RESPONSE_GUNNERS : RESPONSE_PISTOLS
+        : guard.weapon === "gun" ? GUNNERS : PISTOLS;
       updateEnemy(this.sim, guard, targets, response || this.alertedAt !== undefined ? { ...profile, leash: undefined } : profile);
     }
   }
