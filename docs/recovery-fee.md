@@ -29,7 +29,13 @@ A twelve-metre west service entrance gives the carrier a direct return through
 the yard instead of circling its southern wall. The squad pickup van has
 matching physical collision.
 A **4.8 metre** pedestrian crossing passes over the western road. Both ramps
-connect it to street level. Ground orders stay below the open span. Concrete
+connect it to street level. Click either ramp anywhere along its paving to
+climb, including the open upper section. A follow-up bridge click continues
+the climb even before reaching the ramp; holding RMB and dragging from ramp
+to bridge preserves the same intent. Robots already on the raised path use
+its connected paving rather than whichever floor is closest in height. Queued
+orders use their previous endpoint. Fresh ground orders beneath the flat open
+span still use its underpass. Concrete
 supports clear the traffic lane and the truck's roof. Tall equipment and
 buildings give dependable cover; two parked civilian cars can be destroyed.
 Nearby CARTs continue their workshop meal route and react to gunfire. There

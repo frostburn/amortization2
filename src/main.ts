@@ -82,7 +82,7 @@ export async function start() {
     actor?: number;
     dragged: boolean;
   } | null = null;
-  let moveDrag: { queued: boolean; lastGoal: Vec2; lastTime: number } | null =
+  let moveDrag: { queued: boolean; lastGoal: Vec2; lastTime: number; intent: Vec3 } | null =
     null;
   let covering = false;
   const coverButton = document.getElementById("cover-order") as HTMLButtonElement;
@@ -506,14 +506,20 @@ export async function start() {
       scene.scope.aim(sim);
       return null;
     }
+    const walking = sim.walkingPoint(sim.primary);
+    // A follow-up bridge click can refine an existing climb before the robot
+    // reaches the ramp. Once elevated, its actual paving is the stronger cue.
+    const endpoint = queued || walking.y <= .15 ? sim.primary.path.at(-1) : undefined;
+    const movementFrom = moveDrag?.intent ?? (endpoint ? { ...endpoint, y: endpoint.y ?? 0 } : walking);
     const result = scene.pick(
       pointer.x,
       pointer.y,
       sim.weapon === "grenade" || groundOnly,
-      groundOnly ? (queued ? sim.primary.path.at(-1)?.y : undefined) ?? sim.walkingPoint(sim.primary).y : undefined,
+      groundOnly ? movementFrom : undefined,
     );
     if (result) {
       ground = result.ground;
+      if (moveDrag) moveDrag.intent = { ...ground };
       sim.aim = result.aim;
     }
     updateInteraction(result);
@@ -692,6 +698,7 @@ export async function start() {
       selectionBox.hidden = true;
       moveDrag = {
         queued: e.shiftKey,
+        intent: { ...ground },
         lastGoal: { x: ground.x, y: ground.y, z: ground.z },
         lastTime: sim.time,
       };
