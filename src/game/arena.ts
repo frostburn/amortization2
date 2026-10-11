@@ -1,5 +1,5 @@
 import { ENEMY_BRACE_WAVE, PISTOL, ROBOT_MODELS, STEP, distance2 } from "./config";
-import { ARENA_ENTRIES } from "./ranges";
+import { arenaEntries, entrySlots, type ArenaEntry } from "./arena-entries";
 import { updateEnemy } from "./enemies";
 import type { Actor, Simulation } from "./simulation";
 
@@ -13,11 +13,18 @@ export class ArenaCombat {
   countdown = 4;
   entries = [0];
 
-  constructor(private sim: Simulation) {}
+  readonly gates: ArenaEntry[];
+  private pending: { squad: number; slot: number; gate: ArenaEntry }[] = [];
+  constructor(private sim: Simulation) {
+    this.gates = arenaEntries(sim);
+    if (!this.gates.length) throw new Error(`No reachable arena entrances for ${sim.range}`);
+    if (sim.range !== "arena") this.planEntries(sim.squad);
+  }
 
   get enemies() {
-    return this.sim.actors.filter((a) => a.kind === "enemy" && !a.dead);
+    return this.sim.actors.filter((a) => a.kind === "enemy" && !a.flight && !a.dead);
   }
+  get incoming() { return this.pending.length; }
   get nextCount() {
     return Math.min(12, this.wave + 3);
   }
@@ -26,7 +33,7 @@ export class ArenaCombat {
     const sim = this.sim;
     // Endless play must not accumulate physics bodies or GPU models indefinitely.
     for (const a of [...sim.actors])
-      if (a.kind === "enemy" && a.dead && sim.time - a.deathTime! > 8)
+      if (a.kind === "enemy" && !a.flight && a.dead && sim.time - a.deathTime! > 8)
         sim.retireEnemy(a);
     if (this.phase === "defeat") return;
     const living = sim.squad.filter((a) => !a.dead);
@@ -43,7 +50,7 @@ export class ArenaCombat {
       sim.events.push({ type: "wave", message: `Squad lost on wave ${this.wave}. Shift+R restarts the arena.` });
       return;
     }
-    if (this.phase === "active" && !this.enemies.length && !sim.grenades.length) {
+    if (this.phase === "active" && !this.enemies.length && !this.pending.length && !sim.grenades.length) {
       this.cleared = this.wave;
       this.phase = "intermission";
       this.countdown = 6;
@@ -64,6 +71,7 @@ export class ArenaCombat {
       this.countdown = Math.max(0, this.countdown - STEP);
       if (this.countdown === 0) this.startWave();
     }
+    if (this.phase === "active") this.spawnIncoming();
     if (this.phase === "active")
       for (const a of this.enemies) updateEnemy(sim, a, living, {
         brace: this.wave >= ENEMY_BRACE_WAVE,
@@ -75,40 +83,38 @@ export class ArenaCombat {
 
   private planEntries(living: Actor[]) {
     const squads = Math.ceil(this.nextCount / 4);
-    const gates = ARENA_ENTRIES.map((entry, i) => ({
+    const gates = this.gates.map((entry, i) => ({
       index: i,
       distance: Math.min(...living.map((a) => distance2(entry, a.body.translation()))),
-      order: (i - this.wave % 4 + 4) % 4,
+      order: (i - this.wave % this.gates.length + this.gates.length) % this.gates.length,
     })).sort((a, b) => a.order - b.order);
     const safe = gates.filter((g) => g.distance >= 12);
     this.entries = (safe.length >= squads ? safe : gates.sort((a, b) => b.distance - a.distance))
       .slice(0, squads).map((g) => g.index);
+    while (this.entries.length < squads) this.entries.push(this.entries[this.entries.length % gates.length]);
   }
 
   private startWave() {
     for (const actor of [...this.sim.actors])
-      if (actor.kind === "enemy" && actor.dead) this.sim.retireEnemy(actor);
+      if (actor.kind === "enemy" && !actor.flight && actor.dead) this.sim.retireEnemy(actor);
     const count = this.nextCount;
     this.wave++;
     this.phase = "active";
     for (let i = 0; i < count; i++) {
       const squad = Math.floor(i / 4), slot = i % 4;
-      const gate = ARENA_ENTRIES[this.entries[squad]];
-      const side = slot % 2 === 0 ? -1.1 : 1.1;
-      const depth = Math.floor(slot / 2) * 1.9;
-      const position = {
-        x: gate.x + gate.dz * side + gate.dx * depth,
-        z: gate.z - gate.dx * side + gate.dz * depth,
-      };
-      // Keep an announced entrance even if the player approaches it during the warning.
-      // Try adjacent entrance slots rather than materialising inside another chassis.
-      const candidates = [depth, depth + 1.9, depth + 3.8, depth + 5.7].flatMap((row) =>
-        [side, -side, -3.3, 3.3].map((offset) => ({
-          x: gate.x + gate.dz * offset + gate.dx * row,
-          z: gate.z - gate.dx * offset + gate.dz * row,
-        })));
-      const spawn = candidates.find((p) => this.sim.actors.every((other) =>
-        distance2(p, other.body.translation()) > (other.dead ? 1.5 : 1.2))) ?? position;
+      const gate = this.gates[this.entries[squad]];
+      this.pending.push({ squad, slot, gate });
+    }
+    this.spawnIncoming();
+    this.sim.events.push({ type: "wave", message: `Wave ${this.wave}: ${count} robots entering from ${this.entries.map((i) => this.gates[i].name.toLowerCase()).join(" / ")}.` });
+  }
+
+  private spawnIncoming() {
+    this.pending = this.pending.filter(({ squad, slot, gate }) => {
+      // Busy entrances wait for room; never spawn inside a robot, wall or water.
+      const spawn = entrySlots(this.sim, gate, slot).find(p => this.sim.actors.every(other =>
+        distance2(p, other.body.translation()) > (other.dead ? 1.5 : 1.2)));
+      if (!spawn) return true;
       const a = this.sim.addEnemy(this.wave >= 3 && slot === 3 ? "sniper" : "assault", spawn);
       a.yaw = Math.atan2(gate.dx, gate.dz);
       a.ai = {
@@ -123,15 +129,15 @@ export class ArenaCombat {
       };
       this.sim.navigate(a, a.ai.rally);
       a.ai.rally = a.moveTarget ?? spawn;
-    }
-    this.sim.events.push({ type: "wave", message: `Wave ${this.wave}: ${count} robots entering from ${this.entries.map((i) => ARENA_ENTRIES[i].name.toLowerCase()).join(" / ")}.` });
+      return false;
+    });
   }
 
   inspect() {
     return { wave: this.wave, cleared: this.cleared, phase: this.phase,
       countdown: this.countdown, enemies: this.enemies.length,
       kills: this.kills, enemyShots: this.enemyShots,
-      nextCount: this.nextCount, entries: this.entries.map((i) => ARENA_ENTRIES[i].name),
-      maxWaveRobots: 12 };
+      nextCount: this.nextCount, entries: this.entries.map((i) => this.gates[i].name),
+      incoming: this.pending.length, gates: this.gates.map(g => ({ ...g })), maxWaveRobots: 12 };
   }
 }

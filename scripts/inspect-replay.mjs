@@ -21,7 +21,7 @@ if (!filename) {
       const commands = {};
       for (const input of session.inputs) commands[input.data.type] = (commands[input.data.type] ?? 0) + 1;
       let checked;
-      const sim = await Simulation.create(session.range, session.fourthModel);
+      const sim = await Simulation.create(session.range, session.fourthModel, session.mode);
       try {
         const played = playRecordedSession(sim, session);
         const differences = [];
@@ -37,7 +37,7 @@ if (!filename) {
           : 'Commands reproduce recorded combat and actor positions (within 2 cm).';
       } catch (error) { checked = `Cannot re-simulate: ${error.message}. Recorded observations remain available.`; }
       finally { sim.world.free(); }
-      console.log(JSON.stringify({ attempt: i + 1, range: session.range, seconds: +(session.endTick * replay.step).toFixed(2),
+      console.log(JSON.stringify({ attempt: i + 1, range: session.range, mode: sim.mode, seconds: +(session.endTick * replay.step).toFixed(2),
         outcome: observed.mission?.phase ?? observed.arena?.phase ?? 'range',
         players: observed.actors.filter(a => a.kind === 'player').map(a => ({ id: a.id, hp: a.hp, ammo: a.ammo, position: a.position })),
         shots: observed.shots, hits: observed.hits, throws: observed.throws, deaths,

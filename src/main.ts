@@ -12,6 +12,7 @@ import {
   type RobotModel,
 } from "./game/config";
 import type { RangeId } from "./game/ranges";
+import { levelsForMode, levelName, type GameMode } from "./game/modes";
 import { NEXT_CONTRACT } from "./game/missions";
 import { RangeAudio } from "./audio/audio";
 import type { HumanReplayRecorder, ReplayExportScope } from "./game/replay";
@@ -186,20 +187,19 @@ export async function start() {
   }
 
   function configureMenu() {
-    document.getElementById("menu-title")!.textContent = sim.mission ? sim.mission.definition.title
+    document.getElementById("menu-title")!.textContent = sim.arena ? "Endless arena" : sim.mission ? sim.mission.definition.title
       : sim.range === "concourse" ? "Raised concourse"
       : sim.range === "port" ? "Marine port" : sim.range === "city" ? "City district"
-      : sim.arena ? "Endless arena" : sim.range === "long" ? "Long range" : "Proving ground";
-    document.getElementById("menu-intro")!.textContent = sim.mission ? sim.mission.definition.summary
+      : sim.range === "long" ? "Long range" : "Proving ground";
+    document.getElementById("menu-intro")!.textContent = sim.arena ? `${levelName(sim.range, sim.mode)} · Survive incoming robot squads. Survivors repair and rearm between waves; lost robots stay lost. Shift+R restarts.` : sim.mission ? sim.mission.definition.summary
       : sim.range === "concourse" ? "Explore the pedestrian loop above the street. Broad ramps connect the bridge and upper gallery; target stands test firing between elevations. Right-click the paving to move. Shift+R restores the district."
       : sim.range === "port" ? "Explore the quay. PORTERs move cargo between loading stations; gunfire interrupts their work. Shift+R restores the port."
       : sim.range === "city" ? "Explore the district. Deliveries continue around you; nearby gunfire interrupts them. Reset restores the block."
-      : sim.arena ? "Survive incoming robot squads. Survivors repair and rearm between waves. Shift+R restarts."
       : sim.range === "long" ? "Sight a target with NEEDLE and press Space for braced first-person sniping. Elevated platforms need elevated aim."
       : "Test sustained fire, move heavy targets, and throw grenades over cover.";
     document.getElementById("resume")!.innerHTML = sim.mission
       ? `${sim.mission.phase === "briefing" ? "DEPLOY SQUAD" : "RESUME CONTRACT"} <span>↗</span>`
-      : `${entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
+      : `${sim.arena ? (sim.time > 0 ? "RESUME ARENA" : "START ARENA") : entered ? "RESUME RANGE" : "ENTER RANGE"} <span>↗</span>`;
     canvas.setAttribute("aria-label", sim.mission
       ? `${sim.mission.definition.title} mission. ${sim.pistolsOnly ? "Four pistols." : "Selectable armed squad. Q automatic fire or pistol, E rifle, G grenade. Space toggles braced sniping with the rifle."} Left mouse fires, right mouse moves, shift-drag selects, 5 selects the squad. C then click orders a cover sector; X ceases fire. ${sim.escort ? "Shoot the entrance lock to break in. Click Quill or press H to wait or follow the selected robot. Escape through the rear staff exit to the back-street van. " : sim.hauling ? `H collects or puts down cargo; carriers cannot fire.${sim.hauling.loads.some(l => l.hands === 2) ? " Two robots are needed for the chest." : " One robot carries the case."} ` : ""}Hold Space to brace. ${sim.mission.definition.objectives.join(". ")}.`
       : "3D debug range. Left mouse fires, right mouse moves, shift-drag selects. Q selects automatic weapons or pistol, E rifle, G grenade. Space braces or toggles the scope. 1 to 4 selects robots; 5 selects the squad.");
@@ -270,7 +270,7 @@ export async function start() {
       paused = true;
       configureMenu();
       if (!dialog.open) dialog.showModal();
-    } else toast(sim.range === "port" ? "Port restored." : sim.city ? "District restored." : sim.arena ? "Arena restarted. Squad restored; first wave incoming." : "Range reset. Targets and supplies restored.");
+    } else toast(sim.arena ? "Arena restarted. Squad restored; first wave incoming." : sim.range === "port" ? "Port restored." : sim.city ? "District restored." : "Range reset. Targets and supplies restored.");
     updateUI(sim, audio);
   }
   function chooseWeapon(weapon: Weapon) {
@@ -294,7 +294,8 @@ export async function start() {
     updateUI(sim, audio);
     canvas.focus();
   }
-  function switchRange(range: RangeId) {
+  const lastLevel: Record<GameMode, RangeId> = { mission: "receiving", arena: "arena", practice: "proving" };
+  function switchRange(range: RangeId, mode: GameMode = sim.mode) {
     if (viewer?.active) return;
     nextPausedRender = 0;
     resultDialog.close();
@@ -304,13 +305,15 @@ export async function start() {
     keys.clear();
     pointer.inside = false;
     audio.stop();
-    sim.reset(range);
+    lastLevel[sim.mode] = sim.range;
+    lastLevel[mode] = range;
+    sim.reset(range, sim.fourthModel, mode);
     scene.resetEnvironment();
     scene.resetDynamic();
     scene.resetCamera();
     accumulator = 0;
     configureMenu();
-    if (sim.mission) {
+    if (sim.mission || sim.arena) {
       paused = true;
       if (!dialog.open) dialog.showModal();
     }
@@ -340,6 +343,12 @@ export async function start() {
       loading.fail();
     } finally { preparingChange = false; last = performance.now(); accumulator = 0; }
   }
+  for (const id of ["mode-select", "menu-mode"])
+    document.getElementById(id)!.addEventListener("change", e => {
+      const mode = (e.target as HTMLSelectElement).value as GameMode;
+      if (!levelsForMode(mode).length || mode === sim.mode) return;
+      void prepareChange(() => switchRange(lastLevel[mode], mode), "Preparing the selected game mode…");
+    });
   for (const id of ["range-select", "menu-range"])
     document
       .getElementById(id)!
@@ -408,7 +417,7 @@ export async function start() {
   document.getElementById("mission-replay")!.addEventListener("click", () => { reset(); void resume(); });
   document.getElementById("mission-next")!.addEventListener("click", () => {
     const next = NEXT_CONTRACT[sim.range as keyof typeof NEXT_CONTRACT];
-    if (next) void prepareChange(() => switchRange(next), "Preparing the next contract…");
+    if (next) void prepareChange(() => switchRange(next, "mission"), "Preparing the next contract…");
   });
   document.getElementById("mission-debug")!.addEventListener("click", () => {
     void prepareChange(() => { switchRange("proving"); pause("Proving ground"); }, "Preparing the proving ground…");
@@ -936,6 +945,7 @@ export async function start() {
           {
             version: "0.1.0",
             range: sim.range,
+            mode: sim.mode,
             state: sim.inspect(),
             audio: audio.inspect(),
           },

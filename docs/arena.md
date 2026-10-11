@@ -1,6 +1,14 @@
 # Endless Arena
 
-The arena provides repeated live fights for tuning combat before campaign missions. It uses a 112 × 80 m yard with four broad entrances, tall crates, low barriers, loose crates and clear flanking lanes. Outer cover breaks up the expanded space. The player starts with the chosen four-robot squad selected in a square, viewed through the wider isometric camera.
+Endless Arena is a game mode alongside **Contracts** and **Practice / debug**. Choose it in the header or pause menu, then select a level and squad before **Start arena**. All twelve implemented maps are available: Receiving, Crossing, Handling, Release, Priority Access, Recovery Fee, Training Arena, Proving Ground, Long Range, City District, Raised Concourse and Marine Port. Each mode remembers its last selected level during the session. Changing a map or squad starts a fresh run; Shift+R also restarts the current arena.
+
+The original 112 × 80 m yard is now named **Training Arena** in the level selector. Contract districts retain their reusable scenery, navigable raised paths, water, physics, breakable windows and civilian life. Arena does not start their contract objectives, guards, scripted reinforcements, convoy, cargo deliveries or human escort. Tutorial maps allow all three armed squad configurations. Practice targets are omitted from arena play; their original drills remain in Practice / debug.
+
+Handling's loading gate and Release's two office doors are open. Their roofs, full-height walls, glass collision and camera cutaways remain active. Priority Access's gate is open. Crossing uses a permanent reinforced deck: the narrow canal crossing remains a choke point, but collapse cannot strand incoming waves. The contract's single-load restriction and pursuit alarm are unchanged in Contracts.
+
+Every map has four authored dry approaches, validated against its navigation on setup. A bounded nearby search accounts for surrounding fixtures; navigation checks are not repeated every frame. Enemy formation slots must clear the map, ground layer and occupied hulls. A blocked entrance keeps its pending robots outside the fight until space is available, and pending entries prevent a false wave clear. The warning HUD and ground pulses use those same entrance positions. Long Range's entrances lie inside its sealed perimeter; the port never uses sea as an entrance. Large-map arena cameras start over the squad.
+
+Civilian activity and the normal WATCH response remain active in city maps. Security drones use their own flight AI and lifetime; they do not become wave members or add to the arena score. This keeps civilian interference separate from the wave controller.
 
 ## Loadouts and orders
 

@@ -25,6 +25,30 @@ describe("development human replays", () => {
     return { recorder, advance };
   };
 
+  test("arena on a contract map survives export, playback and rewind; legacy files infer their mode", async () => {
+    const live = await create("receiving");
+    live.reset("receiving", "minigunner", "arena");
+    const { recorder, advance } = capture(live);
+    advance(4.2);
+    const session = readHumanReplay(recorder.export(live)).sessions[0];
+    expect(session.mode).toBe("arena");
+    const fresh = await create("receiving");
+    const player = new ReplayPlayback(fresh, session);
+    while (!player.advanceTo(session.endTick)) {}
+    expect(fresh.mode).toBe("arena");
+    expect(fresh.mission).toBeUndefined();
+    expect(replaySnapshot(fresh)).toEqual(session.final);
+    player.rewind();
+    expect(fresh.arena!.wave).toBe(0);
+    const contract = await create("receiving"), capture2 = capture(contract);
+    capture2.recorder.action(contract, { type: "deploy" }); contract.mission!.deploy(); capture2.advance(.2);
+    const legacy = capture2.recorder.export(contract).sessions[0];
+    delete legacy.mode;
+    expect(playRecordedSession(fresh, legacy)).toEqual(legacy.final);
+    expect(fresh.mode).toBe("mission");
+    expect(() => readHumanReplay({ ...recorder.export(live), sessions: [{ ...session, mode: "toString" }] })).toThrow(/session/);
+  });
+
   test("incremental playback bounds seeking, rewinds and applies final-tick commands", async () => {
     const live = await create("proving"), { recorder, advance } = capture(live);
     live.select(5); live.move({ x: -12, z: -4 }); advance(.4);

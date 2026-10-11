@@ -70,7 +70,9 @@ export class RecoveryView {
     this.root.add(kit, this.route, this.beacon, this.marker, this.salvage);
   }
   update(sim: Simulation, reducedMotion: boolean) {
-    if (!(sim.mission instanceof RecoveryMission)) return;
+    if (!(sim.mission instanceof RecoveryMission)) {
+      this.route.visible = this.beacon.visible = this.marker.visible = this.salvage.visible = false; return;
+    }
     const m = sim.mission, truck = m.truck, p = truck.body.translation(), q = truck.body.rotation();
     this.route.visible = m.disabledAt === undefined && !m.finished;
     this.beacon.position.set(p.x, p.y + VEHICLES.TRUCK.height / 2 + .15, p.z);

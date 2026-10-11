@@ -68,7 +68,7 @@ export class PriorityView {
   }
   update(sim: Simulation, reducedMotion: boolean) {
     const mission = sim.mission;
-    if (!(mission instanceof PriorityMission)) return;
+    if (!(mission instanceof PriorityMission)) { this.gate.visible = this.marker.visible = false; return; }
     this.gate.position.z = mission.gateOpen ? 10.5 : 0;
     this.gate.visible = !mission.gateOpen;
     this.lamp.color.setHex(mission.cargoReleased ? 0xa3e6d0 : 0xdbac5b);

@@ -86,9 +86,11 @@ export class EscortView {
   }
   update(sim: Simulation, reducedMotion: boolean) {
     const mission = sim.mission as EscortMission;
-    this.office.setCutaway(!!mission.cutawayRoofs.length);
+    this.office.setCutaway(!!sim.cutawayRoofs.length);
     this.office.glazing.update(sim.city!.windows.broken);
-    this.door.visible = mission.doorHp > 0; this.rear.visible = !mission.rearOpen;
+    this.door.visible = !!mission && mission.doorHp > 0; this.rear.visible = !!mission && !mission.rearOpen;
+    this.rescue.visible = this.exit.visible = false;
+    if (!mission) return;
     this.lamp.color.setHex(mission.doorHp ? 0xdbac5b : 0xa3e6d0);
     this.exitLamp.color.setHex(mission.rearOpen ? 0xa3e6d0 : 0x655d4d);
     this.alarm.color.setHex(mission.arrivedAt === undefined ? 0x655d4d : reducedMotion || Math.sin(sim.time * 10) > 0 ? 0xe8835c : 0x712d26);
