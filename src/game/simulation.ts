@@ -1016,7 +1016,7 @@ export class Simulation {
       hit && this.actors.find((t) => t.collider.handle === hit.collider.handle);
     const hitOpponent = !!target && !target.dead && this.team(target) !== this.team(a);
     const glass = !!hit && !!this.city?.windows.hit(hit.collider.handle, to, hit.normal);
-    const fixture = !!hit && !glass && !!this.mission?.damageFixture(hit.collider.handle, spec.damage);
+    const fixture = !!hit && !glass && !!this.mission?.damageFixture(hit.collider.handle, spec.damage, this.walkingPoint(a));
     if (!glass && !fixture && target && !target.dead) {
       if (a.kind === "player" && target.kind === "enemy") alertEnemies(this, this.walkingPoint(a));
       this.damage(

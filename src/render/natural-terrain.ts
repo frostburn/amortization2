@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { HeightField } from "../game/height-field";
-import { approachTrack, type ForestTree } from "../game/forest";
+import { approachTrack, southTrack, type ForestTree } from "../game/forest";
 import type { Simulation } from "../game/simulation";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
@@ -18,7 +18,7 @@ export class NaturalTerrainView {
     const colors: number[] = [], c = new THREE.Color();
     for (let i = 0; i < field.vertices.length; i += 3) {
       const x = field.vertices[i], y = field.vertices[i + 1], z = field.vertices[i + 2];
-      const track = approachTrack({x,z}) || Math.abs(z + 8) < 3.2 || Math.abs(z + 22) < 2.5 && x > -37 || z > 33 && z < 41;
+      const track = approachTrack({x,z}) || southTrack({x,z}) || Math.abs(z + 8) < 3.2 || Math.abs(z + 22) < 2.5 && x > -37 || z > 33 && z < 41;
       const clearing = x > -6 && x < 24 && z > -34 && z < 12;
       const plot = x > 31 && z < 30 && z > -46;
       c.setHex(plot ? 0xa69c80 : track ? 0x8c8068 : clearing ? 0x777d53 : 0x536b43);

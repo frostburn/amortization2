@@ -22,14 +22,19 @@ Morrow defines the job and Rook prepares the squad and recovery.
    Both rigs must be stopped. Security within 10 m contests the two-second seal.
 3. Secure the marked clearing for the inspectors. Keep a robot inside it for
    24 seconds; enemy machines within 12 m pause the accumulated control time.
-   Two finite three-robot response squads enter at 5 and 17 seconds after sealing,
-   from the northern plot track and the office track. Each has one machine gun
-   and two pistols. Clear the armed response before inspectors take possession.
+   Two finite four-robot response squads enter at 5 and 10 seconds after sealing,
+   from the northern plot track and the southern service track. Each has two
+   machine guns and two pistols. They engage during their approach and overlap
+   from opposing angles. Clear the armed response before inspectors take possession.
 4. Bring every surviving robot back to the off-track layby. Rook reports losses
    and chassis condition using the shared debrief. There is no cargo haul,
    escort, endless reinforcement loop or silent mission timer.
 
-Four initial guards carry two machine guns and two pistols. Entry is sheltered,
+Four initial guards carry two machine guns and two pistols. Gunners have 160 HP
+and can engage out to 50 m; settled rifle fire needs two hits. Pistols engage at
+28 m. Faster reactions, overlapping responses and the southern approach make
+covering both angles useful instead of feeding one specialist a single file of
+passive targets. Entry is sheltered,
 with a broad sloping forestry track leading toward the western rig. The clearing
 and lateral tracks leave room for formation movement and bullet pressure. Logs
 and boulders supply low cover; ridge crests offer sight lines for NEEDLE. Tree

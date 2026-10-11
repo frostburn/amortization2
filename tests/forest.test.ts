@@ -5,7 +5,7 @@ import { HeightField } from "../src/game/height-field";
 import { FOREST_GROUND, FOREST_SITES } from "../src/game/forest";
 import { ForestMission, FOREST_HOLD_SECONDS } from "../src/game/forest-mission";
 import { NEXT_CONTRACT } from "../src/game/missions";
-import { STEP, distance2 } from "../src/game/config";
+import { MAGAZINE, STEP, distance2 } from "../src/game/config";
 import { levelsForMode } from "../src/game/modes";
 
 describe("Timber Rights and shared natural terrain", () => {
@@ -64,9 +64,11 @@ describe("Timber Rights and shared natural terrain", () => {
   test("an actual rifle shot damages a felling rig, stopping it leaves solid cover", async () => {
     sim = await Simulation.create("forest"); mission().deploy();
     const a=sim.squad[3],r=mission().rigs[0]; place(a,{x:r.x-10,z:r.z});
-    sim.select(4); sim.chooseWeapon("rifle"); sim.setBrace(true); ticks(.8);
+    sim.selectGroup([1,2,3,4]); sim.chooseWeapon("rifle"); sim.setBrace(true); ticks(.8);
     sim.aim={x:r.x,y:r.y+1.8,z:r.z}; sim.shoot(a);
     expect(r.hp).toBe(80); expect(mission().alertedAt).toBeDefined();
+    // Rifle operator 4 is away from the first selected robot at the layby.
+    for(const guard of mission().enemies) expect(guard.ai!.alertPosition).toEqual(sim.walkingPoint(a));
     mission().damageFixture(r.collider,80);
     expect(mission().stoppedRigs).toBe(1);
     expect(sim.world.getCollider(r.collider)).toBeTruthy();
@@ -85,6 +87,7 @@ describe("Timber Rights and shared natural terrain", () => {
     sim=await Simulation.create("forest"); mission().deploy(); const r=mission().rigs[0];
     const origin={x:r.x-3.8,y:r.y+1.2,z:r.z}; mission().blastFixtures(origin);
     expect(r.hp).toBeLessThan(r.maxHp); const hp=r.hp;
+    for(const guard of mission().enemies) expect(guard.ai!.alertPosition).toEqual(origin);
     sim.world.createCollider(RAPIER.ColliderDesc.cuboid(.15,2,4).setTranslation(r.x-3.2,r.y+2,r.z));sim.world.step();
     mission().blastFixtures(origin);expect(r.hp).toBe(hp);
   });
@@ -95,9 +98,45 @@ describe("Timber Rights and shared natural terrain", () => {
     expect(mission().sealedAt).toBeUndefined();stop();ticks(2.2);
     expect(mission().phase).toBe("secure");expect(mission().contested).toBe(true);
     kill();ticks(2.2);expect(mission().phase).toBe("hold");ticks(5.2);
-    expect(mission().responseCount).toBe(1);expect(mission().enemies).toHaveLength(3);kill();ticks(12.2);
-    expect(mission().responseCount).toBe(2);expect(mission().enemies).toHaveLength(3);kill();ticks(40);
+    expect(mission().responseCount).toBe(1);expect(mission().enemies).toHaveLength(4);kill();ticks(5);
+    expect(mission().responseCount).toBe(2);expect(mission().enemies).toHaveLength(4);kill();ticks(40);
     expect(mission().responseCount).toBe(2);expect(mission().phase).toBe("hold"); // Nobody in the clearing.
+  },15000);
+
+  test("responses overlap from opposite tracks and fire before finishing their approach", async () => {
+    sim=await Simulation.create("forest");mission().deploy();seal();
+    place(sim.squad[0],{x:14,z:-1});ticks(5.1);
+    const first=mission().enemies.map(a=>a.id);
+    expect(first).toHaveLength(4);
+    expect(mission().enemies.filter(a=>a.weapon==="gun")).toHaveLength(2);
+    ticks(2);
+    expect(mission().enemyShots).toBeGreaterThan(0);
+    expect(mission().responseCount).toBe(1);
+    const shots=mission().enemyShots;
+    ticks(3);
+    expect(mission().responseCount).toBe(2);expect(mission().enemies).toHaveLength(8);
+    const south=mission().enemies.filter(a=>!first.includes(a.id));
+    expect(south.every(a=>a.ai!.rally.z>FOREST_SITES.clearing.z)).toBe(true);
+    ticks(2);
+    expect(mission().enemyShots).toBeGreaterThan(shots);
+    expect(south.some(a=>a.ammo<MAGAZINE)).toBe(true);
+  },15000);
+
+  test("a lone braced SPINDLE trading fire in the clearing takes return fire", async () => {
+    sim=await Simulation.create("forest","minigunner");mission().deploy();stop();kill();
+    const spindle=sim.squad[3];place(spindle,{x:31,z:2});ticks(2.2);
+    expect(mission().phase).toBe("hold");
+    place(spindle,{x:14,z:-1});sim.select(4);sim.chooseWeapon("minigun");sim.setBrace(true);
+    for(let i=0;i<30/STEP&&!spindle.dead&&mission().phase==="hold";i++) {
+      const targets=mission().enemies.sort((a,b)=>distance2(spindle.body.translation(),a.body.translation())-distance2(spindle.body.translation(),b.body.translation()));
+      const target=targets[0];
+      sim.trigger=!!target;
+      if(target){const p=target.body.translation();sim.aim={...p,y:p.y+.7};}
+      if(!sim.ammunition(spindle).ammo)sim.reloadActor(spindle);
+      sim.step();sim.events.length=0;
+    }
+    expect(mission().enemyShots).toBeGreaterThan(3);
+    expect(spindle.hp).toBeLessThan(spindle.maxHp);
   },15000);
 
   test("hold pauses when contested, requires a robot in the clearing, then all survivors must extract", async () => {

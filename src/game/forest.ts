@@ -19,6 +19,8 @@ export const FOREST_GROUND = new HeightField({ left: -144, right: 144, back: -12
 export function approachTrack(p: Vec2) {
   return p.x > -66 && p.x < -18 && p.z > -15 && p.z < 43 && Math.abs((p.x + 57) * 45 + (p.z - 37) * 33) / Math.hypot(45,33) < 5;
 }
+/** Southern service track gives the response a second route into the clearing. */
+export const southTrack = (p: Vec2) => p.x > 6 && p.x < 20 && p.z > 9 && p.z < 42;
 export type ForestTree = Vec2 & { radius: number; height: number; broadleaf: boolean };
 let seed = 914;
 const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -26,7 +28,7 @@ export const FOREST_TREES: ForestTree[] = [];
 for (let z = -113; z <= 113; z += 9) for (let x = -131; x <= 131; x += 9) {
   const p = { x: x + (random() - .5) * 6, z: z + (random() - .5) * 6 };
   // Clear logging tracks and a legible clearing. No narrow random tree mazes.
-  if (approachTrack(p) || p.x > 20 && p.z > -42 && p.z < 30 || p.z > 32 && p.z < 43 ||
+  if (approachTrack(p) || southTrack(p) || p.x > 20 && p.z > -42 && p.z < 30 || p.z > 32 && p.z < 43 ||
     Math.abs(p.z + 8) < 6 || Math.abs(p.z + 22) < 5 && p.x > -35 ||
     p.x > -5 && p.x < 23 && p.z > -34 && p.z < 12) continue;
   FOREST_TREES.push({ ...p, radius: .27 + random() * .17, height: 9 + random() * 7, broadleaf: random() > .78 });

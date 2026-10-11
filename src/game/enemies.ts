@@ -31,6 +31,7 @@ export type EnemyProfile = {
   leash?: number;
   reactionTime?: number;
   pistolRange?: number;
+  automaticRange?: number;
 };
 
 /** Radio contact reports preserve the firing position, not future player movement. */
@@ -147,7 +148,7 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
       brain.state = "reloading";
       brain.burstUntil = 0;
       brain.nextAttack = Math.max(brain.nextAttack, now + 0.5);
-    } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? profile.pistolRange ?? 24 : 38)) {
+    } else if (brain.visible && distance < (a.weapon === "rifle" ? 80 : a.weapon === "pistol" ? profile.pistolRange ?? 24 : profile.automaticRange ?? 38)) {
       a.braced = profile.brace;
       a.path = [];
       a.moveTarget = undefined;

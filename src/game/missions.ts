@@ -44,7 +44,7 @@ export abstract class Mission {
   obstacles: BoxSpec[] = [];
   /** Pickable mission fixtures that accept weapon damage. */
   readonly breakables = new Set<number>();
-  damageFixture(_handle: number, _amount: number): boolean { return false; }
+  damageFixture(_handle: number, _amount: number, _origin?: Vec3): boolean { return false; }
   blastFixtures(_origin: Vec3, _source?: RAPIER.RigidBody): void {}
   /** Roofs and their walls stay physical during camera cutaways. */
   readonly roofs: { area: RoofedArea; collider: number; walls?: number[]; revealDistance?: number }[] = [];

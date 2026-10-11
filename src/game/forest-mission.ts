@@ -12,16 +12,17 @@ export const TIMBER_CONTRACT = {
   briefing: [
     { speaker: "morrow", message: "The water cooperative has an enforceable stop-work order. The clearing crew ignored it. Disable both felling rigs, seal their work-order terminal, and hold the site for the inspectors. Leave the standing forest and the plot alone." },
     { speaker: "vale", message: "Two active rigs, west and east of the clearing. The data center isn't built yet: survey stakes, cooling foundations and a site office. A ridge hides our approach from the layby. The logging tracks are wide enough for the squad." },
-    { speaker: "rook", message: "Two machine guns and two pistols on site. Trees stop bullets at the trunk; ridgelines stop them completely. Work from a clear crest, or push security along the logging track. A stopped rig remains solid cover." },
+    { speaker: "rook", message: "Two machine guns and two pistols on site. The gunners can reach across the clearing and take two settled rifle hits. Response squads bring two guns each, from opposite tracks. Put covering robots on both angles. Trees and ridgelines stop bullets; a stopped rig remains solid cover." },
     { speaker: "sable", message: "Shoot the rig's engine chassis, not the trees. Once both drives stop, bring a robot to the amber terminal beside the office. Sealing that instruction calls the contractor's response squads. Hold the marked clearing until the inspectors can take possession, then recover everyone at the layby." },
   ],
   objectives: ["Disable both felling rigs", "Seal the illegal work order at the terminal", "Secure the clearing for the inspectors", "Recover the surviving squad at the layby"],
   releaseSeconds: 2, returnSeconds: 1,
 } as const satisfies MissionDefinition;
 export const FOREST_HOLD_SECONDS = 24;
-const GUNNERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: .28, attackInterval: 3,
-  reactionTime: 1.2, noticeRange: 65, leash: 14 };
-const PISTOLS: EnemyProfile = { ...GUNNERS, brace: false, automaticBurst: .06, pistolRange: 22, attackInterval: 1.9 };
+export const FOREST_RESPONSE_DELAYS = [5, 10] as const;
+const GUNNERS: EnemyProfile = { brace: true, grenades: false, automaticBurst: .32, attackInterval: 2.6,
+  reactionTime: .7, noticeRange: 80, automaticRange: 50, leash: 14 };
+const PISTOLS: EnemyProfile = { ...GUNNERS, brace: false, automaticBurst: .06, pistolRange: PISTOL.range, attackInterval: 1.4 };
 export type FellingRig = typeof FOREST_RIGS[number] & { hp: number; maxHp: number; collider: number };
 
 /** Stop work, seize its command record, then defend the site through two finite responses. */
@@ -55,12 +56,13 @@ export class ForestMission extends Mission {
     const a = this.sim.addEnemy("assault", p);
     a.weapons = [gun ? "gun" : "pistol"]; a.weapon = gun ? "gun" : "pistol";
     a.ammo = gun ? MAGAZINE : 0; a.pistol.ammo = PISTOL.magazine;
-    a.hp = a.maxHp = gun ? 132 : 100;
-    const rally = response ? this.sim.terrain!.resolve({ x: 9 + slot * 5, z: -8 + (slot % 2 ? 9 : -9) }) : this.sim.terrain!.resolve(p);
+    a.hp = a.maxHp = gun ? 160 : 100;
+    const north = this.responseCount === 1;
+    const rally = response ? this.sim.terrain!.resolve({ x: 5 + slot * 5, z: north ? -17 : 8 }) : this.sim.terrain!.resolve(p);
     a.ai = { squad: response ? this.responseCount : 0, gate: response ? "CONTRACTOR RESPONSE" : "LOGGING SECURITY",
       rally, flank: slot % 2 ? .45 : -.45, target: null, aim: { ...rally, y: rally.y + 1.3 }, state: response ? "entering" : "holding",
-      nextThink: this.sim.time + slot * .06, nextRoute: 0, nextAttack: this.sim.time + 1.2,
-      entryUntil: this.sim.time + (response ? 6 : 0), nextGrenade: Infinity, burstUntil: 0, visible: false, fire: false };
+      nextThink: this.sim.time + slot * .06, nextRoute: 0, nextAttack: this.sim.time + .7,
+      entryUntil: this.sim.time, nextGrenade: Infinity, burstUntil: 0, visible: false, fire: false };
     (response ? this.responseIds : this.guardIds).push(a.id);
     if (response) this.sim.navigate(a, rally);
     return a;
@@ -71,15 +73,14 @@ export class ForestMission extends Mission {
   get marker() { return this.phase === "return" ? { ...FOREST_SITES.entry, kind: "return" as const }
     : this.phase === "secure" ? { ...FOREST_SITES.terminal, kind: "dispatch" as const }
     : this.phase === "hold" ? { ...FOREST_SITES.clearing, kind: "dispatch" as const } : null; }
-  damageFixture(handle: number, amount: number) {
+  damageFixture(handle: number, amount: number, origin?: Vec3) {
     const rig = this.rigs.find(r => r.collider === handle);
     if (!rig) return false;
     const active = rig.hp > 0;
     rig.hp = Math.max(0, rig.hp - Math.max(0, amount));
     if (active && amount > 0) {
       this.alertedAt ??= this.sim.time;
-      const attacker = this.sim.active[0];
-      if (attacker) alertEnemies(this.sim, this.sim.walkingPoint(attacker));
+      alertEnemies(this.sim, origin ?? { x: rig.x, y: rig.y, z: rig.z });
       if (!rig.hp) this.sim.events.push({ type: "comms", speaker: "sable", message: `${rig.id === "west" ? "West" : "East"} rig stopped. Its chassis is still cover. ${this.stoppedRigs === 2 ? "Both drives are out; seal the work order at the terminal." : "One drive remaining."}` });
     }
     return true;
@@ -91,24 +92,24 @@ export class ForestMission extends Mission {
       const distance = Math.hypot(point.x - origin.x, point.y - origin.y, point.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;
       const hit = this.sim.ray(origin, point, source, c => c.handle !== rig.collider);
-      if (!hit) this.damageFixture(rig.collider, 210 * Math.sqrt(1 - distance / BLAST_RADIUS));
+      if (!hit) this.damageFixture(rig.collider, 210 * Math.sqrt(1 - distance / BLAST_RADIUS), origin);
     }
   }
   private response() {
     this.responseCount++;
     const north = this.responseCount === 1;
-    const slots = north ? [{ x: 54, z: -31 }, { x: 60, z: -26 }, { x: 54, z: -21 }]
-      : [{ x: 63, z: 25 }, { x: 56, z: 23 }, { x: 61, z: 17 }];
-    slots.forEach((p, i) => this.guard(p, i === 0, i, true));
+    const slots = north ? [{ x: 42, z: -32 }, { x: 48, z: -25 }, { x: 39, z: -22 }, { x: 46, z: -36 }]
+      : [{ x: 9, z: 36 }, { x: 16, z: 39 }, { x: 2, z: 37 }, { x: 23, z: 36 }];
+    slots.forEach((p, i) => this.guard(p, i < 2, i, true));
     this.sim.events.push({ type: "security", phase: "arrival", position: { ...slots[0], y: 1 }, level: 1 });
     this.sim.events.push({ type: "comms", speaker: "vale", message: north
-      ? "Contractor response coming down the north track. One machine gun, two pistols. Keep a robot in the clearing; cover from the ridge or logs."
-      : "Second and final squad, from the site-office track. The inspectors are waiting for the armed machines to stop." });
+      ? "North-track response: two machine guns, two pistols. The south track is reporting another squad. Cover both angles and keep a robot in the clearing."
+      : "Second and final squad on the southern service track. Two more machine guns. They're crossing the first squad's angle." });
   }
   updateCombat() {
     const living = this.sim.squad.filter(a => !a.dead);
     if (this.alertedAt === undefined && this.enemies.some(a => a.hp < a.maxHp || living.some(target => distance2(a.body.translation(), target.body.translation()) < 24))) this.alertedAt = this.sim.time;
-    if (this.sealedAt !== undefined && this.responseCount < 2 && this.sim.time >= this.sealedAt + (this.responseCount === 0 ? 5 : 17)) this.response();
+    if (this.sealedAt !== undefined && this.responseCount < 2 && this.sim.time >= this.sealedAt + FOREST_RESPONSE_DELAYS[this.responseCount]) this.response();
     for (const guard of this.enemies) {
       const response = this.responseIds.includes(guard.id);
       const targets = this.alertedAt !== undefined || response ? living
