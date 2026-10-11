@@ -791,7 +791,7 @@ export class Simulation {
     }
   }
   navigate(actor: Actor, point: Vec2, queue = false, bridgePass = false) {
-    const current = this.walkingPoint(actor);
+    const current = this.navigationPoint(actor);
     const start = queue ? this.mission?.bridge?.queuedGoal(actor) ?? actor.path.at(-1) ?? current : current;
     const path = this.navigation.findPath(start, point, this.dynamicNavigationBoxes(true, actor));
     if (!bridgePass && this.mission?.bridge?.route(actor, path, queue)) return;
@@ -803,6 +803,15 @@ export class Simulation {
   walkingPoint(actor: Actor): Vec3 {
     const p = actor.body.translation();
     return { x: p.x, y: p.y - (actor.kind === "human" ? HUMAN.height / 2 : .93), z: p.z };
+  }
+  private navigationPoint(actor: Actor): Vec3 {
+    const foot = this.walkingPoint(actor);
+    const ground = this.layout.ground?.heightAt(foot);
+    // A capsule resting on a slope has its bottom above the ground directly
+    // beneath its centre. Use the walking surface for route/support queries,
+    // without moving the physical hull or treating airborne robots as grounded.
+    if (ground !== undefined && Math.abs(foot.y - ground) < .08) foot.y = ground;
+    return foot;
   }
   walkingHeight(point: Vec2) { return this.terrain?.resolve(point).y ?? 0; }
 
@@ -1477,7 +1486,7 @@ export class Simulation {
       v = a.body.linvel();
     // Recover the assigned corner if another hull or an impact displaces an arrival.
     const recoveryGoal = this.mission?.bridge?.waitingGoal(a) ?? a.moveTarget;
-    const foot = this.walkingPoint(a);
+    const foot = this.navigationPoint(a);
     if (!a.path.length && recoveryGoal && (distance2(p, recoveryGoal) > 0.15 || this.terrain &&
         Math.abs(foot.y - (recoveryGoal.y ?? 0)) > .22) && this.time >= (a.replanAt ?? 0)) {
       a.path = this.navigation.findPath(this.terrain ? foot : p, recoveryGoal, this.dynamicNavigationBoxes(true, a));
@@ -1518,11 +1527,17 @@ export class Simulation {
     const amount = Math.min(length, acceleration * STEP) * a.body.mass();
     const support = this.terrain && this.ray(p, { ...p, y: p.y - 1.13 }, a.body,
       collider => collider.parent()?.isFixed() ?? false);
-    if (this.terrain ? !!support && support.normal.y > .6 : p.y < 1.1)
+    if (this.terrain ? !!support && support.normal.y > .6 : p.y < 1.1) {
+      const impulse = { x: (ix / length) * amount, y: 0, z: (iz / length) * amount };
+      // Walk along natural slopes instead of driving horizontally into them.
+      // Contact friction can otherwise cancel the whole uphill motor impulse.
+      if (this.layout.ground && support && Math.abs(foot.y - this.layout.ground.heightAt(foot)) < .08)
+        impulse.y = -(support.normal.x * impulse.x + support.normal.z * impulse.z) / support.normal.y;
       a.body.applyImpulse(
-        { x: (ix / length) * amount, y: 0, z: (iz / length) * amount },
+        impulse,
         true,
       );
+    }
   }
 
   private walkVelocity(a: Actor, preferred: Vec2): Vec2 {
@@ -1595,7 +1610,7 @@ export class Simulation {
           (next.x > BOUNDS.right - 0.37 && next.x >= p.x) ||
           (next.z < BOUNDS.back + 0.37 && next.z <= p.z) ||
           (next.z > BOUNDS.front - 0.37 && next.z >= p.z) ||
-          !(this.terrain ? this.terrain.segmentClear(this.walkingPoint(a), next, .36,
+          !(this.terrain ? this.terrain.segmentClear(this.navigationPoint(a), next, .36,
             this.dynamicNavigationBoxes(false, a)) : segmentClear(p, next, boxes, 0.36))
         )
           continue;

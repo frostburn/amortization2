@@ -144,6 +144,11 @@ dialog.mission-menu { width: 640px; max-width: min(640px, 92vw); }
 #menu.mission-menu #resume { position: sticky; bottom: 10px; z-index: 1; box-shadow: 0 -12px 24px #152124; }
 .mission-result-actions { display: grid; gap: 12px; margin-top: 22px; }
 .mission-result-actions > button:last-child { padding: 12px; font: 11px ui-monospace, monospace; }
+#mission-restart-confirmation { padding: 14px; border: 1px solid var(--amber); }
+#mission-restart-question { margin: 0; }
+#mission-restart-confirmation > p + p { color: var(--muted); font-size: 12px; }
+#mission-restart-confirmation > div { display: flex; gap: 12px; }
+#mission-restart-confirmation button { flex: 1; padding: 12px 8px; font: 11px ui-monospace, monospace; }
 #mission-result-detail { font: 11px ui-monospace, monospace; line-height: 1.7; color: var(--muted); }
 .minigunner-unit .unit-role { color: var(--amber); }
 .topbar nav {

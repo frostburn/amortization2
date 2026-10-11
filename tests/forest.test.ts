@@ -50,6 +50,30 @@ describe("Timber Rights and shared natural terrain", () => {
     }
   }, 15000);
 
+  test.each(["assault", "minigunner", "sniper"] as const)("%s squad clears the replay's uphill formation snag without another order", async model => {
+    sim = await Simulation.create("forest", model, "practice");
+    ticks(100*STEP);
+    sim.move({x:-30.667441913410897,y:5.226225152445943,z:-.8006404831461182});
+    const idle=sim.squad.map(()=>0);let longest=0;
+    for(let i=0;i<40/STEP;i++){
+      sim.step();sim.events.length=0;
+      sim.squad.forEach((a,j)=>{
+        const v=a.body.linvel();
+        idle[j]=a.path.length&&Math.hypot(v.x,v.z)<.12?idle[j]+1:0;
+        longest=Math.max(longest,idle[j]);
+      });
+      if(sim.squad.every(a=>!a.path.length))break;
+    }
+    expect(longest*STEP).toBeLessThan(1.5);
+    for(const a of sim.squad){
+      expect(a.path).toHaveLength(0);
+      expect(distance2(a.body.translation(),a.moveTarget!)).toBeLessThan(.3);
+      // The physics hull remains supported; navigation must not teleport it.
+      const p=a.body.translation();
+      expect(Math.abs(p.y-.93-FOREST_GROUND.heightAt(p))).toBeLessThan(.08);
+    }
+  },15000);
+
   test.each(["sniper", "minigunner", "assault"] as const)("%s squad starts safely; contract and arena both select the woodland", async model => {
     sim = await Simulation.create("forest", model);
     expect(NEXT_CONTRACT.recovery).toBe("forest");
