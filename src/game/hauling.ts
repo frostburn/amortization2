@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { STEP, clamp, distance2, type Vec2 } from "./config";
 import { NavigationGrid, segmentClear } from "./navigation";
 import type { Actor, Prop, Simulation } from "./simulation";
+import { vehicleFootprint } from "./traffic";
 
 export type SquadLoad = {
   prop: Prop; hands: 1 | 2; unlocked: boolean; delivered: boolean;
@@ -124,7 +125,9 @@ export class SquadHauling {
     const bounds = this.sim.layout.bounds, radius = FORMATION_MARGIN;
     const goal = { x: clamp(point.x, bounds.left + radius, bounds.right - radius),
       z: clamp(point.z, bounds.back + radius, bounds.front - radius) };
-    const extras = [...(this.sim.mission?.obstacles ?? []), ...this.sim.props.filter(p => p !== load.prop)
+    const extras = [...(this.sim.mission?.obstacles ?? []),
+      ...(this.sim.city?.vehicles ?? []).filter(c => !c.hp || c.driveHp === 0 || c.state === "stranded").map(vehicleFootprint),
+      ...this.sim.props.filter(p => p !== load.prop && p.body.isEnabled())
       .map(p => ({ ...p.body.translation(), w: p.w, d: p.d }))];
     const path = this.grids.get(load.prop.id)!.findPath(queue ? load.path.at(-1) ?? load.prop.body.translation() : load.prop.body.translation(), goal, extras);
     load.path = queue ? [...load.path, ...path] : path; load.goal = load.path.at(-1);

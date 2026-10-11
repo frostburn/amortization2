@@ -10,6 +10,18 @@ function dispose(root:THREE.Object3D) {
   materials.forEach(m=>m.dispose());
 }
 describe("reusable traffic models",()=>{
+  test("TRUCK has exposed reflective front glazing and a full-height payload body",()=>{
+    const {root}=vehicleBody("TRUCK"),spec=VEHICLES.TRUCK,ray=new THREE.Raycaster();root.updateMatrixWorld(true);
+    try {
+      ray.set(new THREE.Vector3(0,1.9-spec.height/2,spec.length),new THREE.Vector3(0,0,-1));
+      const hits=ray.intersectObject(root,true),first=hits[0];
+      expect(first).toBeDefined();expect((first.object as THREE.Mesh).material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+      expect(hits.filter(h=>Math.abs(h.distance-first.distance)<1e-5)).toHaveLength(1);
+      const bounds=new THREE.Box3().setFromObject(root);
+      expect(bounds.max.y+spec.height/2).toBeGreaterThan(2.9);
+      expect(bounds.max.y+spec.height/2).toBeLessThan(3.15);
+    } finally {dispose(root);}
+  });
   test.each(["CAB","VAN"] as const)("%s has an exposed sloping windscreen and separated body surfaces",model=>{
     const {root}=vehicleBody(model),spec=VEHICLES[model],ray=new THREE.Raycaster();root.updateMatrixWorld(true);
     try {

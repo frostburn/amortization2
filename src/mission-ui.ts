@@ -2,6 +2,8 @@ import { NEXT_CONTRACT, type Contact } from "./game/missions";
 import { RANGES } from "./game/ranges";
 import type { EscortMission } from "./game/escort-mission";
 import { PriorityMission } from "./game/priority-mission";
+import { RecoveryMission } from "./game/recovery-mission";
+import { RECOVERY_DRIVE_HP } from "./game/recovery";
 import { squadName } from "./game/config";
 import type { Simulation } from "./game/simulation";
 import { rookDebrief } from "./game/debrief";
@@ -54,6 +56,9 @@ export function updateMissionUI(sim: Simulation) {
   const note = document.querySelector(".loadout-note")!;
   note.textContent = selectable ? "Choose before deployment. Restart the contract to change the squad." : "Changing the squad restarts the combat floor.";
   document.getElementById("haul-controls")!.hidden = !sim.hauling;
+  document.querySelector("#haul-controls span")!.textContent = sim.hauling?.loads.some(l => l.hands === 2)
+    ? "Click cargo or press H to collect / put it down. Right-click moves the hauling team. The chest needs two; carriers cannot shoot. Ctrl-click deliberately fires."
+    : "Click the dispatch case or press H to collect / put it down. Right-click moves the carrier. Other robots can cover; the carrier cannot shoot. Ctrl-click deliberately fires.";
   document.getElementById("escort-controls")!.hidden = !sim.escort;
   document.getElementById("escort-status")!.hidden = !sim.escort;
   if (!mission) return;
@@ -85,6 +90,7 @@ export function updateMissionUI(sim: Simulation) {
   const load = sim.hauling?.available();
   const escort = sim.escort, rescue = mission as EscortMission;
   const priority = mission instanceof PriorityMission ? mission : undefined;
+  const recovery = mission instanceof RecoveryMission ? mission : undefined;
   if (escort) {
     const guide = escort.leader;
     setText("escort-state", escort.human.dead ? "Lost" : escort.state === "captive" ? "Inside office"
@@ -92,7 +98,16 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines remaining`
+  setText("mission-detail", recovery ? mission.phase === "briefing" ? "Choose squad · Intercept the sand-coloured truck"
+    : mission.phase === "intercept" ? !recovery.rolling ? "Convoy preparing to leave · Set your ambush"
+      : recovery.engagedAt === undefined ? "Convoy moving · Shoot the truck's drive housing"
+      : `${recovery.enemies.length} security machines · Truck still moving`
+    : mission.phase === "secure" ? recovery.enemies.length ? `Truck stopped · ${recovery.enemies.length} security machines`
+      : "Security clear · Bring a robot beside the truck"
+    : mission.phase === "return" ? `${recovery.case.delivered ? "Case aboard" : recovery.case.state === "carried" ? "Carrying dispatch case" : "Collect dispatch case · H"}${recovery.patrolAt === undefined ? "" : ` · ${recovery.enemies.length} pursuers`} · ${near} / ${living.length} at the van`
+    : mission.phase === "complete" ? `${recovery.loadCondition === "intact" ? "Load intact" : "Salvage secured"} · Squad recovered`
+    : mission.failureReason ?? "Recovery required"
+    : priority ? mission.phase === "yard" ? `${priority.guards.length} perimeter machines remaining`
     : mission.phase === "restore" ? priority.restoredAt !== undefined ? `${priority.response.length} response machines remaining`
       : priority.contested ? "Restart paused · Clear the service-door approach"
       : priority.repairing.length ? `${priority.repairing.length} technicians working · ${priority.response.length} response machines`
@@ -114,11 +129,16 @@ export function updateMissionUI(sim: Simulation) {
     : mission.phase === "failed" ? "Squad requires recovery"
     : `${mission.enemies.length} guards remaining`);
   const progress = document.getElementById("mission-progress") as HTMLProgressElement;
+  progress.setAttribute("aria-label", recovery && mission.phase === "intercept" ? "Truck drive remaining" : "Objective progress");
   progress.hidden = !marker || !!escort && mission.phase === "rescue" || !!sim.hauling && mission.phase === "delivery" && !mission.releaseProgress;
   progress.value = mission.phase === "breach" ? 1 - rescue.doorHp / rescue.doorMaxHp : (mission.phase === "dispatch" || mission.phase === "delivery") ? mission.releaseProgress : mission.returnProgress;
   if (priority) {
     progress.hidden = mission.phase === "yard" || mission.finished;
     progress.value = mission.phase === "restore" ? priority.repairProgress : mission.returnProgress;
+  }
+  if (recovery) {
+    progress.hidden = !["intercept", "return"].includes(mission.phase);
+    progress.value = mission.phase === "intercept" ? recovery.truck.driveHp! / RECOVERY_DRIVE_HP : mission.returnProgress;
   }
   if (escort && mission.phase === "breach") progress.hidden = false;
 
@@ -126,8 +146,13 @@ export function updateMissionUI(sim: Simulation) {
     const complete = mission.phase === "complete";
     setText("mission-result-state", complete ? "CONTRACT COMPLETE" : "RECOVERY REQUIRED");
     const civilians = [...sim.city!.carts, ...sim.city!.kites, ...sim.city!.porters, ...sim.city!.vehicles];
-    const damaged = civilians.filter(c => c.hp <= 0).length;
-    const message = priority ? !complete
+    const damaged = civilians.filter(c => c.hp <= 0 && !("path" in c && c.team === "enemy")).length;
+    const message = recovery ? !complete
+      ? `${mission.failureReason ?? "Recovery required"}. Vale is keeping the cooperative's collection crew clear. Rook will arrange squad recovery.`
+      : recovery.loadCondition === "intact"
+        ? "Charging racks and drive assemblies secured. The cooperative can put its fleet back to work. Gannet sold the equipment before its seizure was authorised; Quill found an extra payment for delivery today. Someone else wanted that truck gone."
+        : "The cooperative has the surviving assemblies, but the charging racks will need replacing. Quill found Gannet's sale record: signed before the seizure was authorised, with extra payment for delivery today."
+      : priority ? !complete
       ? `${mission.failureReason ?? "Recovery required"}. Vale is getting the owners and a recovery crew clear of the district.`
       : damaged ? "Dispatch is running again. We also owe the neighbourhood repairs. Meridian has offered priority access, with control of dispatch attached. Quill will handle their terms."
       : "The owners have their exchange and their equipment. Meridian has already offered priority access in return for control of dispatch. Quill is answering them. Send our invoice to the cooperative."

@@ -25,7 +25,9 @@ describe("self-driving street traffic",()=>{
     for(const path of trafficPaths(district))for(let d=0;d<path.total;d+=1.1) {
       const p=pointOnTrafficPath(path,d).point,q=pointOnTrafficPath(path,d+0.1).point,l=distance2(p,q);
       const forward={x:(q.x-p.x)/l,z:(q.z-p.z)/l};
-      for(const spec of Object.values(VEHICLES))for(const a of [-1,1])for(const b of [-1,1]) {
+      // Ambient loops carry CABs and VANs. The larger mission truck uses its
+      // authored dogleg, checked with its full footprint in recovery.test.ts.
+      for(const spec of [VEHICLES.CAB, VEHICLES.VAN])for(const a of [-1,1])for(const b of [-1,1]) {
         const x=p.x+forward.x*a*spec.length/2+forward.z*b*spec.width/2;
         const z=p.z+forward.z*a*spec.length/2-forward.x*b*spec.width/2;
         expect(road(district,x,z),`${path.id} leaves road at ${x}, ${z}`).toBe(true);

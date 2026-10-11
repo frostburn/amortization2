@@ -133,10 +133,10 @@ export class CityLife {
   }
 
   damage(c: CivilianCart | CivilianKite | CivilianPorter | CivilianVehicle, damage: number, impulse: Vec3, point: Vec3,
-    responsible?: "player" | "enemy") {
-    if (responsible === "player" && damage > 0 && c.hp > 0)
+    responsible?: "player" | "enemy", attacker?: Vec3) {
+    if (responsible === "player" && damage > 0 && c.hp > 0 && !("path" in c && c.team === "enemy"))
       this.sim.security?.report(point, c.id, damage >= c.hp);
-    if ("path" in c) { this.traffic.damage(c, damage, impulse, point); this.disturb(point); return; }
+    if ("path" in c) { this.traffic.damage(c, damage, impulse, point, responsible === "player" ? attacker : undefined); this.disturb(point); return; }
     if (c.model === "KITE") { this.flights.damage(c, damage, impulse, point); this.disturb(point); return; }
     if (c.model === "PORTER") { this.workers.damage(c, damage, impulse, point); this.disturb(point); return; }
     const chassis = CIVILIAN_CHASSIS[c.model];
@@ -162,11 +162,11 @@ export class CityLife {
 
   blast(origin: Vec3, source?: RAPIER.RigidBody, responsible?: "player" | "enemy" | "neutral") {
     const victims = responsible === "player" ? [...this.carts, ...this.kites, ...this.porters, ...this.vehicles]
-      .filter(c => c.hp > 0).map(c => ({ civilian: c, hp: c.hp })) : [];
+      .filter(c => c.hp > 0 && !("path" in c && c.team === "enemy")).map(c => ({ civilian: c, hp: c.hp })) : [];
     this.disturb(origin, origin, 12);
     this.flights.blast(origin, source);
     this.workers.blast(origin, source);
-    this.traffic.blast(origin, source);
+    this.traffic.blast(origin, source, responsible);
     for (const c of this.carts) {
       const p = c.body.translation(), distance = Math.hypot(p.x - origin.x, p.y - origin.y, p.z - origin.z);
       if (distance >= BLAST_RADIUS) continue;

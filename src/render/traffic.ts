@@ -62,6 +62,30 @@ export function vehicleBody(model:VehicleModel, reflection?:THREE.Texture) {
       b(0.05,0.065,0.2,side*0.918,0.82,-0.65,metal);
       const mirror=dome(0.10,side*0.98,1.01,0.84,paint);mirror.scale.set(0.75,0.65,1.25);
     }
+  } else if (model === "TRUCK") {
+    // A recognisable rigid box truck: long payload body and rounded autonomous cab.
+    profile([{ z: -3.72, bottom: .72, top: 2.8, width: 1.13, roof: 1.07 },
+      { z: -3.55, bottom: .68, top: 2.95, width: 1.22, roof: 1.16 },
+      { z: .65, bottom: .68, top: 2.95, width: 1.22, roof: 1.16 },
+      { z: .82, bottom: .72, top: 2.8, width: 1.13, roof: 1.07 }], paint);
+    profile([{ z: .88, bottom: .45, top: 2.35, width: 1.12, roof: .95 },
+      { z: 1.2, bottom: .4, top: 2.55, width: 1.2, roof: .94 },
+      { z: 2.2, bottom: .4, top: 2.45, width: 1.18, roof: .88 },
+      { z: 3.65, bottom: .52, top: 1.15, width: .88, roof: .72 }], paint);
+    profile([{ z: 2.23, bottom: 1.25, top: 2.47, width: .86, roof: .85 },
+      { z: 3.36, bottom: 1.22, top: 1.5, width: .8, roof: .75 }], glass);
+    for (const side of [-1, 1]) {
+      b(.06, .11, 4, side * 1.23, 1.05, -1.4, metal);
+      b(.05, 1.85, .035, side * 1.235, 1.8, -1.45, rubber);
+      const mirror = dome(.14, side * 1.32, 1.85, 2.5, paint); mirror.scale.set(.6, 1, .8);
+    }
+    // Exposed low drive housing, distinct from the tall payload compartment.
+    b(2.1, .25, 4.5, 0, .58, -.4, rubber);
+    b(1.8, .12, .6, 0, .43, 1.3, metal);
+    b(.045, 2.05, .03, 0, 1.75, -3.738, rubber);
+    const lid = b(1.5, .018, 2.8, 0, 2.96, -1.4, metal);
+    for (const z of [-2.2, -.6]) b(1.65, .024, .09, 0, 2.979, z, rubber);
+    lid.receiveShadow = true;
   } else {
     profile([{z:-2.69,bottom:0.38,top:1.98,width:0.87,roof:0.81},
       {z:-2.4,bottom:0.3,top:2.15,width:0.99,roof:0.87},
@@ -101,7 +125,7 @@ export function vehicleBody(model:VehicleModel, reflection?:THREE.Texture) {
   b(spec.width*0.8,0.10,0.13,0,0.42,-spec.length/2+0.015,rubber);
   b(0.33,0.075,0.05,0,0.59,-spec.length/2-0.015,metal);
   // A round lidar pod and four compact camera domes make autonomy visible at game scale.
-  const lidarZ=model==="CAB"?-0.18:-0.62,roof=model==="CAB"?1.52:2.15;
+  const lidarZ=model==="CAB"?-0.18:model==="TRUCK"?1.5:-0.62,roof=model==="CAB"?1.52:model==="TRUCK"?2.55:2.15;
   round(0.22,0.06,0,roof+0.03,lidarZ,rubber);
   round(0.19,0.11,0,roof+0.105,lidarZ,glass);
   const cap=dome(0.195,0,roof+0.16,lidarZ,paint);cap.scale.y=0.35;
@@ -157,7 +181,7 @@ class VehicleFleet {
         this.local.setPosition(side*(spec.width/2-0.015),radius-spec.height/2,front?spec.wheelbase/2:-spec.wheelbase/2);
         this.matrix.multiplyMatrices(this.pose,this.local);this.wheels.forEach(m=>m.setMatrixAt(i*4+k,this.matrix));
       }
-      const hazards=c.state==="alert"||c.state==="settling"||c.state==="stranded"||!c.hp;
+      const hazards=c.state==="alert"||c.state==="settling"||c.state==="stranded"||c.driveHp===0||!c.hp;
       const turning=Math.abs(c.steering)>0.16;
       for(let k=0;k<8;k++) {
         const side=k%2?1:-1,front=k<4,indicator=k%4>=2;
@@ -184,7 +208,7 @@ class VehicleFleet {
 export class TrafficFleet {
   root=new THREE.Group();private fleets:VehicleFleet[]=[];
   constructor(cars:CivilianVehicle[],reflection?:THREE.Texture) {
-    for(const model of ["CAB","VAN"] as const) {
+    for(const model of ["CAB","VAN","TRUCK"] as const) {
       const members=cars.filter(c=>c.model===model);if(!members.length)continue;
       const fleet=new VehicleFleet(members,model,reflection);this.fleets.push(fleet);this.root.add(fleet.root);
     }

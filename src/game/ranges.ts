@@ -19,8 +19,9 @@ import { ESCORT_DISTRICT, ESCORT_FIXTURES, ESCORT_SHELTERS, ESCORT_SPAWNS } from
 import { CONCOURSE_DISTRICT, CONCOURSE_FIXTURES, CONCOURSE_RAILS, CONCOURSE_SURFACES } from "./concourse";
 import type { WalkSurface } from "./walk-surfaces";
 import { PRIORITY_DISTRICT, PRIORITY_FIXTURES, PRIORITY_RAILS, PRIORITY_SITES, PRIORITY_SURFACES } from "./priority";
+import { RECOVERY_DISTRICT, RECOVERY_FIXTURES, RECOVERY_RAILS, RECOVERY_SITES, RECOVERY_SURFACES } from "./recovery";
 
-export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "priority" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
+export type RangeId = "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -45,6 +46,13 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  recovery: {
+    name: "06 · RECOVERY FEE", contract: true, city: RECOVERY_DISTRICT, bounds: RECOVERY_DISTRICT.bounds,
+    barriers: RECOVERY_FIXTURES, platforms: [], walkSurfaces: RECOVERY_SURFACES, walkVolumes: RECOVERY_RAILS,
+    players: [[-1.1, 1.1], [-1.1, -1.1], [1.1, -1.1], [1.1, 1.1]].map(([x, z]) =>
+      ({ x: RECOVERY_SITES.spawn.x + x, z: RECOVERY_SITES.spawn.z + z })),
+    targets: [], props: [],
+  },
   priority: {
     name: "05 · PRIORITY ACCESS", contract: true, city: PRIORITY_DISTRICT, bounds: PRIORITY_DISTRICT.bounds,
     barriers: PRIORITY_FIXTURES, platforms: [], walkSurfaces: PRIORITY_SURFACES, walkVolumes: PRIORITY_RAILS,
