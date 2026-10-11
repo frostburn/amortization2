@@ -1,5 +1,56 @@
 # Recorded verification runs
 
+## Timber Rights: four machinegunners
+
+[timber-rights-assault.json](timber-rights-assault.json) is the unchanged
+development recorder export from a complete keyboard/mouse playthrough.
+Gameplay source:
+[`65c78158b08148c374da74d9fc878e2cb314ae45`](https://github.com/frostburn/amortization2/commit/65c78158b08148c374da74d9fc878e2cb314ae45).
+The capture records revision `65c7815`, `range: "forest"` and `mode: "mission"`.
+
+| Result | Recorded value |
+| --- | --- |
+| Simulated duration | 139.65 seconds / 8,379 ticks |
+| Outcome | Complete; both rigs disabled; work order sealed; clearing secured |
+| Security defeated | Four guards and two three-robot response squads |
+| Squad recovered | 4 / 4 |
+| Robot health, IDs 1–4 | 108, 160, 26, 16 / 160 |
+| Player combat | 986 shots; 190 robot hits; no grenades |
+| Enemy shots | 41 |
+| Work order sealed / inspectors take possession | 83.38 s / 112.95 s |
+| Capture | One attempt; 465 inputs; 285 snapshots; 11 camera observations |
+
+The squad climbs the approach track, fights security from the western logging
+lane, stops both rigs, then advances downhill to the work-order terminal.
+It returns to the clearing for both contractor responses, defeats them and
+retraces the woodland track to the layby. Two badly damaged robots survive
+the return. Commands use the regular movement, brace, fire and reload controls.
+
+Installed Playwright/Chromium was used because the Browser plugin was not
+available. Its virtual clock advances the ordinary fixed simulation while
+skipping rendered frames. Read-only `inspect()` and `project()` helpers supply
+coordinates; the shared terrain module supplies the ground height for movement
+clicks. Health, positions, ammunition, rig damage and objective progress were
+not injected. Desktop/laptop visual checks use 1440 × 900 and 1280 × 720.
+
+Run `npm run dev`, open **Controls & settings → View replay**, and select the
+JSON. For textual reconstruction:
+
+```sh
+npm run inspect:replay -- docs/replays/timber-rights-assault.json
+```
+
+The offline inspector and browser viewer reproduce recorded combat and final
+robot positions within two centimetres. Browser checks import, seek to the end,
+rewind, play and exit to the live game. Later gameplay/physics changes may
+diverge; compare against the source above.
+
+This verifies the four-machinegun mission route. Tests separately cover all
+three loadouts, terrain/physics agreement, uphill/downhill formation movement,
+rifle and grenade damage to rigs, contested objectives, exactly two response
+squads, recovery and terrain-aware arena entries. It does not establish human
+difficulty or performance on physical graphics hardware.
+
 ## Recovery Fee: bridge access
 
 [recovery-fee-bridge.json](recovery-fee-bridge.json) is the unchanged development

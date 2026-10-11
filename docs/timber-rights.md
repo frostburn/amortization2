@@ -56,3 +56,8 @@ The woodland is also selectable in Endless Arena. Authored mission guards,
 objectives and response squads are absent there; rigs remain inactive solid map
 landmarks, and arena robots spawn on their actual terrain height. Existing
 practice districts and contracts remain available.
+
+The full four-machinegun verification run is available in
+[Recorded verification runs](replays/README.md#timber-rights-four-machinegunners).
+Load its JSON in the development replay viewer to watch the approach, both
+responses and recovery.
