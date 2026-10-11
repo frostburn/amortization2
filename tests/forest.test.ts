@@ -73,6 +73,14 @@ describe("Timber Rights and shared natural terrain", () => {
     expect(sim.terrain!.canStand({...r,y:r.y})).toBe(false);
   },15000);
 
+  test("low-cover assistance remains relative to the ground on a wooded hill", async () => {
+    sim=await Simulation.create("forest","assault","practice"); const a=sim.squad[0]; place(a,{x:-18,z:6});
+    const ground={x:-18,z:-3}, low={...ground,y:FOREST_GROUND.heightAt(ground)+.05};
+    const raised={...ground,y:FOREST_GROUND.heightAt(ground)+1.65};
+    sim.world.step();
+    expect(sim.clearsLowCover(a,low,raised)).toBe(true);
+  });
+
   test("grenade pressure damages a nearby rig but solid terrain blocks it", async () => {
     sim=await Simulation.create("forest"); mission().deploy(); const r=mission().rigs[0];
     const origin={x:r.x-3.8,y:r.y+1.2,z:r.z}; mission().blastFixtures(origin);

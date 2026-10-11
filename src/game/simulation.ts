@@ -278,7 +278,7 @@ export class Simulation {
         ),
         body,
       );
-      if ((box.y ?? 0) + box.h < AUTOMATIC_AIM.height)
+      if (box.h < AUTOMATIC_AIM.height)
         this.lowCover.add(collider.handle);
     }
     for (const surface of [...this.layout.walkSurfaces ?? [], ...this.layout.walkVolumes ?? []]) {
