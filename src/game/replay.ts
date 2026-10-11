@@ -2,6 +2,7 @@ import { STEP, type Vec2, type Vec3, type Weapon } from "./config";
 import { RANGES, type RangeId } from "./ranges";
 import { defaultMode, GAME_MODES, levelsForMode, type GameMode } from "./modes";
 import type { GameEvent, Simulation } from "./simulation";
+import { expandHumanReplay } from "./replay-codec";
 
 export type ReplayAction =
   | { type: "select"; id: number; additive: boolean }
@@ -195,6 +196,7 @@ function validAction(value: unknown): value is ReplayAction {
 }
 
 export function readHumanReplay(value: unknown): HumanReplay {
+  if (value && typeof value === "object" && "version" in value && value.version === 2) value = expandHumanReplay(value);
   const replay = value as HumanReplay | null;
   if (!replay || replay.format !== "amortization2-human-replay" || replay.version !== 1 ||
       replay.step !== STEP || !Array.isArray(replay.sessions) || replay.sessions.length > 32)

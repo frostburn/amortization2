@@ -43,8 +43,10 @@ export async function start() {
   await loading.show("Preparing the view…");
   const scene = await RangeScene.create(canvas, sim, texture);
   let replay: HumanReplayRecorder | undefined;
+  let serializeReplay: typeof import("./game/replay-codec").stringifyHumanReplay;
   if (import.meta.env.DEV) {
     const { HumanReplayRecorder } = await import("./game/replay");
+    serializeReplay = (await import("./game/replay-codec")).stringifyHumanReplay;
     replay = new HumanReplayRecorder(__REPLAY_REVISION__);
     replay.begin(sim);
     sim.onInput = action => replay!.action(sim, action);
@@ -52,7 +54,7 @@ export async function start() {
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-export-replay], [data-export-all-replays]"))
       button.addEventListener("click", () => {
         const scope = button.hasAttribute("data-export-all-replays") ? "all" : "current";
-        const url = URL.createObjectURL(new Blob([JSON.stringify(replay!.export(recordedSim, scope), null, 2)], { type: "application/json" }));
+        const url = URL.createObjectURL(new Blob([serializeReplay(replay!.export(recordedSim, scope))], { type: "application/json" }));
         const link = document.createElement("a");
         link.href = url;
         const attempt = scope === "all" ? "all-attempts" : `attempt-${replay!.status.sessions}`;
@@ -988,7 +990,7 @@ export async function start() {
       project: (p: Vec3) => scene.project(p),
       reset,
       ...(import.meta.env.DEV ? {
-        exportReplay: (scope: ReplayExportScope = "current") => JSON.stringify(replay!.export(recordedSim, scope), null, 2),
+        exportReplay: (scope: ReplayExportScope = "current") => serializeReplay(replay!.export(recordedSim, scope)),
         inspectReplay: () => replay!.status,
         inspectPlayback: () => viewer!.inspect(),
       } : {}),

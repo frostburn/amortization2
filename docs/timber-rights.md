@@ -41,7 +41,10 @@ the western rig. The clearing
 and lateral tracks leave room for formation movement and bullet pressure. Logs
 and boulders supply low cover; ridge crests offer sight lines for NEEDLE. Tree
 trunks and terrain block actual bullets. Foliage supplies visual concealment,
-with overhead cutaways where crowns obscure robots.
+with overhead cutaways where crowns obscure the friendly squad. Live hostile
+robots retain their cover and show a warm outline only along camera-obscured
+contours. This works behind trees, terrain and buildings, including in the rifle
+scope; an outline does not make the obstacle shoot-through.
 
 ## Reusable landscape
 
@@ -57,6 +60,10 @@ ground beneath a supported capsule rather than its slightly raised rounded
 bottom; the hull itself still moves through ordinary physics.
 
 `NaturalTerrainView` draws vertex-colored earth and instanced pine/birch trees.
+`EnemyOutlines` reuses the animated chassis geometry and world depth buffer.
+Two small silhouette passes use stencil masking to remove internal seams and
+self-occlusion; they do not re-render the district or add navigation/ray queries.
+The scope draws the outlines before its fixed reticle and lens overlay.
 The forest continues outside the playable 160 × 120 m area. The eastern plot is
 graded flat and marked with survey stakes, future slab pads and cooling-plant
 footprints. The office reuses the city building kit; the recovery van reuses the

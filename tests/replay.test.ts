@@ -203,7 +203,7 @@ describe("development human replays", () => {
   test("unsupported versions, prototype floor names, malformed commands and unordered ticks fail before simulation", async () => {
     const sim = await create(); const { recorder } = capture(sim);
     const data = recorder.export(sim);
-    expect(() => readHumanReplay({ ...data, version: 2 })).toThrow(/version/);
+    expect(() => readHumanReplay({ ...data, version: 3 })).toThrow(/version/);
     const session = data.sessions[0];
     expect(() => playRecordedSession(sim, { ...session, range: "toString" as Simulation["range"] })).toThrow(/session/);
     const input = { tick: 0, wallMs: 0, data: { type: "control" as const, aim: { x: Infinity, y: 0, z: 0 }, trigger: true } };

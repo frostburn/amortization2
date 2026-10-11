@@ -62,6 +62,26 @@ pauses neither the game nor the recorder and never resets an attempt.
 
 ## Contents and limits
 
+New downloads and console exports use **version 2 compact JSON**. Snapshots
+store only changes from the previous observation (the first uses `initial`);
+`final` stores changes from the last snapshot. Timed inputs, events and camera
+samples use `[tick, wallMs, data]` tuples. A snapshot patch `[value]` replaces a
+subtree; an object patches its existing keys or array indices. `{}` means no
+change. Adding/removing fields or changing an array's length replaces that
+subtree. JSON whitespace is omitted. Input coordinates, tick ordering, timestamps,
+combat observations and camera samples are preserved without rounding or removal.
+
+The current viewer and inspection command accept both versions. To read a file
+as conventional, indented version 1 JSON (or load it in an older game checkout):
+
+```sh
+npm run format:replay -- capture.json expanded.json --expand
+```
+
+To compact an existing file, omit `--expand`. Conversion preserves its original
+gameplay revision and timestamps; it does not re-simulate or update the capture.
+Compact imports also bound nesting and expanded observation size before playback.
+
 The versioned capture includes resolved selection, movement/queued movement,
 weapon, reload, brace/scope and grenade commands; changes in aim and trigger;
 shot endpoints, impacts and other simulation events; observed snapshots twice a

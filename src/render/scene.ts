@@ -35,6 +35,7 @@ import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { NaturalTerrainView } from "./natural-terrain";
 import { FOREST_TREES } from "../game/forest";
+import { EnemyOutlines } from "./enemy-outlines";
 import { ConcourseView } from "./concourse";
 import { PRIORITY_SUPPORTS } from "../game/priority";
 import { equipmentCase } from "./equipment";
@@ -207,6 +208,8 @@ export class RangeScene {
   private environmentLabels = new THREE.Group();
   private dynamic = new THREE.Group();
   private actors = new Map<number, ActorVisual>();
+  private enemyOutlines = new EnemyOutlines();
+  private outlinedEnemies = new Set<THREE.Object3D>();
   private props = new Map<number, THREE.Group>();
   private grenades = new Map<number, THREE.Group>();
   private grenadeHazards = new Map<number, THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>>();
@@ -347,6 +350,7 @@ export class RangeScene {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
+      stencil: true,
       alpha: false,
       powerPreference: "high-performance",
     });
@@ -925,6 +929,7 @@ export class RangeScene {
       : makeActorBody(a, { metal, dark, silver, yellow, shell, sniperShell, minigunShell, orange, pale, glow, targetPaint });
     if (human) { human.root.position.y = -HUMAN.height / 2; body.torso.add(human.root); body.root.add(body.torso); }
     const { root, torso } = body, friend = this.sim.team(a) === "player", sniper = a.model === "sniper";
+    if (this.sim.team(a) === "enemy") this.enemyOutlines.add(root);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.74, 0.79, 40),
       new THREE.MeshBasicMaterial({
@@ -993,6 +998,7 @@ export class RangeScene {
   }
 
   private disposeActor(visual: ActorVisual) {
+    this.enemyOutlines.remove(visual.root);
     visual.human?.dispose();
     if (visual.name) { visual.name.material.map?.dispose(); visual.name.material.dispose(); visual.name.removeFromParent(); }
     visual.root.traverse((object) => {
@@ -1581,9 +1587,11 @@ export class RangeScene {
     }
     const cutawayRoofs = new Set(this.sim.cutawayRoofs.map(roof => roof.collider));
     const closedRoofs = this.sim.roofs.filter(roof => !cutawayRoofs.has(roof.collider)) ?? [];
+    this.outlinedEnemies.clear();
     for (const a of this.sim.actors) {
       if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;
+      if (!a.dead && this.sim.team(a) === "enemy") this.outlinedEnemies.add(v.root);
       const p = a.body.translation();
       v.root.position.set(
         THREE.MathUtils.lerp(a.previous.x, p.x, alpha),
@@ -1841,7 +1849,11 @@ export class RangeScene {
           ]
         : [],
       !paused,
+      (camera) => this.enemyOutlines.render(this.renderer, camera, this.outlinedEnemies),
     );
-    if (!sniping) this.renderer.render(this.scene, this.camera);
+    if (!sniping) {
+      this.renderer.render(this.scene, this.camera);
+      this.enemyOutlines.render(this.renderer, this.camera, this.outlinedEnemies);
+    }
   }
 }

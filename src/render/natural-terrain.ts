@@ -36,13 +36,16 @@ export class NaturalTerrainView {
     const crown = mergeGeometries(parts)!; parts.forEach(p => p.dispose());
     this.opacity = new THREE.InstancedBufferAttribute(new Float32Array(trees.length).fill(1), 1);
     crown.setAttribute("canopyOpacity", this.opacity);
-    const foliage = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, alphaToCoverage: coverage,
-      transparent: !coverage, depthWrite: coverage });
+    const foliage = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, alphaToCoverage: coverage });
     foliage.onBeforeCompile = shader => {
       shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute float canopyOpacity; varying float vCanopyOpacity;")
         .replace("#include <begin_vertex>", "#include <begin_vertex>\nvCanopyOpacity = canopyOpacity;");
       shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vCanopyOpacity;")
         .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.a *= vCanopyOpacity;");
+      // Without MSAA, screen-door fading still writes the canopy's actual depth
+      // so hidden-enemy contours work on non-antialiased contexts too.
+      if (!coverage) shader.fragmentShader = shader.fragmentShader.replace("#include <alphatest_fragment>",
+        "if (diffuseColor.a < fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453)) discard; diffuseColor.a = 1.0;");
     };
     this.crowns = new THREE.InstancedMesh(crown, foliage, trees.length); this.crowns.castShadow = true;
     this.root.add(this.crowns);
@@ -66,9 +69,10 @@ export class NaturalTerrainView {
     });
   }
   update(sim: Simulation, camera: THREE.Camera, delta: number) {
-    const actors = sim.actors.filter(a => !a.dead && !a.flight).map(a => a.body.translation());
+    const actors = sim.actors.filter(a => !a.dead && !a.flight && sim.team(a) === "player").map(a => a.body.translation());
     this.crownPositions.forEach((crown, i) => {
-      // Hide foliage only where it visually covers a chassis. The trunk remains
+      // Keep the squad readable; enemies retain cover and get hidden contours.
+      // The trunk remains
       // physical and opaque; no collision disappears under the camera cutaway.
       const obscures = !sim.sniping && actors.some(p => {
         const dx = camera.position.x - p.x, dy = camera.position.y - p.y, dz = camera.position.z - p.z;
