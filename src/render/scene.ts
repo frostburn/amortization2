@@ -6,6 +6,7 @@ import {
   FORMATION_SPACING,
   HUMAN,
   FIREARMS,
+  RIFLE,
   GRAVITY,
   GRENADE_FUSE,
   clamp,
@@ -1219,8 +1220,7 @@ export class RangeScene {
   get listenerPosition() {
     const operator = this.sim.sniping && this.sim.rifleOperator;
     if (!operator) return this.camera.position;
-    const p = operator.body.translation();
-    return { x: p.x, y: p.y + 0.65, z: p.z };
+    return this.sim.rifleSight(operator);
   }
   get listenerRight() {
     const camera = this.sim.sniping ? this.scope.camera : this.camera;
@@ -1618,7 +1618,7 @@ export class RangeScene {
         ? 0
         : aimingFirearm
           ? -Math.atan2(
-              aim.y - p.y - (a.flight ? -.28 : .42),
+              aim.y - p.y - (a.flight ? -.28 : a.weapon === "rifle" ? RIFLE.mountHeight : .42),
               Math.hypot(aim.x - p.x, aim.z - p.z),
             ) -
             a.recoil * 0.13
@@ -1627,11 +1627,15 @@ export class RangeScene {
             : -a.recoil * 0.13;
       if (v.primaryGun) v.primaryGun.visible = !carrying && a.weapon !== "pistol";
       if (v.pistol) v.pistol.visible = !carrying && a.weapon === "pistol";
-      if (v.arms) v.arms.visible = !carrying;
+      if (v.arms) {
+        v.arms.visible = !carrying;
+        v.arms.position.y = a.model === "sniper" && a.weapon === "rifle" ? RIFLE.mountHeight - .42 : 0;
+      }
       if (v.carryArms) v.carryArms.visible = carrying;
       if (v.bipod) v.bipod.visible = a.braced && a.weapon === "rifle" && !a.dead;
       if (v.barrels && !a.dead) v.barrels.rotation.z += delta * a.spin * Math.PI * 10;
       v.flash.position.z = a.flight ? .65 : FIREARMS[a.weapon].muzzle;
+      v.flash.position.y = a.flight ? 0 : .3 + (a.weapon === "rifle" ? RIFLE.mountHeight - .42 : 0);
       if (a.flight) {
         v.rotors?.forEach((rotor, i) => { rotor.rotation.y += delta * a.flight!.rotors * 100 * (i % 2 ? -1 : 1); });
         if (v.beacon) v.beacon.visible = !a.dead && Math.sin(elapsed * 9 + a.id) > .1;

@@ -36,6 +36,7 @@ export const RIFLE = {
   settle: 0.6,
   recoil: 180,
   muzzle: 1.65,
+  mountHeight: 0.72,
 };
 export const PISTOL = {
   magazine: 12,

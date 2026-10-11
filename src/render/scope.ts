@@ -53,10 +53,10 @@ export class SniperView {
     if (!operator) return;
     if (this.operator !== operator) {
       this.operator = operator;
-      const p = operator.body.translation();
+      const p = sim.rifleSight(operator);
       const direction = new THREE.Vector3()
         .copy(sim.aim)
-        .sub(new THREE.Vector3(p.x, p.y + 0.65, p.z))
+        .sub(new THREE.Vector3(p.x, p.y, p.z))
         .normalize();
       this.yaw = Math.atan2(direction.x, direction.z);
       this.pitch = Math.asin(clamp(direction.y, -1, 1));
@@ -66,8 +66,7 @@ export class SniperView {
       Math.sin(this.pitch),
       Math.cos(this.yaw) * Math.cos(this.pitch),
     );
-    const p = operator.body.translation();
-    this.camera.position.set(p.x, p.y + 0.65, p.z);
+    this.camera.position.copy(sim.rifleSight(operator));
     this.camera.lookAt(this.camera.position.clone().add(direction));
     this.camera.updateMatrixWorld();
   }

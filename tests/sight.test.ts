@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import RAPIER from "@dimforge/rapier3d-compat";
 import { Vector3 } from "three";
 import { Simulation } from "../src/game/simulation";
 import { RIFLE, STEP } from "../src/game/config";
@@ -75,6 +76,48 @@ describe("centred sniper sight", () => {
     const expected = aim.clone().sub(from).normalize();
     expect(direction.distanceTo(expected)).toBeLessThan(1e-6);
     expect(sim.rifleSpread(sim.primary)).toBeGreaterThan(0); // The fired shot restarts settling.
+  });
+
+  test.each(["low rail", "wall corner"])("a visible target clears a %s in both the scope and the shot", (cover) => {
+    const target = sim.actors.find(a => a.id === 11)!;
+    for (let i = 0; i < Math.ceil((RIFLE.settle + 0.1) / STEP); i++) sim.step();
+    sight.aim(sim);
+    const direction = sight.camera.getWorldDirection(new Vector3());
+    const centre = sight.camera.position.clone().addScaledVector(direction, 3);
+    const right = new Vector3(direction.z, 0, -direction.x).normalize();
+    const body = sim.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    if (cover === "low rail") {
+      // The optical line clears the rail, but the old lower muzzle line did not.
+      sim.world.createCollider(RAPIER.ColliderDesc.cuboid(.8, .5, .8)
+        .setTranslation(centre.x, centre.y - .62, centre.z), body);
+    } else {
+      // A corner beside the optic used to intercept the right-offset barrel.
+      centre.addScaledVector(right, .25);
+      sim.world.createCollider(RAPIER.ColliderDesc.cuboid(.11, .5, .11)
+        .setTranslation(centre.x, centre.y, centre.z), body);
+    }
+    sim.world.step();
+    sight.aim(sim);
+    expect(sim.fireRay(sim.primary, sight.camera.position, sight.camera.position.clone().addScaledVector(sight.camera.getWorldDirection(new Vector3()), RIFLE.range))?.collider.handle).toBe(target.collider.handle);
+    sim.shoot(sim.primary);
+    expect(target.killedBy).toBe("rifle");
+  });
+
+  test("cover immediately in front of the scope still blocks firing instead of being skipped by barrel reach", () => {
+    const target = sim.actors.find(a => a.id === 11)!;
+    for (let i = 0; i < Math.ceil((RIFLE.settle + 0.1) / STEP); i++) sim.step();
+    sight.aim(sim);
+    const centre = sight.camera.position.clone().addScaledVector(sight.camera.getWorldDirection(new Vector3()), .4);
+    const wall = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(.15, .5, .15)
+      .setTranslation(centre.x, centre.y, centre.z));
+    sim.world.step();
+    sight.aim(sim);
+    expect(sim.fireRay(sim.primary, sight.camera.position, sight.camera.position.clone().addScaledVector(sight.camera.getWorldDirection(new Vector3()), RIFLE.range))?.collider.handle).toBe(wall.handle);
+    sim.shoot(sim.primary);
+    expect(target.hp).toBe(target.maxHp);
+    const shot = sim.events.find(e => e.type === "shot")!;
+    if (shot.type !== "shot") throw Error("missing shot");
+    expect(new Vector3().copy(shot.to).distanceTo(sight.camera.position)).toBeLessThan(.5);
   });
 
   test("a teammate crossing the fixed optic intercepts its aim ray and actual rifle shot", () => {
