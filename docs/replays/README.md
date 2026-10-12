@@ -434,3 +434,33 @@ npm run inspect:replay -- docs/replays/scope-firing-line.json
 Physics regression tests separately exercise visible targets above low rails and
 beside wall corners, nearby cover blocking the optical line, and friendly rifle
 interception. Later gameplay changes may diverge from the documented source commit.
+
+
+## Night Shift: one road escort, three clearing defenders
+
+[night-shift-minigunner.json](night-shift-minigunner.json) is a complete agent
+verification using the normal simulation input API and development recorder.
+Gameplay source: [`ea2fff3`](https://github.com/frostburn/amortization2/commit/ea2fff3ab39f7bd97e635a5f3420775138aae08e).
+This is an agent run, not a human keyboard/mouse performance. The controller
+uses squad-detected contacts only. It gives ANCHOR movement and covering orders
+beside the convoy while ROOK, LATCH and SPINDLE fight the ground squads. Health,
+positions, damage, ammunition, enemy spawns and objective state are not injected.
+
+| Result | Value |
+| --- | --- |
+| Duration | 131.78 seconds / 7,907 fixed ticks |
+| Squad recovered | 4 / 4 |
+| Final integrity | ANCHOR 116; ROOK 194; LATCH 70; SPINDLE 166 |
+| Convoy received | VAN 56 / 320; TRUCK 620 / 620 |
+| Contractor responses | Three ground squads; four pistol-drone pairs |
+| Peak unattended occupation | About 28% before the team moved into the clearing |
+| Outcome | Complete; no hostiles remaining |
+
+Deterministic reconstruction matches the recorded final snapshot exactly. The
+capture is compact replay v2, approximately 465 KiB. It is an inspection artifact
+and is not loaded by the default tests or CI. Run `npm run dev`, choose **View
+replay**, and load the JSON; use its linked gameplay source for matching playback.
+
+```sh
+npm run inspect:replay -- docs/replays/night-shift-minigunner.json
+```

@@ -52,3 +52,8 @@ allowing heavy vehicles to physically push small robot wrecks.
 
 Full verification runs belong in `docs/replays/` as viewable development replay
 JSON, not in the default test pipeline. Long replay tests remain opt-in.
+
+
+The [viewable 3+1 verification run](replays/night-shift-minigunner.json) finishes
+with all four robots and both supply vehicles. Its source revision, controller
+and final condition are documented in the [replay index](replays/README.md).
