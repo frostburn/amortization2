@@ -55,6 +55,28 @@ describe("Night Shift: two fronts and optical contacts", () => {
     expect(van.hp).toBeLessThan(hp);
     place(sim.squad[0], p.x + 3, p.z - 5); sim.world.step(); drone.ai!.nextThink = 0;
     sim.step(); expect(drone.ai!.target).toBe(sim.squad[0].id);
+    expect(drone.flight!.goal.x).toBeCloseTo(van.body.translation().x + 10, 0);
+    expect(drone.flight!.goal.z).toBe(39);
+  });
+
+  test("a drone above an obsolete tree detour resumes pursuit of the moving convoy", async () => {
+    sim = await Simulation.create("nightforest"); mission().deploy(); sim.time = 16;
+    sim.squad.forEach(a => place(a, -60, -40)); sim.step();
+    mission().groundWaves = 3; mission().droneWaves = 4;
+    mission().groundEnemies.forEach(a => sim.damage(a,a.hp,{x:0,y:0,z:0},a.body.translation(),"gun"));
+    const drone = mission().drones[0];
+    drone.body.setTranslation({x:-48,y:sim.security!.ceiling,z:25},true);
+    drone.flight!.transit = {goal:{x:-48,y:4.5,z:25},stage:"descend"};
+    drone.ai!.nextThink = 0;
+    ticks(12);
+    const vehicle = mission().convoy.find(c=>c.id===drone.ai!.target)!;
+    expect(vehicle).toBeDefined();
+    expect(drone.flight!.goal.x-vehicle.body.translation().x).toBeCloseTo(10,0);
+    expect([35,39]).toContain(drone.flight!.goal.z);
+    expect(drone.flight!.transit).toBeUndefined();
+    expect(drone.body.translation().y).toBeLessThan(drone.flight!.hover+1);
+    expect(Math.hypot(drone.body.translation().x-drone.flight!.goal.x,
+      drone.body.translation().z-drone.flight!.goal.z)).toBeLessThan(4);
   });
 
   test("an abandoned clearing builds a foothold; friendly presence contests it and clearing it reverses pressure", async () => {

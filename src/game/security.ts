@@ -225,10 +225,19 @@ export class SecurityResponse {
     let goal = f.goal;
     const altitude = this.ceiling + (f.state === "withdrawing" ? 8 : 0);
     if (!f.transit && this.blocked(p, goal, a.body)) f.transit = { goal: { ...goal }, stage: "climb" };
+    // A new outdoor destination may now be directly reachable. Check the
+    // entire swept hull before leaving the detour, including any hidden roof.
+    if (f.transit && f.state === "pursuing" && this.columnClear(goal) && !this.blocked(p, goal, a.body)) f.transit = undefined;
     if (f.transit) {
       const route = f.transit;
-      // Finish the checked outdoor approach before accepting another pursuit
-      // goal. Recomputing a diagonal descent each tick could cut through a roof.
+      // A moving pursuit must not finish at a stale point under a tree. Accept
+      // only a checked outdoor column; descent still follows a vertical leg.
+      if (f.state === "pursuing" && distance2(route.goal, f.goal) > 1 && this.columnClear(f.goal)) {
+        route.goal = { ...f.goal };
+        route.stage = p.y >= this.ceiling - .25 ? "cross" : "climb";
+      }
+      // Keep the climb/cross/vertical descent sequence whenever a direct
+      // approach is still obstructed. Cutaway roofs remain physical barriers.
       if (route.stage === "climb") {
         goal = { x: p.x, y: this.ceiling, z: p.z };
         if (p.y >= this.ceiling - .25) route.stage = "cross";

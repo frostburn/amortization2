@@ -117,7 +117,10 @@ export function vehicleBody(model:VehicleModel, reflection?:THREE.Texture) {
     b(0.13,0.08,0.035,0.16,1.04,-2.72,metal);
   }
   for(const side of [-1,1]) {
-    b(0.065,0.12,spec.length*0.85,side*(spec.width/2-0.07),0.3,0,rubber);
+    // Sills follow the payload/passenger body. A full-width strip extending
+    // along the tapered nose looks like an exposed rail beside the vehicle.
+    b(0.065,0.12,model==="VAN"?2.45:model==="CAB"?2.9:5.3,
+      side*(spec.width/2-0.07),0.3,model==="VAN"?-1.2:model==="TRUCK"?-.6:0,rubber);
     const sensor=dome(0.065,side*(model==="CAB"?0.65:0.23),model==="CAB"?0.66:0.69,spec.length/2-0.01,glass);
     sensor.scale.z=0.65;
   }

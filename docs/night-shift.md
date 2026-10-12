@@ -45,6 +45,26 @@ still hit something. Firing gives a position away locally, not through
 terrain or across the entire map. This is the first night rule set, rather than
 an assumption that every robot has perfect thermal vision.
 
+## Ground routes, pursuit and wrecks
+
+Continuous natural slopes up to a rise of 0.65 metres per metre use direct
+walking routes when no actual obstacle blocks the footprint. Raised deck edges
+retain their stricter step limit. Physics still supports and moves the hull;
+navigation does not teleport robots up hills. The open ridge approach identified
+in the human Night Shift replay has a bounded movement regression.
+
+Hostile drones continue updating pursuit while above hover height. Their flight
+positions track the vehicles inside the cleared road corridor even if their guns
+switch to a nearby escort. Obstacle detours accept updated outdoor destinations
+only after full hull and descent-column checks, including hidden roofs.
+
+Disabled ground robots retain physical mass and collisions but use flat chassis
+panels with lower friction. Living robots push through real contacts rather than
+planning around wrecks. Grounded wrecks damp towards a preferred back-panel pose
+aligned with the local ground; blast-driven airborne motion remains free.
+Vehicle sills end at the wider bodywork rather than extending as exposed rails
+along tapered noses.
+
 ## Verification
 
 Focused tests exercise deployment, physical convoy motion, drone targets,

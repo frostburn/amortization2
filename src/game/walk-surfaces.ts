@@ -111,6 +111,13 @@ export class WalkTerrain {
       return false;
     });
   }
+  /** Natural slopes have continuous support; authored deck edges keep their
+   * stricter step limit so widening hill access cannot open retaining walls. */
+  riseLimit(a: Vec3, b: Vec3) {
+    const natural = this.ground && Math.abs(a.y - this.ground.heightAt(a)) < .03 &&
+      Math.abs(b.y - this.ground.heightAt(b)) < .03;
+    return natural ? .65 : .3;
+  }
   canStand(p: Vec3, radius = 0.55, dynamic: Obstacle[] = []) {
     const b = this.bounds;
     if (p.x < b.left + radius || p.x > b.right - radius ||
@@ -129,10 +136,12 @@ export class WalkTerrain {
     }
     // Footprint support across adjoining pieces keeps internal seams open,
     // but prevents pathfinding around an unguarded edge or up a retaining wall.
+    const natural = this.ground && Math.abs(p.y - this.ground.heightAt(p)) < .03;
     for (const [dx, dz] of [[0, 0], [-radius, -radius], [radius, -radius],
       [radius, radius], [-radius, radius]]) {
       const q = { x: p.x + dx, z: p.z + dz };
-      if (!this.heights(q).some(y => Math.abs(y - p.y) <= Math.hypot(dx, dz) * 0.3 + 0.025 &&
+      const heights = this.heights(q);
+      if (!heights.some(y => Math.abs(y - p.y) <= Math.hypot(dx, dz) * (natural && y === heights[0] ? .65 : .3) + 0.025 &&
         this.hulls.every(s => {
           if (!contains(s, q, -0.001)) return true;
           const top = surfaceHeight(s, q), bottom = s.filled ? -0.12 : top - s.thickness;
@@ -152,12 +161,14 @@ export class WalkTerrain {
     }
     const count = Math.max(1, Math.ceil(distance2(a, b) / 0.25));
     const step = distance2(a, b) / count;
+    let previous = { x: a.x, y: height, z: a.z };
     for (let i = 1; i <= count; i++) {
       const q = { x: a.x + (b.x - a.x) * i / count, z: a.z + (b.z - a.z) * i / count };
-      const heights = this.heights(q).filter(y => Math.abs(y - height) <= step * 0.3 + 0.025 &&
+      const heights = this.heights(q).filter(y => Math.abs(y - height) <= step * this.riseLimit(previous, { ...q, y }) + 0.025 &&
         this.canStand({ ...q, y }, radius, dynamic));
       if (!heights.length) return false;
       height = heights.reduce((best, y) => Math.abs(y - height) < Math.abs(best - height) ? y : best);
+      previous = { ...q, y: height };
     }
     return b.y === undefined || Math.abs(height - b.y) < 0.05;
   }
@@ -282,7 +293,7 @@ export class SurfaceNavigation {
       const x = c.x + dx, z = c.z + dz;
       if ((!dx && !dz) || x < 0 || x >= this.width || z < 0 || z >= this.height) continue;
       for (const next of this.cells[z * this.width + x]) {
-        const q = this.nodes[next], rise = Math.hypot(dx, dz) * CELL * 0.3 + 0.025;
+        const q = this.nodes[next], rise = Math.hypot(dx, dz) * CELL * this.terrain.riseLimit(p, q) + 0.025;
         if (Math.abs(p.y - q.y) > rise) continue;
         // Both nodes already have full footprint support. A diagonal also
         // needs its cardinal cells; this prevents inflated-corner cutting.

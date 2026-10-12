@@ -50,6 +50,20 @@ describe("Timber Rights and shared natural terrain", () => {
     }
   }, 15000);
 
+  test("the Night Shift replay's open ridge approach goes straight there without stalling", async () => {
+    sim=await Simulation.create("nightforest","minigunner","practice");
+    const a=sim.squad[0],start={x:30.763,z:16.227},end={x:-1.251,z:-26.897};
+    sim.squad.slice(1).forEach((a,i)=>place(a,{x:-60+i*3,z:37}));place(a,start);sim.world.step();
+    sim.navigate(a,sim.terrain!.resolve(end));expect(a.path).toEqual([sim.terrain!.resolve(end)]);
+    let idle=0,longest=0;
+    for(let i=0;i<18/STEP&&a.path.length;i++){
+      sim.step();sim.events.length=0;const v=a.body.linvel();
+      idle=Math.hypot(v.x,v.z)<.12?idle+1:0;longest=Math.max(longest,idle);
+    }
+    expect(a.path).toHaveLength(0);expect(distance2(a.body.translation(),end)).toBeLessThan(.15);
+    expect(longest*STEP).toBeLessThan(.5);
+  });
+
   test.each(["assault", "minigunner", "sniper"] as const)("%s squad clears the replay's uphill formation snag without another order", async model => {
     sim = await Simulation.create("forest", model, "practice");
     ticks(100*STEP);

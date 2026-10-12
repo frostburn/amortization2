@@ -102,13 +102,21 @@ export class NightForestMission extends Mission {
     for (const a of this.drones) {
       const f = a.flight!, b = a.ai!, p = a.body.translation();
       b.fire = false;
-      if (p.y > f.hover + 1 || this.sim.isDisrupted(a)) continue;
+      if (this.sim.isDisrupted(a)) continue;
       f.state = "pursuing";
       if (this.sim.time >= b.nextThink) {
         b.nextThink = this.sim.time + .2;
         const protector = this.sim.squad.filter(target => !target.dead && distance2(p, target.body.translation()) < 14 && this.sim.canSee(a, target))
           .sort((first, second) => distance2(p, first.body.translation()) - distance2(p, second.body.translation()))[0];
         const vehicle = this.convoy.filter(c => c.hp > 0).sort((first, second) => distance2(p, first.body.translation()) - distance2(p, second.body.translation()))[0];
+        if (vehicle) {
+          // Escort fire can distract the gun, never the convoy pursuit. Stay in
+          // the cleared road corridor rather than parking beside a tree-bound escort.
+          const road = vehicle.body.translation();
+          f.goal = forestPoint({ x: clamp(road.x + 10 + (f.slot % 2 ? 3 : 0), -70, 68),
+            z: 37 + (f.slot % 2 ? -2 : 2) }, 4.5);
+          f.hover = f.goal.y;
+        }
         const target = protector ?? vehicle;
         if (!target) continue;
         if (b.target !== target.id) b.nextAttack = Math.max(b.nextAttack, this.sim.time + .8);
@@ -117,12 +125,12 @@ export class NightForestMission extends Mission {
         const hit = this.sim.fireRay(a, this.sim.muzzle(a, b.aim), b.aim);
         b.visible = distance2(p, q) < 26 && !!hit && (protector ? hit.collider.handle === protector.collider.handle : vehicle!.colliders.some(c => c.handle === hit.collider.handle));
         b.state = b.visible ? "aiming" : "advancing";
-        f.goal = { x: q.x + 12 + (f.slot % 2 ? 2 : 0), y: f.hover, z: clamp(q.z + (f.slot % 2 ? -5 : 5), 33, 41) };
+
       }
-      if (b.visible && this.sim.time >= b.nextAttack && !a.pistol.reload) {
+      if (p.y <= f.hover + 1 && b.visible && this.sim.time >= b.nextAttack && !a.pistol.reload) {
         b.burstUntil = this.sim.time + .06; b.nextAttack = this.sim.time + 2.4;
       }
-      b.fire = b.visible && this.sim.time < b.burstUntil;
+      b.fire = p.y <= f.hover + 1 && b.visible && this.sim.time < b.burstUntil;
       if (!a.pistol.ammo) this.sim.reloadActor(a);
     }
   }
