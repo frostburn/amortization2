@@ -123,6 +123,7 @@ export class SniperView {
     sim: Simulation,
     hiddenObjects: THREE.Object3D[],
     enabled: boolean,
+    afterWorld?: (camera: THREE.Camera) => void,
   ) {
     const operator = enabled && sim.sniping && sim.rifleOperator;
     this.visible = !!operator;
@@ -159,6 +160,7 @@ export class SniperView {
     const visibility = hiddenObjects.map((o) => o.visible);
     hiddenObjects.forEach((o) => (o.visible = false));
     renderer.render(world, this.camera);
+    afterWorld?.(this.camera);
     hiddenObjects.forEach((o, i) => (o.visible = visibility[i]));
     renderer.autoClear = false;
     renderer.clearDepth();

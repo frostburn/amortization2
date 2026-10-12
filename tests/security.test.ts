@@ -1,3 +1,4 @@
+import { longReplayTest } from "./long-replay";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { STEP, RIFLE } from "../src/game/config";
@@ -269,7 +270,7 @@ describe("civilian security response", () => {
     expect(sim.security!.active).toHaveLength(2);
   });
 
-  test("recorded civilian attacks reproduce dispatch, air combat and drone positions", async () => {
+  longReplayTest("recorded civilian attacks reproduce dispatch, air combat and drone positions", async () => {
     stage();
     // Recording must begin from the authored floor, without fixture teleports.
     sim.reset("receiving");

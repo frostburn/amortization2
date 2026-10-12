@@ -38,6 +38,21 @@ The viewer and file controls are absent from production builds.
 
 ## Inspecting an export
 
+Long captures and replay integration runs are **not run by `npm test` or CI**.
+The default suite uses tiny authored codec fixtures and short recorder/playback
+checks, with at most two physics workers. To run the longer bridge, hauling, escort, recovery, security, raised-path
+and archived terrain replay checks explicitly, use:
+
+```sh
+npm run test:replays
+# Or run one file's opt-in replay checks:
+npm run test:replays -- tests/replay-codec.test.ts
+```
+
+This separate command enables only the tests prefixed `long replay:` and runs
+them with one worker. Stored JSON captures remain available for manual viewing
+and `inspect:replay`; no archived playthrough is loaded during the default tests.
+
 Attach the JSON when describing a combat or movement problem. In the matching
 source checkout, run:
 
@@ -61,6 +76,26 @@ returns the current attempt; `exportReplay("all")` returns the full page history
 pauses neither the game nor the recorder and never resets an attempt.
 
 ## Contents and limits
+
+New downloads and console exports use **version 2 compact JSON**. Snapshots
+store only changes from the previous observation (the first uses `initial`);
+`final` stores changes from the last snapshot. Timed inputs, events and camera
+samples use `[tick, wallMs, data]` tuples. A snapshot patch `[value]` replaces a
+subtree; an object patches its existing keys or array indices. `{}` means no
+change. Adding/removing fields or changing an array's length replaces that
+subtree. JSON whitespace is omitted. Input coordinates, tick ordering, timestamps,
+combat observations and camera samples are preserved without rounding or removal.
+
+The current viewer and inspection command accept both versions. To read a file
+as conventional, indented version 1 JSON (or load it in an older game checkout):
+
+```sh
+npm run format:replay -- capture.json expanded.json --expand
+```
+
+To compact an existing file, omit `--expand`. Conversion preserves its original
+gameplay revision and timestamps; it does not re-simulate or update the capture.
+Compact imports also bound nesting and expanded observation size before playback.
 
 The versioned capture includes resolved selection, movement/queued movement,
 weapon, reload, brace/scope and grenade commands; changes in aim and trigger;

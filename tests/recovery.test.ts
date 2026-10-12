@@ -1,3 +1,4 @@
+import { longReplayTest } from "./long-replay";
 import { afterEach, describe, expect, test } from "vitest";
 import { STEP, distance2, type Vec2 } from "../src/game/config";
 import { Simulation, type Actor } from "../src/game/simulation";
@@ -233,7 +234,7 @@ describe("Recovery Fee", () => {
     expect(sim.squad.every(a => distance2(a.body.translation(), RECOVERY_SITES.exit) < RECOVERY_SITES.exit.radius)).toBe(true);
   });
 
-  test("normal fire and convoy response replay even when the renderer drains events", async () => {
+  longReplayTest("normal fire and convoy response replay even when the renderer drains events", async () => {
     sim = await Simulation.create("recovery", "sniper");
     const r = new HumanReplayRecorder("recovery-test"); r.begin(sim);
     sim.onInput = action => r.action(sim, action);

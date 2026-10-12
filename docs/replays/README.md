@@ -1,5 +1,17 @@
 # Recorded verification runs
 
+These captures have been losslessly re-encoded as compact version 2 JSON. The
+gameplay data, original revisions, timestamps and verification results below are
+unchanged. The current viewer and `inspect:replay` decode either format. For an
+older source checkout, first expand the file using the current checkout:
+
+```sh
+npm run format:replay -- docs/replays/timber-rights-terrain.json /tmp/terrain-v1.json --expand
+```
+
+Then load the expanded file in the original gameplay checkout. See
+[human replays](../human-replays.md) for the encoding and conversion commands.
+
 ## Timber Rights: slope movement and failed-attempt controls
 
 Two unchanged native keyboard/mouse captures verify the terrain correction and
