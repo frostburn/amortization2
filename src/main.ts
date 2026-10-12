@@ -258,7 +258,6 @@ export async function start() {
     if (viewer?.active) return;
     nextPausedRender = 0;
     resultDialog.close();
-    dismissRestartConfirmation();
     dismissComms();
     exitSniping();
     cancelDrags();
@@ -294,7 +293,8 @@ export async function start() {
       );
       return;
     }
-    audio.stop();
+    // Reconcile firing loops without cutting off explosions or other one-shots.
+    audio.update(sim, paused);
     updateUI(sim, audio);
     canvas.focus();
   }
@@ -420,27 +420,9 @@ export async function start() {
     });
   document.getElementById("reset")!.addEventListener("click", reset);
   document.getElementById("arena-restart")!.addEventListener("click", () => { reset(); canvas.focus(); });
-  const replayButton = document.getElementById("mission-replay")!;
-  const restartConfirmation = document.getElementById("mission-restart-confirmation")!;
-  function dismissRestartConfirmation() {
-    restartConfirmation.hidden = true;
-    replayButton.hidden = false;
-  }
-  replayButton.addEventListener("click", () => {
-    if (sim.mission?.phase === "failed") {
-      replayButton.hidden = true;
-      restartConfirmation.hidden = false;
-      document.getElementById("mission-restart-confirm")!.focus();
-    } else { reset(); void resume(); }
-  });
-  document.getElementById("mission-restart-confirm")!.addEventListener("click", () => {
-    if (restartConfirmation.hidden) return;
+  document.getElementById("mission-replay")!.addEventListener("click", () => {
     reset(); void resume();
   });
-  document.getElementById("mission-restart-cancel")!.addEventListener("click", () => {
-    dismissRestartConfirmation(); replayButton.focus();
-  });
-  resultDialog.addEventListener("close", dismissRestartConfirmation);
   document.getElementById("mission-next")!.addEventListener("click", () => {
     const next = NEXT_CONTRACT[sim.range as keyof typeof NEXT_CONTRACT];
     if (next) void prepareChange(() => switchRange(next, "mission"), "Preparing the next contract…");
@@ -772,7 +754,6 @@ export async function start() {
         else if (sim.active.length)
           toast(
             `Grenades rearming. Ready in ${sim.grenadeCooldown.toFixed(1)} s.`,
-            true,
           );
         updateUI(sim, audio);
       } else sim.trigger = true;
@@ -842,12 +823,9 @@ export async function start() {
     }
     if (resultDialog.open) {
       // Held bracing must not activate the newly focused native button.
-      // Confirmation requires a deliberate click or a fresh Enter press.
+      // A fresh Enter press can still activate the focused result action.
       if (e.code === "Space" || e.key === "Enter" && e.repeat) e.preventDefault();
-      if (e.code === "Escape") {
-        e.preventDefault();
-        if (!restartConfirmation.hidden) { dismissRestartConfirmation(); replayButton.focus(); }
-      }
+      if (e.code === "Escape") e.preventDefault();
       return;
     }
     if (isForm(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
