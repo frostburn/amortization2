@@ -64,6 +64,15 @@ bottom; the hull itself still moves through ordinary physics.
 Two small silhouette passes use stencil masking to remove internal seams and
 self-occlusion; they do not re-render the district or add navigation/ray queries.
 The scope draws the outlines before its fixed reticle and lens overlay.
+Contours require at least 30% estimated camera coverage, with a 25% release
+threshold to avoid flicker. An 8 × 8 grid samples the actual front-facing robot
+surface; asynchronous GPU queries test those points against the existing world
+depth. The sampling budget is two robots per frame, serviced round-robin. Small
+ground contacts and unreliable off-screen slivers do not enable an outline.
+Surface-depth bias accounts for antialiasing at sloping faces; the probes never
+raycast the district or wait for GPU results synchronously.
+A scissored chassis-only depth reference rejects self-occluded edge samples;
+it reuses one render target and never re-renders the level.
 The forest continues outside the playable 160 × 120 m area. The eastern plot is
 graded flat and marked with survey stakes, future slab pads and cooling-plant
 footprints. The office reuses the city building kit; the recovery van reuses the
