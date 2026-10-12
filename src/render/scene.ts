@@ -929,7 +929,7 @@ export class RangeScene {
       : makeActorBody(a, { metal, dark, silver, yellow, shell, sniperShell, minigunShell, orange, pale, glow, targetPaint });
     if (human) { human.root.position.y = -HUMAN.height / 2; body.torso.add(human.root); body.root.add(body.torso); }
     const { root, torso } = body, friend = this.sim.team(a) === "player", sniper = a.model === "sniper";
-    if (this.sim.team(a) === "enemy") this.enemyOutlines.add(root);
+    if (a.kind === "enemy") this.enemyOutlines.add(root);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.74, 0.79, 40),
       new THREE.MeshBasicMaterial({
@@ -1591,7 +1591,7 @@ export class RangeScene {
     for (const a of this.sim.actors) {
       if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;
-      if (!a.dead && this.sim.team(a) === "enemy") this.outlinedEnemies.add(v.root);
+      if (!a.dead && a.kind === "enemy") this.outlinedEnemies.add(v.root);
       const p = a.body.translation();
       v.root.position.set(
         THREE.MathUtils.lerp(a.previous.x, p.x, alpha),
