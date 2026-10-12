@@ -43,6 +43,15 @@ describe("reusable traffic models",()=>{
       expect(samples).toBeGreaterThan(0);
     } finally {dispose(root);}
   });
+  test.each(["CAB","VAN","TRUCK"] as const)("%s has no detached bars below its outer body panels",model=>{
+    const {root}=vehicleBody(model),spec=VEHICLES[model];
+    try {
+      const trim=(root.children as THREE.Mesh[]).find(m=>(m.material as THREE.MeshStandardMaterial).color?.getHex()===0x20282a)!;
+      const positions=trim.geometry.getAttribute("position");
+      for(let i=0;i<positions.count;i++) if(positions.getY(i)+spec.height/2<.36)
+        expect(Math.abs(positions.getX(i))).toBeLessThan(spec.width*.43);
+    } finally {dispose(root);}
+  });
   test("adding vehicles increases instances rather than draw calls, and disposal releases every batch",async()=>{
     const sim=await Simulation.create("city"),reflection=new THREE.Texture();
     const small=new TrafficFleet(sim.city!.vehicles.slice(0,3),reflection),large=new TrafficFleet(sim.city!.vehicles,reflection);

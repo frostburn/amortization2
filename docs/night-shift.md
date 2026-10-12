@@ -62,8 +62,8 @@ Disabled ground robots retain physical mass and collisions but use flat chassis
 panels with lower friction. Living robots push through real contacts rather than
 planning around wrecks. Grounded wrecks damp towards a preferred back-panel pose
 aligned with the local ground; blast-driven airborne motion remains free.
-Vehicle sills end at the wider bodywork rather than extending as exposed rails
-along tapered noses.
+Detached longitudinal underbody trim is removed from the vehicle models,
+including the exposed bars along tapered noses.
 
 ## Verification
 
