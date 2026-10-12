@@ -541,7 +541,7 @@ export class Simulation {
       this.chooseWeapon(this.pistolsOnly ? "pistol" : ROBOT_MODELS[this.primary.model!].weapon);
   }
   get grenadeThrower(): Actor | undefined {
-    const ready = this.active.filter((a) => this.supports(a, "grenade") && a.grenadeCooldown === 0 && !this.isDisrupted(a));
+    const ready = this.active.filter((a) => this.supports(a, "grenade") && !a.haul && a.grenadeCooldown === 0 && !this.isDisrupted(a));
     return ready.find((a) => a.id > this.lastGrenadier) ?? ready[0];
   }
   get grenadeCooldown() {
@@ -1209,7 +1209,7 @@ export class Simulation {
   }
 
   throwGrenade(point: Vec2, actor = this.grenadeThrower): boolean {
-    if (!actor || actor.dead || this.isDisrupted(actor) || actor.grenadeCooldown > 0 || !this.supports(actor, "grenade")) return false;
+    if (!actor || actor.dead || actor.haul || this.isDisrupted(actor) || actor.grenadeCooldown > 0 || !this.supports(actor, "grenade")) return false;
     if (actor.kind === "player") this.onInput?.({ type: "grenade", point: { ...point }, actor: actor.id });
     const from = this.grenadeOrigin(actor, point);
     const { velocity } = grenadeVelocity(from, point);
