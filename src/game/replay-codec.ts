@@ -42,12 +42,15 @@ export function compactHumanReplay(replay: HumanReplay): CompactReplay {
 }
 export const stringifyHumanReplay = (replay: HumanReplay) => JSON.stringify(compactHumanReplay(replay));
 
-/** Guard both nesting and expanded snapshot size before allocating full copies. */
-export function expandHumanReplay(value: unknown): HumanReplay {
+/** Guard both nesting and expanded snapshot size before allocating full copies.
+ * Callers may lower the node budget; the production ceiling cannot be raised. */
+export function expandHumanReplay(value: unknown, nodeLimit = 8_000_000): HumanReplay {
   const fail = (): never => { throw new Error("Invalid compact replay or expansion exceeds capture limits"); };
+  if (!Number.isSafeInteger(nodeLimit) || nodeLimit < 1) return fail();
+  const budget = Math.min(nodeLimit, 8_000_000);
   let nodes = 0;
   const measure = (data: unknown, depth = 0): number => {
-    if (depth > 48 || ++nodes > 8_000_000) return fail();
+    if (depth > 48 || ++nodes > budget) return fail();
     if (data === null || typeof data === "string" || typeof data === "boolean") return 1;
     if (typeof data === "number") return Number.isFinite(data) ? 1 : fail();
     if (!data || typeof data !== "object") return fail();

@@ -38,6 +38,21 @@ The viewer and file controls are absent from production builds.
 
 ## Inspecting an export
 
+Long captures and replay integration runs are **not run by `npm test` or CI**.
+The default suite uses tiny authored codec fixtures and short recorder/playback
+checks, with at most two physics workers. To run the longer bridge, hauling, escort, recovery, security, raised-path
+and archived terrain replay checks explicitly, use:
+
+```sh
+npm run test:replays
+# Or run one file's opt-in replay checks:
+npm run test:replays -- tests/replay-codec.test.ts
+```
+
+This separate command enables only the tests prefixed `long replay:` and runs
+them with one worker. Stored JSON captures remain available for manual viewing
+and `inspect:replay`; no archived playthrough is loaded during the default tests.
+
 Attach the JSON when describing a combat or movement problem. In the matching
 source checkout, run:
 

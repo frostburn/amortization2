@@ -1,3 +1,4 @@
+import { longReplayTest } from "./long-replay";
 import { afterEach, describe, expect, test } from "vitest";
 import { CONCOURSE_RAILS, CONCOURSE_SURFACES } from "../src/game/concourse";
 import { STEP, distance2, grenadeVelocity, type Vec2 } from "../src/game/config";
@@ -176,7 +177,7 @@ describe("raised debug district", () => {
     expect(sim.clearsLowCover(sim.primary, { ...low, z: -5 }, { ...upper, z: -5 })).toBe(false);
   });
 
-  test("queued orders and replays preserve surface height, and reset isolates older floors", async () => {
+  longReplayTest("queued orders and replays preserve surface height, and reset isolates older floors", async () => {
     sim = await Simulation.create("concourse");
     const recorder = new HumanReplayRecorder("raised-test"); recorder.begin(sim);
     sim.onInput = action => recorder.action(sim!, action);

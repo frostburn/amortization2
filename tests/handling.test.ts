@@ -1,3 +1,4 @@
+import { longReplayTest } from "./long-replay";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { PISTOL, STEP, distance2 } from "../src/game/config";
 import { HandlingMission } from "../src/game/handling-mission";
@@ -288,7 +289,7 @@ describe("Handling contract and squad hauling", () => {
     sim.step(); expect(mission().phase).toBe("failed"); expect(mission().failureReason).toMatch(/Not enough chassis/);
   });
 
-  test("human export and playback reproduce pickup, a queued haul, physical cargo and drone arrivals", async () => {
+  longReplayTest("human export and playback reproduce pickup, a queued haul, physical cargo and drone arrivals", async () => {
     sim.reset(); const recorder = new HumanReplayRecorder("handling-test"); recorder.begin(sim);
     sim.onInput = action => recorder.action(sim, action);
     // Native deployment is recorded by main, like every existing contract.

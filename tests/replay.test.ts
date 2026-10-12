@@ -1,3 +1,4 @@
+import { longReplayTest } from "./long-replay";
 import { afterEach, describe, expect, test } from "vitest";
 import { STEP, distance2 } from "../src/game/config";
 import { HumanReplayRecorder, playRecordedSession, readHumanReplay, replaySnapshot } from "../src/game/replay";
@@ -67,7 +68,7 @@ describe("development human replays", () => {
     expect(recorder.status.sessions).toBe(1);
   });
 
-  test("covering orders, bridge admission and the last-crossing alarm resimulate exactly", async () => {
+  longReplayTest("covering orders, bridge admission and the last-crossing alarm resimulate exactly", async () => {
     const sim = await create("crossing"), { recorder, advance } = capture(sim);
     recorder.action(sim, { type: "deploy" }); sim.mission!.deploy();
     const walk = (timeout: number) => {

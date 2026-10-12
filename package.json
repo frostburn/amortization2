@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:replays": "node scripts/test-replays.mjs",
     "inspect:replay": "node scripts/inspect-replay.mjs",
     "format:replay": "node scripts/format-replay.mjs"
   },

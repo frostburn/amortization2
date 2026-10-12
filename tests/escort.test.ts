@@ -1,3 +1,4 @@
+import { longReplayTest } from "./long-replay";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { PISTOL, STEP, distance2, type Vec2 } from "../src/game/config";
 import { ESCORT_DOOR, ESCORT_REAR_DOOR, ESCORT_SITES } from "../src/game/escort";
@@ -183,7 +184,7 @@ describe("Release contract and human escort", () => {
     expect(mission().phase).toBe("failed"); expect(mission().failureReason).toMatch(/No chassis/);
   });
 
-  test("real movement, pistol combat, covering orders and the escort replay through the entire contract", async () => {
+  longReplayTest("real movement, pistol combat, covering orders and the escort replay through the entire contract", async () => {
     sim.reset(); const recorder = new HumanReplayRecorder("escort-test"); recorder.begin(sim);
     sim.onInput = action => recorder.action(sim, action);
     recorder.action(sim, { type: "deploy" }); mission().deploy();
