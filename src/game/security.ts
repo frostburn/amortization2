@@ -165,6 +165,7 @@ export class SecurityResponse {
         if (now - a.deathTime! > WATCH.wreckSeconds) this.retire(a);
         continue;
       }
+      if (this.sim.mission?.managesDrone(a)) continue;
       if (flight.state === "withdrawing") {
         brain.state = "entering";
         brain.target = null;
@@ -190,7 +191,7 @@ export class SecurityResponse {
           Math.abs(q.z - area.z) < area.d / 2 && q.y < (area.y ?? 0) + area.h);
         brain.aim = { x: q.x, y: q.y + .25, z: q.z };
         const muzzle = this.sim.muzzle(a, brain.aim);
-        brain.visible = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) < 26 &&
+        brain.visible = this.sim.canSee(a, target) && Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) < 26 &&
           !this.sim.layout.shelters?.some(area => crossesArea(muzzle, brain.aim, area, 0, (area.y ?? 0) + area.h - .15)) &&
           this.sim.fireRay(a, muzzle, brain.aim)?.collider.handle === target.collider.handle;
         brain.state = a.pistol.reload ? "reloading" : brain.visible ? "aiming" : "advancing";

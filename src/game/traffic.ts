@@ -241,6 +241,9 @@ export class StreetTraffic {
   }
   update() {
     const now=this.sim.time;
+    const wrecks = this.sim.actors.some(a => a.dead)
+      ? new Set(this.sim.actors.filter(a => a.dead).map(a => a.collider.handle)) : undefined;
+    const ignoreWrecks = wrecks ? (h: RAPIER.Collider) => !wrecks.has(h.handle) : undefined;
     // Newly destroyed neighbours join the same bounded Set iteration. No
     // recursive damage/blast calls, and each vehicle crosses zero health once.
     for(const c of this.detonations) {
@@ -297,7 +300,10 @@ export class StreetTraffic {
         for(const side of [-0.44,0,0.44]) {
           const from={x:p.x+forward.x*(spec.length/2+0.08)+forward.z*spec.width*side,
             y:0.35,z:p.z+forward.z*(spec.length/2+0.08)-forward.x*spec.width*side};
-          const hit=this.sim.ray(from,{x:from.x+forward.x*10,y:from.y,z:from.z+forward.z*10},c.body);
+          // Heavy vehicles can push small robot wrecks; braking forever in front
+          // of a downed drone would strand an otherwise intact convoy.
+          const hit=this.sim.ray(from,{x:from.x+forward.x*10,y:from.y,z:from.z+forward.z*10},c.body,
+            ignoreWrecks);
           if(hit)c.clearance=Math.min(c.clearance,hit.timeOfImpact);
         }
       } else c.clearance=Math.max(0,c.clearance-speed*STEP);

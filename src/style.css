@@ -1108,3 +1108,9 @@ a:hover {
 .range-title #mode-select { font-size: 10px; letter-spacing: 1px; color: var(--mint); padding-block: 3px; }
 
 .level-menu { margin-top: 12px; }
+
+#night-status { margin-top: 12px; display: grid; gap: 6px; }
+#night-status > div { display: flex; align-items: center; gap: 8px; }
+#night-status span { width: 64px; font: 9px ui-monospace, monospace; color: var(--muted); }
+#night-status progress { flex: 1; width: 0; height: 5px; }
+#night-occupation { accent-color: #ef9a64; }

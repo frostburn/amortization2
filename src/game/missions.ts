@@ -69,6 +69,8 @@ export abstract class Mission {
   abstract get objective(): number;
   abstract get marker(): { x: number; z: number; radius: number; kind: "dispatch" | "return" } | null;
   abstract updateCombat(): void;
+  managesDrone(_actor: Simulation["actors"][number]) { return false; }
+  updateAirCombat(): void {}
   abstract updateObjectives(): void;
   abstract inspect(): { id: string; phase: MissionPhase; objective: number; enemies: number; guards: number;
     releaseProgress: number; returnProgress: number; cargoReleased: boolean; marker: Mission["marker"];
@@ -95,7 +97,7 @@ export abstract class Mission {
   }
 }
 
-export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery", recovery: "forest" } as const;
+export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery", recovery: "forest", forest: "nightforest" } as const;
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
 export class ReceivingMission extends Mission {

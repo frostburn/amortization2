@@ -41,6 +41,8 @@ import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
 import { PriorityMission } from "./priority-mission";
+import { NightForestMission } from "./night-forest-mission";
+import { NightVisibility } from "./night-visibility";
 import { ForestMission } from "./forest-mission";
 import { RecoveryMission } from "./recovery-mission";
 import type { HumanEscort } from "./human-escort";
@@ -165,6 +167,7 @@ export class Simulation {
   arena?: ArenaCombat;
   mission?: Mission;
   hauling?: SquadHauling;
+  night?: NightVisibility;
   escort?: HumanEscort;
   city?: CityLife;
   terrain?: WalkTerrain;
@@ -213,6 +216,7 @@ export class Simulation {
     this.arena = undefined;
     this.arenaLandmarks = undefined;
     this.mission = undefined;
+    this.night = undefined;
     this.hauling = undefined;
     this.escort = undefined;
     this.security = undefined;
@@ -254,7 +258,7 @@ export class Simulation {
     const extent = { left: bounds.left - 24, right: bounds.right + 24, back: bounds.back - 24, front: bounds.front + 24 };
     if (this.layout.ground) {
       const field = this.layout.ground;
-      this.world.createCollider(RAPIER.ColliderDesc.trimesh(field.vertices, field.indices).setFriction(.8), this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
+      this.world.createCollider(RAPIER.ColliderDesc.trimesh(field.vertices, field.indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setFriction(.8), this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
     }
     for (const piece of this.layout.ground ? [] : dryGround(extent, this.layout.city?.water ?? [])) {
       const floor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(
@@ -321,9 +325,10 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    if (mode === "mission") this.mission = range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "mission") this.mission = range === "nightforest" ? new NightForestMission(this) : range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
     if (mode === "arena") this.arenaLandmarks = new ArenaLandmarks(this);
     this.security = this.city ? new SecurityResponse(this) : undefined;
+    this.night = this.layout.night ? new NightVisibility(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
     this.arena = mode === "arena" ? new ArenaCombat(this) : undefined;
@@ -989,6 +994,7 @@ export class Simulation {
       const target = this.actors.find(target => target.id === a.cover!.target && !target.dead);
       if (!target || this.fireRay(a, from, aim, weapon)?.collider.handle !== target.collider.handle) return;
     }
+    this.night?.flash(from);
     const delta = {
       x: aim.x - from.x,
       y: aim.y - from.y,
@@ -1338,8 +1344,12 @@ export class Simulation {
     this.city?.blast(origin, source, team);
     this.city?.windows.blast(origin, source);
     this.mission?.blastFixtures(origin, source);
+    this.night?.flash(origin, .7, 25);
     this.events.push({ type: "explosion", position: origin, affected, team, ...(vehicle === undefined ? {} : { vehicle }) });
   }
+
+  canSee(observer: Actor, target: Actor) { return this.night?.canSee(observer, target) ?? true; }
+  isDetected(a: Actor) { return !this.night || a.kind !== "enemy" || this.night.visible.has(a.id); }
 
   isDisrupted(a: Actor) {
     return !a.dead && a.stagger > 0;
@@ -1351,8 +1361,10 @@ export class Simulation {
     this.arena?.update();
     this.hauling?.update();
     this.escort?.update();
+    this.night?.update();
     this.mission?.updateCombat();
     this.security?.update();
+    this.mission?.updateAirCombat();
     updateCoverFire(this);
     for (const a of this.actors) {
       a.grenadeCooldown = Math.max(0, a.grenadeCooldown - STEP);
@@ -1709,6 +1721,7 @@ export class Simulation {
       drills: { ...this.drill },
       weapon: this.weapon,
       sniping: this.sniping,
+      night: this.night ? { detected: [...this.night.visible], lights: this.night.lights } : null,
       selected: [...this.selected],
       grenades: this.grenades.map((g) => ({
         id: g.id,

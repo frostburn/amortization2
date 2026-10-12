@@ -91,6 +91,17 @@ Each wave adds robots up to three four-member squads, then continues indefinitel
 
 Choose **City District** for a 234 × 147 metre urban sandbox. Twenty six-wheel CARTs circulate between shops and homes; five heavier **CRATE** parcel cabinets serve the depot, station hall, canal library and apartments, opening one of three compartments per visit. Both chassis yield to the squad and one another. Pan east for a shallow canal with two paved crossings, stone banks, quay furniture and a pump house; ground orders use the crossings. Nearby gunfire interrupts collection and closes local shop shutters; activity resumes after quiet. Hits launch and tumble civilian hulls, including wrecks, with CRATE's greater mass resisting bullet pressure. Their quiet motor mix is independently adjustable in the pause menu. Buildings, streets, paving and canals use reusable geometry and shared collision/navigation data. The district has no mission or scheduled enemy waves. Damage to civilians calls airborne WATCH security; continued attacks escalate the response. See [city construction and behavior](docs/city-district.md) and [the civilian cast through 2040](docs/civilian-robots.md).
 
+## Night Shift
+
+**08 · Night Shift** continues at Birchwater after dark. Keep the inspection van
+and supply truck alive on the southern forestry road while preventing the
+contractor's robots from establishing a foothold in the clearing. The intended
+split is one covering robot for the convoy and three for the ground fight.
+Headlights, a sweeping work light and combat flashes illuminate the scene;
+contacts come from squad sensors, so camera panning cannot expose dark enemies.
+All three squad configurations are available, and the night district is also
+selectable in Endless Arena. See [Night Shift](docs/night-shift.md).
+
 ## Raised concourse
 
 Choose **Raised Concourse** under **Practice / debug** for a 120 × 98 metre district with a pedestrian loop at **4.8 m and 8.4 m**. Broad ramps connect its terraces, a bridge crosses the working street, and a second gallery gives the block a layered isometric silhouette. Ground-level movement clicks on open decks go underneath; robots already upstairs keep using the raised route. Use the filled arrival ramps to climb. Markers follow the chosen floor, while weapon aiming retains target elevation. Orange targets at ground, bridge and gallery height let you test cross-level fire and grenades. CART deliveries and cars continue on the streets below. There is no contract or scheduled combat wave. See [raised surfaces and navigation](docs/raised-concourse.md).

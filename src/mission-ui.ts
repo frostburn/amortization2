@@ -2,6 +2,7 @@ import { NEXT_CONTRACT, type Contact } from "./game/missions";
 import { RANGES } from "./game/ranges";
 import type { EscortMission } from "./game/escort-mission";
 import { PriorityMission } from "./game/priority-mission";
+import { NightForestMission } from "./game/night-forest-mission";
 import { ForestMission } from "./game/forest-mission";
 import { RecoveryMission } from "./game/recovery-mission";
 import { RECOVERY_DRIVE_HP } from "./game/recovery";
@@ -26,6 +27,7 @@ export const missionHUD = `
     <div class="panel-heading"><b id="mission-name">01 / RECEIVING</b> <span id="mission-stage">1 / 3</span></div>
     <h2 id="mission-objective">Clear the pickup yard</h2><p id="mission-detail">4 guards</p>
     <progress id="mission-progress" max="1" value="0" aria-label="Objective progress" hidden></progress>
+    <div id="night-status" hidden><div><span>VAN</span><progress id="night-van-health" max="320" value="320" aria-label="Convoy van integrity"></progress></div><div><span>TRUCK</span><progress id="night-truck-health" max="620" value="620" aria-label="Convoy truck integrity"></progress></div><div><span>CLEARING</span><progress id="night-occupation" max="1" value="0" aria-label="Enemy foothold pressure"></progress></div></div>
     <div id="escort-status" hidden><img src="${portrait("quill")}" alt="Ren Quill" width="36" height="36"/><div><b>QUILL</b><span id="escort-state"></span><progress id="escort-health" max="88" value="88" aria-label="Ren Quill health"></progress></div></div>
   </aside>
   <aside id="mission-comms" class="mission-comms" role="status" aria-live="polite" hidden>
@@ -62,6 +64,7 @@ export function updateMissionUI(sim: Simulation) {
     : "Click the dispatch case or press H to collect / put it down. Right-click moves the carrier. Other robots can cover; the carrier cannot shoot. Ctrl-click deliberately fires.";
   document.getElementById("escort-controls")!.hidden = !sim.escort;
   document.getElementById("escort-status")!.hidden = !sim.escort;
+  document.getElementById("night-status")!.hidden = !(mission instanceof NightForestMission);
   if (!mission) return;
 
   const briefing = document.getElementById("mission-briefing")!;
@@ -91,6 +94,7 @@ export function updateMissionUI(sim: Simulation) {
   const load = sim.hauling?.available();
   const escort = sim.escort, rescue = mission as EscortMission;
   const priority = mission instanceof PriorityMission ? mission : undefined;
+  const night = mission instanceof NightForestMission ? mission : undefined;
   const forest = mission instanceof ForestMission ? mission : undefined;
   const recovery = mission instanceof RecoveryMission ? mission : undefined;
   if (escort) {
@@ -100,7 +104,16 @@ export function updateMissionUI(sim: Simulation) {
     const health = document.getElementById("escort-health") as HTMLProgressElement;
     health.max = escort.human.maxHp; health.value = escort.human.hp;
   }
-  setText("mission-detail", forest ? mission.phase === "briefing" ? "Choose squad · Stop the illegal clearance"
+  if (night) {
+    (document.getElementById("night-van-health") as HTMLProgressElement).value = night.convoy[0].hp;
+    (document.getElementById("night-truck-health") as HTMLProgressElement).value = night.convoy[1].hp;
+    (document.getElementById("night-occupation") as HTMLProgressElement).value = night.occupation;
+  }
+  setText("mission-detail", night ? mission.phase === "briefing" ? "One robot for the road · Three for the clearing"
+    : mission.phase === "return" ? `${near} / ${living.length} at the receiving bay`
+    : mission.finished ? mission.failureReason ?? "Convoy safe · Site secured"
+    : `${night.arrivedAt === undefined ? night.rolling ? "Convoy approaching" : "Convoy waiting to roll" : "Convoy received"} · ${night.contested ? "Clearing contested" : night.occupation > 0 ? "Enemy foothold growing" : "Watch both approaches"}`
+    : forest ? mission.phase === "briefing" ? "Choose squad · Stop the illegal clearance"
     : mission.phase === "intercept" ? `${forest.stoppedRigs} / 2 felling rigs stopped`
     : mission.phase === "secure" ? forest.contested ? "Terminal contested · Clear its approach" : "Bring a robot to the amber terminal"
     : mission.phase === "hold" ? `${Math.round(forest.holdProgress * 100)}% secured · ${forest.enemies.length} security machines${forest.contested ? " · Clearing contested" : " · Keep a robot in the clearing"}`
@@ -148,6 +161,7 @@ export function updateMissionUI(sim: Simulation) {
     progress.hidden = !["intercept", "return"].includes(mission.phase);
     progress.value = mission.phase === "intercept" ? recovery.truck.driveHp! / RECOVERY_DRIVE_HP : mission.returnProgress;
   }
+  if (night) { progress.hidden = mission.phase !== "return"; progress.value = mission.returnProgress; }
   if (forest) {
     progress.hidden = mission.phase === "intercept" || mission.finished;
     progress.value = mission.phase === "secure" ? mission.releaseProgress : mission.phase === "hold" ? forest.holdProgress : mission.returnProgress;
@@ -160,7 +174,10 @@ export function updateMissionUI(sim: Simulation) {
     setText("mission-result-state", complete ? "CONTRACT COMPLETE" : "RECOVERY REQUIRED");
     const civilians = [...sim.city!.carts, ...sim.city!.kites, ...sim.city!.porters, ...sim.city!.vehicles];
     const damaged = civilians.filter(c => c.hp <= 0 && !("path" in c && c.team === "enemy")).length;
-    const message = forest ? complete
+    const message = night ? complete
+      ? "Both inspection vehicles are in and the contractor's return squads are gone. The cooperative can preserve the site until morning. Their dispatcher called this a recovery operation; Quill will ask why recovery needed armed machines and a drone screen."
+      : `${mission.failureReason ?? "Recovery required"}. Vale is diverting the inspection crew; Rook is arranging chassis recovery.`
+      : forest ? complete
       ? "The logging has stopped, the work order is preserved and the inspectors have the site. The instruction called protected-buffer clearance 'drainage preparation'. Meridian's application still goes to a public decision; this contractor no longer gets to decide it with a felling rig."
       : "Rook is arranging chassis recovery. The water cooperative still has its stop-work order; Vale is keeping the inspectors clear of the armed site."
       : recovery ? !complete

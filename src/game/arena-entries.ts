@@ -7,6 +7,7 @@ export type ArenaEntry = Vec2 & { name: string; dx: number; dz: number };
 // Dry street/yard approaches rather than the visual rectangle's edges (which
 // may be buildings or sea). The long range has entries inside its perimeter.
 const APPROACHES: Record<RangeId, readonly Vec2[]> = {
+  nightforest: [{ x: 42, z: -32 }, { x: 14, z: 38 }, { x: -60, z: 37 }],
   forest: [{ x: -66, z: -8 }, { x: 66, z: -24 }, { x: 66, z: 25 }, { x: -65, z: 26 }],
   arena: ARENA_ENTRIES,
   proving: [{ x: 0, z: -23 }, { x: 29, z: 0 }, { x: 0, z: 17 }, { x: -29, z: 0 }],

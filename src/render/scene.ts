@@ -35,6 +35,7 @@ import { SniperView } from "./scope";
 import { ARENA_ENTRIES } from "../game/ranges";
 import { NaturalTerrainView } from "./natural-terrain";
 import { FOREST_TREES } from "../game/forest";
+import { NightLighting } from "./night-lighting";
 import { EnemyOutlines } from "./enemy-outlines";
 import { ConcourseView } from "./concourse";
 import { PRIORITY_SUPPORTS } from "../game/priority";
@@ -195,6 +196,8 @@ export class RangeScene {
   camera = new THREE.OrthographicCamera(-30, 30, 15, -15, 0.1, 400);
   scope = new SniperView();
   private sun!: THREE.DirectionalLight;
+  private sky = new THREE.HemisphereLight(0xd4e8ec, 0x44423a, 2);
+  private nightLighting?: NightLighting;
   private environment = new THREE.Group();
   private cityView?: CityView;
   private concourseView?: ConcourseView;
@@ -363,7 +366,7 @@ export class RangeScene {
     this.renderer.info.autoReset = false;
     this.scene.background = new THREE.Color(0x242d30);
     this.scene.fog = new THREE.Fog(0x242d30, 90, 145);
-    this.scene.add(new THREE.HemisphereLight(0xd4e8ec, 0x44423a, 2.0));
+    this.scene.add(this.sky);
     const sun = new THREE.DirectionalLight(0xffe5be, 3.2);
     this.sun = sun;
     sun.position.set(-18, 38, 15);
@@ -775,8 +778,16 @@ export class RangeScene {
   }
 
   private configureRangeLighting() {
+    const night = !!this.sim.night;
+    this.sky.intensity = night ? .55 : 2;
+    this.sky.color.setHex(night ? 0x7a9cce : 0xd4e8ec);
+    this.sun.intensity = night ? .6 : 3.2;
+    this.sun.color.setHex(night ? 0x779bcc : 0xffe5be);
+    this.scene.background = new THREE.Color(night ? 0x07111c : 0x242d30);
+    if (this.nightLighting) { this.scene.remove(this.nightLighting.root); this.nightLighting.dispose(); this.nightLighting = undefined; }
+    if (night) { this.nightLighting = new NightLighting(); this.nightLighting.update(this.sim); this.scene.add(this.nightLighting.root); }
     const long = this.sim.range === "long";
-    this.scene.fog = new THREE.Fog(0x242d30, 240, 340);
+    this.scene.fog = new THREE.Fog(night ? 0x07111c : 0x242d30, 180, 300);
     const district = this.sim.city?.district;
     const centerX = district ? (district.bounds.left + district.bounds.right) / 2 : 0;
     const centerZ = district ? (district.bounds.back + district.bounds.front) / 2 : 0;
@@ -1178,7 +1189,7 @@ export class RangeScene {
     }
     const cutaway = this.sim.cutawayColliders;
     const hit = this.sim.ray(origin, origin.clone().addScaledVector(dir, this.camera.far), undefined,
-      cutaway?.size ? collider => !cutaway.has(collider.handle) : undefined);
+      collider => !cutaway?.has(collider.handle) && !this.sim.actors.some(a => a.collider.handle === collider.handle && !this.sim.isDetected(a)));
     const actor =
       hit &&
       this.sim.actors.find((a) => a.collider.handle === hit.collider.handle);
@@ -1551,6 +1562,7 @@ export class RangeScene {
   render(alpha: number, delta: number, elapsed: number, paused = false) {
     this.renderer.info.reset();
     this.updateCamera();
+    this.nightLighting?.update(this.sim);
     this.cityView?.update(this.sim, this.sim.sniping ? this.scope.camera : this.camera, paused ? 0 : delta);
     this.naturalTerrain?.update(this.sim, this.camera, paused ? 0 : delta);
     this.concourseView?.update(this.sim, this.camera, paused ? 0 : delta);
@@ -1591,7 +1603,9 @@ export class RangeScene {
     for (const a of this.sim.actors) {
       if (!this.actors.has(a.id)) this.actors.set(a.id, this.makeActor(a));
       const v = this.actors.get(a.id)!;
-      if (!a.dead && a.kind === "enemy") this.outlinedEnemies.add(v.root);
+      const detected = this.sim.isDetected(a);
+      v.root.visible = detected;
+      if (!a.dead && a.kind === "enemy" && detected) this.outlinedEnemies.add(v.root);
       const p = a.body.translation();
       v.root.position.set(
         THREE.MathUtils.lerp(a.previous.x, p.x, alpha),
@@ -1672,7 +1686,7 @@ export class RangeScene {
         v.torso.rotation.z -= stagger * sideways * 0.23;
       }
       v.ring.visible =
-        !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)) || (a.kind === "human" &&
+        detected && !a.dead && (a.kind === "enemy" || (a.kind === "player" && this.sim.selected.has(a.id)) || (a.kind === "human" &&
           !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2)));
       v.ring.position.set(v.root.position.x, this.sim.walkingHeight(this.sim.walkingPoint(a)) + 0.047, v.root.position.z);
       (v.ring.material as THREE.MeshBasicMaterial).color.set(
@@ -1680,7 +1694,7 @@ export class RangeScene {
       );
       v.ring.scale.setScalar(a.flight ? 1.7 : stagger > 0 ? 1 + stagger * 0.2 : a.kind === "enemy" && a.ai?.state === "aiming" ? 1.05 + Math.sin(elapsed * 9) * 0.12 : 1);
       v.health.visible =
-        !a.dead &&
+        detected && !a.dead &&
         !closedRoofs.some(({ area }) => p.y < area.h && Math.abs(p.x - area.x) < area.w / 2 && Math.abs(p.z - area.z) < area.d / 2) &&
         (a.kind === "enemy" || a.kind === "human" || (a.hp < a.maxHp &&
         (this.sim.time - a.hitTime < 4 || a.kind === "player")));
