@@ -10,7 +10,7 @@ type Flash = { position: Vec3; until: number; range: number };
 export class NightVisibility {
   readonly visible = new Set<number>();
   private nextScan = 0;
-  private actorCount = -1;
+  private actorKey = "";
   private actorHulls = new Set<number>();
   readonly flashes: Flash[] = [];
   constructor(private sim: Simulation) {}
@@ -38,9 +38,10 @@ export class NightVisibility {
     this.nextScan = 0;
   }
   private unblocked(from: Vec3, to: Vec3) {
-    if (this.actorCount !== this.sim.actors.length) {
-      this.actorCount = this.sim.actors.length;
-      this.actorHulls = new Set(this.sim.actors.map(a => a.collider.handle));
+    const handles = this.sim.actors.map(a => a.collider.handle), key = handles.join(",");
+    if (key !== this.actorKey) {
+      this.actorKey = key;
+      this.actorHulls = new Set(handles);
     }
     // Ignore sensor owners and the contacted chassis; vehicles, cargo and world
     // geometry still occlude both light exposure and optical contacts.

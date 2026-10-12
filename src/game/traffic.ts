@@ -21,6 +21,8 @@ export type CivilianVehicle = {
   explodedAt?: number;
   commanded?: boolean; parked?: boolean; arrival?: Vec2;
   team?: "enemy";
+  /** Contract supplies still take damage, but do not dispatch civilian police. */
+  reportDamage?: boolean;
   /** Optional vulnerable drive: immobilisation preserves the hull and payload. */
   driveHp?: number;
   speedLimit?: number;

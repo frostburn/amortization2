@@ -13,7 +13,7 @@ export const NIGHT_CONTRACT = {
     { speaker: "morrow", message: "The injunction survived the evening hearing. The contractor is trying to make it irrelevant before morning. Keep their robots out of the clearing and get the inspectors' two supply vehicles into the receiving bay. Both vehicles must survive." },
     { speaker: "vale", message: "The convoy comes from the west along the southern forestry road. Twelve seconds before it rolls. The clearing is north of the fork. Send one robot to meet the vehicles and three into the clearing; you can see both approaches from here." },
     { speaker: "rook", message: "The road attackers are small pistol drones. One machine gun and a covering order should handle a pair. Stay beside the road, ahead of the convoy; don't stand in its lane. The clearing gets machine guns and pistols from two tracks. Keep three chassis for that fight." },
-    { speaker: "sable", message: "Work lights sweep the clearing; headlights move with the convoy. Your squad shares optical contacts, but the overhead camera doesn't see through darkness. Gunfire gives positions away briefly. Hold the clearing while the convoy arrives, defeat the last response, then assemble at the receiving bay." },
+    { speaker: "sable", message: "Work lights sweep the clearing; headlights move with the convoy. Watch silhouettes between the pools of light. Automatic covering fire has less reach in darkness; muzzle flashes give shooters away. Hold the clearing while the convoy arrives, defeat the last response, then assemble at the receiving bay." },
   ],
   objectives: ["Protect the convoy and prevent a foothold in the clearing", "Defeat the remaining contractor robots", "Assemble the surviving squad at the receiving bay"],
   releaseSeconds: 0, returnSeconds: 1,
@@ -37,6 +37,7 @@ export class NightForestMission extends Mission {
     super(sim);
     this.convoy = NIGHT_CONVOY_START.map((p, i) => {
       const c = sim.city!.traffic.park(i ? "TRUCK" : "VAN", i ? 0x879e8c : 0x71988c, p, Math.PI / 2);
+      c.reportDamage = false;
       c.hp = i ? 620 : 320; c.speedLimit = 1.85;
       return c;
     });

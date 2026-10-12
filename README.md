@@ -98,7 +98,8 @@ and supply truck alive on the southern forestry road while preventing the
 contractor's robots from establishing a foothold in the clearing. The intended
 split is one covering robot for the convoy and three for the ground fight.
 Headlights, a sweeping work light and combat flashes illuminate the scene;
-contacts come from squad sensors, so camera panning cannot expose dark enemies.
+enemy models stay visible under scene lighting, without glowing markers or
+outlines. Cover-fire acquisition and enemy sensors still respect darkness.
 All three squad configurations are available, and the night district is also
 selectable in Endless Arena. See [Night Shift](docs/night-shift.md).
 

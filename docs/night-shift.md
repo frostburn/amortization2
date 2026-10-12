@@ -32,13 +32,16 @@ its approaches. Headlights move with the convoy. Muzzle flashes and explosions
 briefly light nearby ground. Only the clearing spotlight casts an additional
 shadow map; headlights and flashes use a bounded set of cheaper local lights.
 
-Optical contacts come from the surviving squad, independent of camera position
+Automatic target acquisition comes from the surviving squad, independent of camera position
 or quality settings. Dark acquisition reaches 18 metres; lit contacts can reach
 52 metres, with static terrain and cover still blocking sight. Enemy AI uses the
 same exposure rule against squad members. Cover orders also need an optical
-contact. Hidden hostiles have no model, ground ring, health bar, hover elevation
-hint or camera-occlusion outline. Ballistics remain physical: firing into a dark
-area can still hit something. Firing gives a position away locally, not through
+contact. Enemy chassis remain in the scene and are shaded by its lights;
+darkness never removes their models or blocks manual hover aiming. Night enemies
+have no luminous ground ring, health bar, camera-occlusion outline or flashing
+beacon, and their sensor lenses use lit materials. Their muzzle flashes still
+illuminate real gunfire. Ballistics remain physical: firing into a dark area can
+still hit something. Firing gives a position away locally, not through
 terrain or across the entire map. This is the first night rule set, rather than
 an assumption that every robot has perfect thermal vision.
 

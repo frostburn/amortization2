@@ -16,7 +16,7 @@ export class NightLighting {
     for (const source of sources) {
       let light = this.spots.get(source.id);
       if (!light) {
-        light = new THREE.SpotLight(source.color, source.intensity, source.range, source.angle, .65, 1.3);
+        light = new THREE.SpotLight(source.color, source.intensity * .8, source.range, source.angle, .65, 1.3);
         light.castShadow = source.shadow;
         if (source.shadow) { light.shadow.mapSize.set(1024, 1024); light.shadow.bias = -.0003; light.shadow.normalBias = .08; }
         this.spots.set(source.id, light); this.root.add(light, light.target);
@@ -27,7 +27,7 @@ export class NightLighting {
     for (const [id, light] of this.spots) if (!sources.some(source => source.id === id)) light.visible = false;
     this.flashes.forEach((light, i) => {
       const flash = night.flashes[i];
-      light.intensity = flash ? 100 * Math.min(1, (flash.until - sim.time) / .12) : 0;
+      light.intensity = flash ? 80 * Math.min(1, (flash.until - sim.time) / .12) : 0;
       if (flash) { light.position.copy(flash.position); light.distance = flash.range; }
     });
   }

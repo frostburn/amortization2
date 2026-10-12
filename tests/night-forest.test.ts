@@ -87,6 +87,30 @@ describe("Night Shift: two fronts and optical contacts", () => {
     for (let i = 0; i < 61; i++) mission().updateObjectives(); expect(mission().phase).toBe("complete");
   });
 
+  test("night sensors refresh hull identities when an enemy is replaced without changing actor count", async () => {
+    sim = await Simulation.create("nightforest", "assault", "practice");
+    sim.squad.forEach(a => place(a, -50, 37));
+    const first = sim.addEnemy("assault", { x: -40, z: 37 }); sim.world.step();
+    expect(sim.canSee(sim.squad[0], first)).toBe(true);
+    const count = sim.actors.length; sim.retireEnemy(first);
+    const replacement = sim.addEnemy("assault", { x: -40, z: 37 }); sim.world.step();
+    expect(sim.actors).toHaveLength(count);
+    expect(sim.canSee(sim.squad[0], replacement)).toBe(true);
+    expect(sim.canSee(replacement, sim.squad[0])).toBe(true);
+  });
+
+  test("convoy friendly fire still damages supplies but never summons unrelated civilian security", async () => {
+    sim = await Simulation.create("nightforest");
+    const van = mission().convoy[0], p = { ...van.body.translation() }, zero = { x: 0, y: 0, z: 0 };
+    sim.city!.damage(van, 5, zero, p, "player", p);
+    expect(van.hp).toBe(315); expect(sim.security!.pressure).toBe(0);
+    sim.world.step(); sim.city!.blast({ ...p, y: .4 }, undefined, "player");
+    expect(van.hp).toBeLessThan(315); expect(sim.security!.pressure).toBe(0);
+    const civilian = sim.city!.traffic.park("CAB", 0x8a9c98, { x: 50, z: 37 }, 0);
+    sim.city!.damage(civilian, 5, zero, civilian.body.translation(), "player");
+    expect(sim.security!.pressure).toBeGreaterThan(0);
+  });
+
   test("cover sectors cannot acquire dark hostiles outside the local sensor range", async () => {
     sim = await Simulation.create("nightforest", "assault", "practice");
     sim.squad.forEach(a => place(a, -50, 37));
