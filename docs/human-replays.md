@@ -9,10 +9,9 @@ number. **Export all attempts** includes earlier retries and debug floors from
 that page session. Either export keeps recording. Reloading the page starts a new capture.
 
 The mission result dialog ignores Space, including a brace key held when the
-squad goes down. Replaying a failed contract opens a restart confirmation;
-confirm with a click or a fresh Enter press. **Keep this attempt** or Escape
-cancels the confirmation. Export controls remain available in the dialog before
-restarting, so the failed run stays the current attempt until you confirm.
+squad goes down. **Replay contract** restarts immediately with a click or a fresh
+Enter press. Export controls remain available until you restart, so you can
+save the failed attempt first.
 
 This is **Vite development mode**; this project does not use Vue. Production
 builds omit the recorder, its controls and the replay console helpers. Debug

@@ -299,6 +299,35 @@ describe("proving ground simulation", () => {
     expect(sim.grenades.at(-1)?.owner).toBe(1);
   });
 
+  test("cargo carriers cannot throw grenades, and squad rotation skips their occupied hands", () => {
+    const carrier = sim.squad[0], otherCarrier = sim.squad[2];
+    carrier.haul = otherCarrier.haul = 123;
+    const aim = { x: 0, z: -15 };
+    let recordedThrows = 0;
+    sim.onInput = action => { if (action.type === "grenade") recordedThrows++; };
+    expect(sim.grenadeThrower).toBeUndefined();
+    expect(sim.throwGrenade(aim)).toBe(false);
+    // Explicit callers (including replay playback) must respect the same rule.
+    expect(sim.throwGrenade(aim, carrier)).toBe(false);
+    expect(sim.throwGrenade(aim, otherCarrier)).toBe(false);
+    expect(sim.grenades).toHaveLength(0);
+    expect(sim.throws).toBe(0);
+    expect(recordedThrows).toBe(0);
+    expect(carrier.grenadeCooldown).toBe(0);
+    expect(otherCarrier.grenadeCooldown).toBe(0);
+
+    sim.select(5);
+    expect(sim.grenadeThrower?.id).toBe(2);
+    expect(sim.throwGrenade(aim)).toBe(true);
+    expect(sim.grenades[0].owner).toBe(2);
+    expect(sim.grenadeThrower).toBeUndefined();
+    expect(sim.throwGrenade(aim)).toBe(false);
+    carrier.haul = undefined;
+    expect(sim.grenadeThrower).toBe(carrier);
+    expect(sim.throwGrenade(aim)).toBe(true);
+    expect(sim.grenades.map(g => g.owner)).toEqual([2, 1]);
+  });
+
   test("grenade rotation skips unavailable robots and cooldowns persist across selection changes", () => {
     sim.throwGrenade({ x: -14, z: -14 });
     sim.select(3);
