@@ -3,6 +3,7 @@ import type { RangeId } from "../game/ranges";
 // Equal X/Y/Z offsets project the three world axes at 120 degrees.
 export const TACTICAL_CAMERA_OFFSET = { x: 48, y: 48, z: 48 };
 const views = {
+  nightport: { halfHeight: 36, halfWidth: 55 },
   nightforest: { halfHeight: 42, halfWidth: 64 },
   forest: { halfHeight: 42, halfWidth: 64 },
   recovery: { halfHeight: 46, halfWidth: 74 },

@@ -2,7 +2,7 @@
 
 Campaign proposal for **2038**, twelve years after the first game's events. The
 original campaign did not establish a calendar year; this is the sequel's working
-chronology. These notes guide future missions and scenes. The playable build includes four tutorial contracts, three armed operations,
+chronology. These notes guide future missions and scenes. The playable build includes tutorial contracts, armed operations,
 and the combat, district and civilian prototypes.
 
 ## Continuity
@@ -257,3 +257,19 @@ inspectors, then leaves the application to the public process. Meridian's
 expansion remains a proposal, and its need for land does not erase the existing
 catchment protections. Sable preserves the instruction record; Vale gets the
 inspectors access; Morrow keeps the operation within its concrete purpose.
+
+
+## Night Shift and Demurrage
+
+[Night Shift](night-shift.md) protects the inspection convoy returning to
+Birchwater after dark while the contractor tries to retake the clearing. The
+crew's success gives the cooperative time to preserve the site until morning.
+
+[Demurrage](demurrage.md) then returns to the marine port. Gannet locks the
+freight cooperative's cranes overnight and bills for the delay it caused. The
+squad reclaims two separated control stands, covers Sable's paired restart and
+fights back through a response at the service gate. Loading resumes visibly.
+Quill puts the lock instruction beside the penalty invoice; Civic Guarantee's
+signature appears behind both the operator and the proposed recovery. Vale
+connects the berth's dispatcher to other independent yards. The operation
+advances the emergency-guarantee thread without settling it in a single scene.

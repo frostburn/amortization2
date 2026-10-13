@@ -24,6 +24,8 @@ export type EnemyBrain = {
 
 export type EnemyProfile = {
   brace: boolean;
+  /** A physical elevated firing post with no ground pursuit route. */
+  fixedPost?: boolean;
   grenades: boolean;
   automaticBurst: number;
   attackInterval: number;
@@ -69,6 +71,7 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
     brain.visible = false;
     brain.burstUntil = 0;
     a.braced = false;
+    if (profile.fixedPost) { a.braced=profile.brace; a.path=[]; a.moveTarget=undefined; brain.state="holding"; return; }
     if (brain.alertPosition) {
       // Finish entering through the authored access route before investigating.
       if (brain.state === "entering" && distance2(a.body.translation(), brain.rally) > .7 && now < brain.entryUntil) return;
@@ -160,7 +163,8 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
       brain.state = "advancing";
       brain.burstUntil = 0;
       brain.nextAttack = Math.max(brain.nextAttack, now + 0.55);
-      if (now >= brain.nextRoute) {
+      if (profile.fixedPost) { a.braced=profile.brace; a.path=[]; a.moveTarget=undefined; }
+      else if (now >= brain.nextRoute) {
         brain.nextRoute = now + 1.2;
         const foot = sim.walkingPoint(target);
         // Rotating the candidate ring around a stationary target can alternate

@@ -74,7 +74,7 @@ function makeNavigationMast() {
 }
 
 /** Bounded Warren trusses: both chords, connected diagonals and closed ends. */
-export function makeCrane(c: CraneSpec, steel = surface(0x516a70, 0.45), safety = surface(0xc6af67), black = surface(0x303e42)) {
+export function makeCrane(c: CraneSpec, steel = surface(0x516a70, 0.45), safety = surface(0xc6af67), black = surface(0x303e42), withHoist = true) {
   const root = new THREE.Group();
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const x = c.x + sx * c.span / 2, z = c.z + sz * 4;
@@ -98,9 +98,11 @@ export function makeCrane(c: CraneSpec, steel = surface(0x516a70, 0.45), safety 
   block(root, 3.2, 0.6, 9, c.x + 17, c.height + 0.55, c.z, black);
   block(root, 1.8, 1.7, 2.2, c.x + 17, c.height - 1.35, c.z + 5.1, steel);
   block(root, 1.4, 0.8, 0.06, c.x + 17, c.height - 1.2, c.z + 6.23, black);
-  for (const sz of [-1, 1]) beam(root,
-    new THREE.Vector3(c.x + 17, c.height, c.z + sz * 2.6), new THREE.Vector3(c.x + 17, 8, c.z + sz * 2.6), 0.035, black);
-  block(root, 3.5, 0.4, 6, c.x + 17, 7.8, c.z, safety);
+  if (withHoist) {
+    for (const sz of [-1, 1]) beam(root,
+      new THREE.Vector3(c.x + 17, c.height, c.z + sz * 2.6), new THREE.Vector3(c.x + 17, 8, c.z + sz * 2.6), 0.035, black);
+    block(root, 3.5, 0.4, 6, c.x + 17, 7.8, c.z, safety);
+  }
   batchRigid(root); return root;
 }
 
@@ -158,7 +160,7 @@ export function makePort(district: CityDistrict) {
   const shared = new Map<string, THREE.MeshStandardMaterial>();
   const steel = surface(0x516a70, 0.45), safety = surface(0xc6af67), black = surface(0x303e42), concrete = surface(0xaaa99b);
   for (const spec of port.containers) root.add(makeContainer(spec, shared));
-  for (const c of port.cranes) kit.add(makeCrane(c, steel, safety, black));
+  for (const c of port.cranes) kit.add(makeCrane(c, steel, safety, black, !port.separateHoists));
   for (let z = -66; z <= 66; z += 12) {
     tube(kit, 0.23, 0.5, 44.2, 0.25, z, steel);
     const cap = tube(kit, 0.13, 0.85, 44.2, 0.4, z, steel); cap.rotation.z = Math.PI / 2;
@@ -177,4 +179,22 @@ export function makePort(district: CityDistrict) {
   block(kit, 0.7, 6, 200, 46, -3, 0, concrete);
   batchRigid(kit); root.add(kit, makeShip(port.ship, shared)); batchRigid(root);
   return root;
+}
+
+
+/** A reusable suspended spreader; cables stay attached while it changes height. */
+export class CraneHoist {
+  readonly root = new THREE.Group();
+  private cables: THREE.Mesh[] = [];
+  private spreader: THREE.Mesh;
+  constructor(private crane: CraneSpec) {
+    const black=surface(0x303e42),paint=surface(0xc6af67);
+    for(const side of [-1,1])this.cables.push(tube(this.root,.035,1,crane.x+17,0,crane.z+side*2.6,black));
+    this.spreader=block(this.root,3.5,.4,6,crane.x+17,7.8,crane.z,paint);
+    this.update(7.8);
+  }
+  update(height: number) {
+    this.spreader.position.y=height;
+    for(const cable of this.cables){cable.scale.y=Math.max(.1,this.crane.height-height-.2);cable.position.y=(this.crane.height+height+.2)/2;}
+  }
 }

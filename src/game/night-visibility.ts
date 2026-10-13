@@ -1,4 +1,5 @@
 import { distance2, type Vec3 } from "./config";
+import { berthLights } from "./night-port";
 import { forestPoint } from "./night-forest";
 import { VEHICLES } from "./traffic";
 import type { Actor, Simulation } from "./simulation";
@@ -16,7 +17,7 @@ export class NightVisibility {
   constructor(private sim: Simulation) {}
   get lights(): NightLight[] {
     const t = this.sim.time * .22;
-    const lights: NightLight[] = [
+    const lights: NightLight[] = this.sim.range === "nightport" ? berthLights(!!this.sim.mission?.cargoReleased) : [
       { id: "clearing", position: forestPoint({ x: 8, z: -26 }, 7), target: forestPoint({ x: 12 + Math.sin(t) * 9, z: -8 + Math.cos(t) * 6 }), range: 45, angle: .65, color: 0xffd599, intensity: 650, shadow: true },
       { id: "receiving", position: forestPoint({ x: 35, z: 24 }, 6), target: forestPoint({ x: 37, z: 37 }), range: 30, angle: .8, color: 0xf9d6a3, intensity: 450, shadow: false },
     ];
@@ -25,7 +26,7 @@ export class NightVisibility {
       const p = c.body.translation(), front = VEHICLES[c.model].length / 2 + .25;
       const x = Math.sin(c.yaw), z = Math.cos(c.yaw);
       lights.push({ id: `vehicle-${c.id}`, position: { x: p.x + x * front, y: p.y + .2, z: p.z + z * front },
-        target: forestPoint({ x: p.x + x * 20, z: p.z + z * 20 }), range: 32, angle: .5,
+        target: { x: p.x + x * 20, y: this.sim.walkingHeight({x:p.x+x*20,z:p.z+z*20}), z: p.z + z * 20 }, range: 32, angle: .5,
         color: 0xd4e6ff, intensity: 400, shadow: false });
     }
     return lights;

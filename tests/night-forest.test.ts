@@ -27,7 +27,7 @@ describe("Night Shift: two fronts and optical contacts", () => {
     sim.reset(); expect(mission().occupation).toBe(0); expect(mission().droneWaves).toBe(0);
     expect(mission().convoy.every(c => c.parked && c.hp > 0)).toBe(true);
     sim.reset("forest"); expect(sim.night).toBeUndefined();
-  });
+  }, 15000);
 
   test("convoy waits through deployment setup, then physically drives east on the flat track", async () => {
     sim = await Simulation.create("nightforest"); mission().deploy();

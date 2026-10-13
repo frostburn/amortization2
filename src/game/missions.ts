@@ -97,7 +97,7 @@ export abstract class Mission {
   }
 }
 
-export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery", recovery: "forest", forest: "nightforest" } as const;
+export const NEXT_CONTRACT = { receiving: "crossing", crossing: "handling", handling: "escort", escort: "priority", priority: "recovery", recovery: "forest", forest: "nightforest", nightforest: "nightport" } as const;
 
 /** A finite authored encounter. No wave refits, reinforcement loop or timed failure. */
 export class ReceivingMission extends Mission {
