@@ -5,6 +5,7 @@ export type ContainerSpec = Vec2 & { length: "20ft" | "40ft"; turn: 0 | 1; level
 export type CraneSpec = Vec2 & { span: number; height: number };
 export type PortLayout = {
   containers: ContainerSpec[];
+  separateHoists?: boolean;
   cranes: CraneSpec[];
   ship: Vec2 & { length: number; width: number };
 };

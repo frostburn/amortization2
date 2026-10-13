@@ -2,6 +2,7 @@ import { NEXT_CONTRACT, type Contact } from "./game/missions";
 import { RANGES } from "./game/ranges";
 import type { EscortMission } from "./game/escort-mission";
 import { PriorityMission } from "./game/priority-mission";
+import { NightPortMission } from "./game/night-port-mission";
 import { NightForestMission } from "./game/night-forest-mission";
 import { ForestMission } from "./game/forest-mission";
 import { RecoveryMission } from "./game/recovery-mission";
@@ -94,6 +95,7 @@ export function updateMissionUI(sim: Simulation) {
   const load = sim.hauling?.available();
   const escort = sim.escort, rescue = mission as EscortMission;
   const priority = mission instanceof PriorityMission ? mission : undefined;
+  const berth = mission instanceof NightPortMission ? mission : undefined;
   const night = mission instanceof NightForestMission ? mission : undefined;
   const forest = mission instanceof ForestMission ? mission : undefined;
   const recovery = mission instanceof RecoveryMission ? mission : undefined;
@@ -109,7 +111,12 @@ export function updateMissionUI(sim: Simulation) {
     (document.getElementById("night-truck-health") as HTMLProgressElement).value = night.convoy[1].hp;
     (document.getElementById("night-occupation") as HTMLProgressElement).value = night.occupation;
   }
-  setText("mission-detail", night ? mission.phase === "briefing" ? "One robot for the road · Three for the clearing"
+  setText("mission-detail", berth ? mission.phase === "briefing" ? "Two crane controls · Cover both approaches"
+    : mission.phase === "yard" ? `${berth.guards.length} security machines remaining`
+    : mission.phase === "restore" ? `${berth.operators.filter(id=>id!==null).length} / 2 controls held · ${berth.contested.some(Boolean)?"Enemy at the controls":"Paired restart"}`
+    : mission.phase === "return" ? `${berth.enemies.length} response machines · ${near} / ${living.length} at the gate`
+    : mission.failureReason ?? "Loading restored · Squad recovered"
+    : night ? mission.phase === "briefing" ? "One robot for the road · Three for the clearing"
     : mission.phase === "return" ? `${near} / ${living.length} at the receiving bay`
     : mission.finished ? mission.failureReason ?? "Convoy safe · Site secured"
     : `${night.arrivedAt === undefined ? night.rolling ? "Convoy approaching" : "Convoy waiting to roll" : "Convoy received"} · ${night.contested ? "Clearing contested" : night.occupation > 0 ? "Enemy foothold growing" : "Watch both approaches"}`
@@ -161,6 +168,7 @@ export function updateMissionUI(sim: Simulation) {
     progress.hidden = !["intercept", "return"].includes(mission.phase);
     progress.value = mission.phase === "intercept" ? recovery.truck.driveHp! / RECOVERY_DRIVE_HP : mission.returnProgress;
   }
+  if (berth) { progress.hidden=!["restore","return"].includes(mission.phase); progress.value=mission.phase==="restore"?berth.releaseProgress:mission.returnProgress; }
   if (night) { progress.hidden = mission.phase !== "return"; progress.value = mission.returnProgress; }
   if (forest) {
     progress.hidden = mission.phase === "intercept" || mission.finished;
@@ -174,7 +182,10 @@ export function updateMissionUI(sim: Simulation) {
     setText("mission-result-state", complete ? "CONTRACT COMPLETE" : "RECOVERY REQUIRED");
     const civilians = [...sim.city!.carts, ...sim.city!.kites, ...sim.city!.porters, ...sim.city!.vehicles];
     const damaged = civilians.filter(c => c.hp <= 0 && !("path" in c && c.team === "enemy")).length;
-    const message = night ? complete
+    const message = berth ? complete
+      ? "The berth is loading again. Quill has Gannet's crane-lock instruction alongside the charges it issued for the delay. Civic Guarantee backed both the operator and the recovery order. Vale is keeping the cooperative in touch with the other independent yards."
+      : `${mission.failureReason ?? "Recovery required"}. The cooperative is holding the berth claim; Rook is arranging chassis recovery from the quay.`
+      : night ? complete
       ? "Both inspection vehicles are in and the contractor's return squads are gone. The cooperative can preserve the site until morning. Their dispatcher called this a recovery operation; Quill will ask why recovery needed armed machines and a drone screen."
       : `${mission.failureReason ?? "Recovery required"}. Vale is diverting the inspection crew; Rook is arranging chassis recovery.`
       : forest ? complete

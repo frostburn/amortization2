@@ -24,3 +24,9 @@ Dropped totes keep their physical collision hulls. Hovering one aims at its actu
 - Harbor water is excluded from ground navigation. Shared `dryGround` cuts the visible and physical ground at the quay; water covers a submerged bed six metres down. Loads knocked over the edge sink rather than resting on an invisible surface-level floor. The old shallow city canal and its bridges retain their existing behavior.
 
 `window.amortization2.inspect().city.porters` exposes physical position, velocity, integrity, state, load position, grip state, distance and completed transfers for QA. It does not issue movement or damage commands.
+
+
+The next campaign visit is [09 — Demurrage](demurrage.md), a night operation
+built from this district. It reclaims paired crane controls and resumes the
+cooperative's loading jobs. Its authored night workforce and separate moving
+hoists do not change the daytime sandbox.

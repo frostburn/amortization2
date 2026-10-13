@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { HandlingView } from "./hauling";
 import { EscortView } from "./escort";
 import { PriorityView } from "./priority";
+import { NightPortView } from "./night-port";
 import { NightForestView } from "./night-forest";
 import { ForestView } from "./forest";
 import { RecoveryView } from "./recovery";
@@ -120,10 +121,10 @@ class CrossingView {
 
 /** Contract-specific landmarks built from shared district and vehicle kits. */
 export class MissionView {
-  private view: ReceivingView | CrossingView | HandlingView | EscortView | PriorityView | RecoveryView | ForestView;
+  private view: NightPortView | ReceivingView | CrossingView | HandlingView | EscortView | PriorityView | RecoveryView | ForestView;
   readonly root: THREE.Group;
   constructor(sim: Simulation, coverage = true) {
-    this.view = sim.range === "nightforest" ? new NightForestView() : sim.range === "forest" ? new ForestView() : sim.range === "recovery" ? new RecoveryView() : sim.range === "priority" ? new PriorityView() : sim.range === "escort" ? new EscortView(coverage) : sim.range === "handling" ? new HandlingView(sim, coverage) : sim.range === "crossing" ? new CrossingView() : new ReceivingView();
+    this.view = sim.range === "nightport" ? new NightPortView() : sim.range === "nightforest" ? new NightForestView() : sim.range === "forest" ? new ForestView() : sim.range === "recovery" ? new RecoveryView() : sim.range === "priority" ? new PriorityView() : sim.range === "escort" ? new EscortView(coverage) : sim.range === "handling" ? new HandlingView(sim, coverage) : sim.range === "crossing" ? new CrossingView() : new ReceivingView();
     this.root = this.view.root;
   }
   update(sim: Simulation, reducedMotion: boolean) { this.view.update(sim, reducedMotion); }

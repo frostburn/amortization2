@@ -103,6 +103,16 @@ outlines. Cover-fire acquisition and enemy sensors still respect darkness.
 All three squad configurations are available, and the night district is also
 selectable in Endless Arena. See [Night Shift](docs/night-shift.md).
 
+## Demurrage
+
+**09 · Demurrage** returns to the marine port at night. Reclaim two separated
+crane controls, keep both occupied while the paired restart completes, then
+fight the response at the service gate. Machine guns cover the container lanes;
+a rifle lookout holds the freighter's deck. Restored cranes and resumed PORTER
+jobs show the cooperative getting its berth back. All squad configurations are
+available, and the night port is also an Endless Arena floor. See
+[Demurrage](docs/demurrage.md).
+
 ## Raised concourse
 
 Choose **Raised Concourse** under **Practice / debug** for a 120 × 98 metre district with a pedestrian loop at **4.8 m and 8.4 m**. Broad ramps connect its terraces, a bridge crosses the working street, and a second gallery gives the block a layered isometric silhouette. Ground-level movement clicks on open decks go underneath; robots already upstairs keep using the raised route. Use the filled arrival ramps to climb. Markers follow the chosen floor, while weapon aiming retains target elevation. Orange targets at ground, bridge and gallery height let you test cross-level fire and grenades. CART deliveries and cars continue on the streets below. There is no contract or scheduled combat wave. See [raised surfaces and navigation](docs/raised-concourse.md).

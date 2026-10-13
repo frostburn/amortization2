@@ -21,10 +21,11 @@ import type { WalkSurface } from "./walk-surfaces";
 import { PRIORITY_DISTRICT, PRIORITY_FIXTURES, PRIORITY_RAILS, PRIORITY_SITES, PRIORITY_SURFACES } from "./priority";
 import { RECOVERY_DISTRICT, RECOVERY_FIXTURES, RECOVERY_RAILS, RECOVERY_SITES, RECOVERY_SURFACES } from "./recovery";
 
+import { NIGHT_PORT, NIGHT_PORT_FIXTURES, BERTH_SITES } from "./night-port";
 import { FOREST_DISTRICT, FOREST_FIXTURES, FOREST_GROUND, FOREST_SITES } from "./forest";
 import type { HeightField } from "./height-field";
 
-export type RangeId = "nightforest" | "forest" | "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
+export type RangeId = "nightport" | "nightforest" | "forest" | "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -51,6 +52,12 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  nightport: {
+    name: "09 · DEMURRAGE", contract: true, night: true, city: NIGHT_PORT, bounds: NIGHT_PORT.bounds,
+    barriers: NIGHT_PORT_FIXTURES, platforms: [],
+    players: [[-1.1,1.1],[-1.1,-1.1],[1.1,-1.1],[1.1,1.1]].map(([x,z])=>({x:BERTH_SITES.spawn.x+x,z:BERTH_SITES.spawn.z+z})),
+    targets: [], props: [],
+  },
   nightforest: {
     name: "08 · NIGHT SHIFT", contract: true, night: true, city: FOREST_DISTRICT, bounds: FOREST_DISTRICT.bounds,
     ground: FOREST_GROUND, walkSurfaces: [], barriers: FOREST_FIXTURES, platforms: [],

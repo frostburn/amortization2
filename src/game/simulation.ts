@@ -41,6 +41,7 @@ import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
 import { PriorityMission } from "./priority-mission";
+import { NightPortMission } from "./night-port-mission";
 import { NightForestMission } from "./night-forest-mission";
 import { NightVisibility } from "./night-visibility";
 import { ForestMission } from "./forest-mission";
@@ -326,7 +327,7 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    if (mode === "mission") this.mission = range === "nightforest" ? new NightForestMission(this) : range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "mission") this.mission = range === "nightport" ? new NightPortMission(this) : range === "nightforest" ? new NightForestMission(this) : range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
     if (mode === "arena") this.arenaLandmarks = new ArenaLandmarks(this);
     this.security = this.city ? new SecurityResponse(this) : undefined;
     this.night = this.layout.night ? new NightVisibility(this) : undefined;

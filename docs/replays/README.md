@@ -464,3 +464,38 @@ replay**, and load the JSON; use its linked gameplay source for matching playbac
 ```sh
 npm run inspect:replay -- docs/replays/night-shift-minigunner.json
 ```
+
+## Demurrage: paired crane restart and contested return
+
+[demurrage-minigunner.json](demurrage-minigunner.json) records a complete agent
+run at gameplay source
+[`66a8f47`](https://github.com/frostburn/amortization2/commit/66a8f47783b1f903435648f498be796b9b70de94).
+The controller uses the normal simulation input API and development recorder,
+with squad-detected contacts and physical firing-line checks. It clears the
+yard, sends ROOK and LATCH to the separated crane controls, covers the restart,
+then regroups and fights through the west response to the service gate. Health,
+positions, ammunition, damage, spawns and objective state are not injected.
+
+| Result | Value |
+| --- | --- |
+| Duration | 121.70 seconds / 7,302 fixed ticks |
+| Squad recovered | 4 / 4 |
+| Final integrity | ANCHOR 76; ROOK 154; LATCH 108; SPINDLE 90 |
+| Cranes restored | 62.42 seconds |
+| Opponents defeated | Seven guards; six quay responders; three gate responders |
+| Combat counters | 327 shots; 316 hits; 32 enemy shots |
+| Outcome | Complete; no contract hostiles remaining |
+
+Deterministic reconstruction matches the final snapshot exactly. The compact
+v2 JSON is about 440 KiB, with camera observations sampled every two seconds.
+This is an agent verification with precise aiming, not a human difficulty test.
+Only the twin-minigun configuration has a full run here; bounded tests check all
+three squad configurations. The file is an inspection artifact and is not loaded
+by default tests or CI.
+
+Run `npm run dev`, open **Controls & settings → View replay**, and select this
+JSON. Use the linked source commit for matching playback after gameplay changes.
+
+```sh
+npm run inspect:replay -- docs/replays/demurrage-minigunner.json
+```
