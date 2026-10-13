@@ -90,6 +90,7 @@ export function updateCoverFire(sim: Simulation) {
       });
       let target: number | null = null;
       for (const enemy of candidates) {
+        if (!sim.canSee(a, enemy)) continue;
         const q = enemy.body.translation();
         if (brain.direction) {
           const length = distance2(p, q) || 1;

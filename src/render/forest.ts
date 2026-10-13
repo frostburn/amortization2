@@ -92,7 +92,7 @@ export class ForestView {
       model.light.color.setHex(active ? 0xe5aa43 : 0x44504b);
     });
     this.terminal.color.setHex(mission?.sealedAt === undefined ? 0xd3a24f : 0x9be6cd);
-    const marker = mission?.marker; this.marker.visible = !!marker;
+    const marker = sim.mission?.marker; this.marker.visible = !!marker;
     if (marker && this.markerKey !== `${marker.x},${marker.z},${marker.radius}`) {
       this.markerKey = `${marker.x},${marker.z},${marker.radius}`;
       const positions: number[] = [];

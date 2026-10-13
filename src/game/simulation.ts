@@ -41,6 +41,8 @@ import { CrossingMission } from "./crossing-mission";
 import { HandlingMission } from "./handling-mission";
 import { EscortMission } from "./escort-mission";
 import { PriorityMission } from "./priority-mission";
+import { NightForestMission } from "./night-forest-mission";
+import { NightVisibility } from "./night-visibility";
 import { ForestMission } from "./forest-mission";
 import { RecoveryMission } from "./recovery-mission";
 import type { HumanEscort } from "./human-escort";
@@ -64,6 +66,7 @@ export interface Actor {
   escort?: number;
   human?: { name: string; coat: number; trim: number; hair: number; glasses?: boolean };
   deathTime?: number;
+  wreckRotation?: { x: number; y: number; z: number; w: number };
   body: RAPIER.RigidBody;
   collider: RAPIER.Collider;
   spawn: Vec3;
@@ -165,6 +168,7 @@ export class Simulation {
   arena?: ArenaCombat;
   mission?: Mission;
   hauling?: SquadHauling;
+  night?: NightVisibility;
   escort?: HumanEscort;
   city?: CityLife;
   terrain?: WalkTerrain;
@@ -213,6 +217,7 @@ export class Simulation {
     this.arena = undefined;
     this.arenaLandmarks = undefined;
     this.mission = undefined;
+    this.night = undefined;
     this.hauling = undefined;
     this.escort = undefined;
     this.security = undefined;
@@ -254,7 +259,7 @@ export class Simulation {
     const extent = { left: bounds.left - 24, right: bounds.right + 24, back: bounds.back - 24, front: bounds.front + 24 };
     if (this.layout.ground) {
       const field = this.layout.ground;
-      this.world.createCollider(RAPIER.ColliderDesc.trimesh(field.vertices, field.indices).setFriction(.8), this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
+      this.world.createCollider(RAPIER.ColliderDesc.trimesh(field.vertices, field.indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setFriction(.8), this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed()));
     }
     for (const piece of this.layout.ground ? [] : dryGround(extent, this.layout.city?.water ?? [])) {
       const floor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(
@@ -321,9 +326,10 @@ export class Simulation {
       });
     }
     this.city = this.layout.city ? new CityLife(this, this.layout.city) : undefined;
-    if (mode === "mission") this.mission = range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
+    if (mode === "mission") this.mission = range === "nightforest" ? new NightForestMission(this) : range === "forest" ? new ForestMission(this) : range === "receiving" ? new ReceivingMission(this) : range === "crossing" ? new CrossingMission(this) : range === "handling" ? new HandlingMission(this) : range === "escort" ? new EscortMission(this) : range === "priority" ? new PriorityMission(this) : range === "recovery" ? new RecoveryMission(this) : undefined;
     if (mode === "arena") this.arenaLandmarks = new ArenaLandmarks(this);
     this.security = this.city ? new SecurityResponse(this) : undefined;
+    this.night = this.layout.night ? new NightVisibility(this) : undefined;
     // Populate scene-query acceleration structures before the first input event.
     this.world.step();
     this.arena = mode === "arena" ? new ArenaCombat(this) : undefined;
@@ -810,7 +816,7 @@ export class Simulation {
     // A capsule resting on a slope has its bottom above the ground directly
     // beneath its centre. Use the walking surface for route/support queries,
     // without moving the physical hull or treating airborne robots as grounded.
-    if (ground !== undefined && Math.abs(foot.y - ground) < .08) foot.y = ground;
+    if (ground !== undefined && Math.abs(foot.y - ground) < .14) foot.y = ground;
     return foot;
   }
   walkingHeight(point: Vec2) { return this.terrain?.resolve(point).y ?? 0; }
@@ -989,6 +995,7 @@ export class Simulation {
       const target = this.actors.find(target => target.id === a.cover!.target && !target.dead);
       if (!target || this.fireRay(a, from, aim, weapon)?.collider.handle !== target.collider.handle) return;
     }
+    this.night?.flash(from);
     const delta = {
       x: aim.x - from.x,
       y: aim.y - from.y,
@@ -1187,7 +1194,17 @@ export class Simulation {
         { x: impulse.z * 0.28, y: 0, z: -impulse.x * 0.28 },
         true,
       );
-      a.body.setLinearDamping(1.2);
+      a.body.setLinearDamping(.7);
+      if (a.model && !a.flight) {
+        // A disabled chassis has flat panels, not the walking capsule's round
+        // contact surface. Keep its mass and physical contacts, but let it slide.
+        a.collider.setShape(new RAPIER.Cuboid(.37, .86, .28));
+        a.collider.setFriction(.12);
+        a.collider.setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min);
+        const half = Math.SQRT1_2;
+        a.wreckRotation = { x: half * Math.cos(a.yaw / 2), y: half * Math.sin(a.yaw / 2),
+          z: -half * Math.sin(a.yaw / 2), w: half * Math.cos(a.yaw / 2) };
+      }
       this.events.push({
         type: "down",
         actor: a.id,
@@ -1338,8 +1355,12 @@ export class Simulation {
     this.city?.blast(origin, source, team);
     this.city?.windows.blast(origin, source);
     this.mission?.blastFixtures(origin, source);
+    this.night?.flash(origin, .7, 25);
     this.events.push({ type: "explosion", position: origin, affected, team, ...(vehicle === undefined ? {} : { vehicle }) });
   }
+
+  canSee(observer: Actor, target: Actor) { return this.night?.canSee(observer, target) ?? true; }
+  isDetected(a: Actor) { return !this.night || a.kind !== "enemy" || this.night.visible.has(a.id); }
 
   isDisrupted(a: Actor) {
     return !a.dead && a.stagger > 0;
@@ -1351,8 +1372,10 @@ export class Simulation {
     this.arena?.update();
     this.hauling?.update();
     this.escort?.update();
+    this.night?.update();
     this.mission?.updateCombat();
     this.security?.update();
+    this.mission?.updateAirCombat();
     updateCoverFire(this);
     for (const a of this.actors) {
       a.grenadeCooldown = Math.max(0, a.grenadeCooldown - STEP);
@@ -1365,6 +1388,7 @@ export class Simulation {
         a.spin = 0;
         a.spooling = false;
         a.firing = false;
+        this.settleWreck(a);
         continue;
       }
       const wasStaggered = this.isDisrupted(a);
@@ -1480,6 +1504,45 @@ export class Simulation {
     this.mission?.updateObjectives();
   }
 
+  private settleWreck(a: Actor) {
+    const preferred = a.wreckRotation;
+    if (!preferred || a.body.isSleeping() || this.time - a.deathTime! < .25) return;
+    const p = a.body.translation(), v = a.body.linvel();
+    // Leave impacts and airborne tumbling alone. On landing, damp towards the
+    // chassis's back panel instead of allowing a capsule to roll indefinitely.
+    const support = this.ray(p, { ...p, y: p.y - 1.1 }, a.body,
+      c => c.parent()?.isFixed() ?? false);
+    if (!support || Math.abs(v.y) > 1.5 || Math.hypot(v.x, v.z) > 3) return;
+    // Follow the local ground plane; a world-horizontal resting pose would
+    // keep fighting the contacts on a hillside.
+    const n = support.normal, divisor = Math.sqrt(2 * (1 + n.y));
+    if (divisor < .1) return;
+    const tilt = { x: n.z / divisor, y: 0, z: -n.x / divisor, w: divisor / 2 };
+    const target = {
+      x: tilt.w*preferred.x + tilt.x*preferred.w - tilt.z*preferred.y,
+      y: tilt.w*preferred.y + tilt.z*preferred.x - tilt.x*preferred.z,
+      z: tilt.w*preferred.z + tilt.z*preferred.w + tilt.x*preferred.y,
+      w: tilt.w*preferred.w - tilt.x*preferred.x - tilt.z*preferred.z,
+    };
+    const q = a.body.rotation(), omega = a.body.angvel();
+    const error = {
+      x: -target.w*q.x + target.x*q.w - target.y*q.z + target.z*q.y,
+      y: -target.w*q.y + target.x*q.z + target.y*q.w - target.z*q.x,
+      z: -target.w*q.z - target.x*q.y + target.y*q.x + target.z*q.w,
+      w: target.w*q.w + target.x*q.x + target.y*q.y + target.z*q.z,
+    };
+    const length = Math.hypot(error.x, error.y, error.z);
+    const angle = 2 * Math.atan2(length, Math.abs(error.w));
+    if (angle < .02 && Math.hypot(omega.x, omega.y, omega.z) < .05) return;
+    const scale = angle / (length || 1) * (error.w < 0 ? -1 : 1);
+    const strength = a.body.mass() * STEP;
+    a.body.applyTorqueImpulse({
+      x: clamp(error.x * scale * 3 - omega.x * 1.2, -6, 6) * strength,
+      y: clamp(error.y * scale * 3 - omega.y * 1.2, -6, 6) * strength,
+      z: clamp(error.z * scale * 3 - omega.z * 1.2, -6, 6) * strength,
+    }, true);
+  }
+
   private drive(a: Actor) {
     if (this.hauling?.drive(a)) return;
     const p = a.body.translation(),
@@ -1525,13 +1588,16 @@ export class Simulation {
       iz = dz + a.knockback.z - v.z,
       length = Math.hypot(ix, iz) || 1;
     const amount = Math.min(length, acceleration * STEP) * a.body.mass();
-    const support = this.terrain && this.ray(p, { ...p, y: p.y - 1.13 }, a.body,
-      collider => collider.parent()?.isFixed() ?? false);
-    if (this.terrain ? !!support && support.normal.y > .6 : p.y < 1.1) {
+    const support = this.ray(p, { ...p, y: p.y - 1.13 }, a.body,
+      collider => (collider.parent()?.isFixed() ?? false) ||
+        this.actors.some(other => other.dead && other.collider.handle === collider.handle));
+    // A fallen chassis can lift the walking capsule slightly. Continue driving
+    // while supported by it rather than treating that contact as an airborne halt.
+    if (support && support.normal.y > .6) {
       const impulse = { x: (ix / length) * amount, y: 0, z: (iz / length) * amount };
       // Walk along natural slopes instead of driving horizontally into them.
       // Contact friction can otherwise cancel the whole uphill motor impulse.
-      if (this.layout.ground && support && Math.abs(foot.y - this.layout.ground.heightAt(foot)) < .08)
+      if (this.layout.ground && support && Math.abs(foot.y - this.layout.ground.heightAt(foot)) < .14)
         impulse.y = -(support.normal.x * impulse.x + support.normal.z * impulse.z) / support.normal.y;
       a.body.applyImpulse(
         impulse,
@@ -1546,30 +1612,17 @@ export class Simulation {
       velocity = a.body.linvel();
     const speed = Math.hypot(preferred.x, preferred.z);
     const remaining = distance2(p, a.path[0]);
-    const collecting = this.hauling?.loadFor(a)?.state === "approaching";
+    // Wrecks yield through hull contacts. Steering around them makes a fallen
+    // robot an immovable navigation obstacle, especially at a formation corner.
     const neighbours = this.actors
-      .filter(
-        (other) =>
-          other !== a &&
-          (!other.dead || !!other.model || other.kind === "human") &&
-          // During collection, wrecks yield through real hull contacts rather
-          // than steering away forever from a grip occupied by a fallen hand.
-          !(collecting && other.dead) &&
-          Math.abs(other.body.translation().y - p.y) < 1.3 &&
-          distance2(p, other.body.translation()) < 5,
-      )
-      .map((other) => {
-        // Disabled capsules can lie across an aisle. Their rotated footprint
-        // still blocks walking even though they no longer have movement intent.
-        const wreck = other.dead && (!!other.model || other.kind === "human");
-        const q = wreck ? other.body.rotation() : null;
-        return {
-          p: other.body.translation(), v: other.body.linvel(),
-          player: (!!other.model || other.kind === "human") && !wreck && !other.flight,
-          w: other.flight ? WATCH.radius * 2 : q ? 0.74 + 1.12 * Math.abs(2 * (q.x * q.y - q.w * q.z)) : this.range === "long" ? 0.6 : 0.96,
-          d: other.flight ? WATCH.radius * 2 : q ? 0.74 + 1.12 * Math.abs(2 * (q.w * q.x + q.y * q.z)) : this.range === "long" ? 0.96 : 0.6,
-        };
-      });
+      .filter(other => other !== a && !other.dead &&
+        Math.abs(other.body.translation().y - p.y) < 1.3 && distance2(p, other.body.translation()) < 5)
+      .map(other => ({
+        p: other.body.translation(), v: other.body.linvel(),
+        player: (!!other.model || other.kind === "human") && !other.flight,
+        w: other.flight ? WATCH.radius * 2 : this.range === "long" ? .6 : .96,
+        d: other.flight ? WATCH.radius * 2 : this.range === "long" ? .96 : .6,
+      }));
     if (!neighbours.length) return preferred;
     const boxes = this.navigationBoxes(false);
     let best: Vec2 = { x: 0, z: 0 },
@@ -1709,6 +1762,7 @@ export class Simulation {
       drills: { ...this.drill },
       weapon: this.weapon,
       sniping: this.sniping,
+      night: this.night ? { detected: [...this.night.visible], lights: this.night.lights } : null,
       selected: [...this.selected],
       grenades: this.grenades.map((g) => ({
         id: g.id,

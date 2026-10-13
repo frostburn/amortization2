@@ -165,6 +165,7 @@ export class SecurityResponse {
         if (now - a.deathTime! > WATCH.wreckSeconds) this.retire(a);
         continue;
       }
+      if (this.sim.mission?.managesDrone(a)) continue;
       if (flight.state === "withdrawing") {
         brain.state = "entering";
         brain.target = null;
@@ -190,7 +191,7 @@ export class SecurityResponse {
           Math.abs(q.z - area.z) < area.d / 2 && q.y < (area.y ?? 0) + area.h);
         brain.aim = { x: q.x, y: q.y + .25, z: q.z };
         const muzzle = this.sim.muzzle(a, brain.aim);
-        brain.visible = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) < 26 &&
+        brain.visible = this.sim.canSee(a, target) && Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) < 26 &&
           !this.sim.layout.shelters?.some(area => crossesArea(muzzle, brain.aim, area, 0, (area.y ?? 0) + area.h - .15)) &&
           this.sim.fireRay(a, muzzle, brain.aim)?.collider.handle === target.collider.handle;
         brain.state = a.pistol.reload ? "reloading" : brain.visible ? "aiming" : "advancing";
@@ -224,10 +225,19 @@ export class SecurityResponse {
     let goal = f.goal;
     const altitude = this.ceiling + (f.state === "withdrawing" ? 8 : 0);
     if (!f.transit && this.blocked(p, goal, a.body)) f.transit = { goal: { ...goal }, stage: "climb" };
+    // A new outdoor destination may now be directly reachable. Check the
+    // entire swept hull before leaving the detour, including any hidden roof.
+    if (f.transit && f.state === "pursuing" && this.columnClear(goal) && !this.blocked(p, goal, a.body)) f.transit = undefined;
     if (f.transit) {
       const route = f.transit;
-      // Finish the checked outdoor approach before accepting another pursuit
-      // goal. Recomputing a diagonal descent each tick could cut through a roof.
+      // A moving pursuit must not finish at a stale point under a tree. Accept
+      // only a checked outdoor column; descent still follows a vertical leg.
+      if (f.state === "pursuing" && distance2(route.goal, f.goal) > 1 && this.columnClear(f.goal)) {
+        route.goal = { ...f.goal };
+        route.stage = p.y >= this.ceiling - .25 ? "cross" : "climb";
+      }
+      // Keep the climb/cross/vertical descent sequence whenever a direct
+      // approach is still obstructed. Cutaway roofs remain physical barriers.
       if (route.stage === "climb") {
         goal = { x: p.x, y: this.ceiling, z: p.z };
         if (p.y >= this.ceiling - .25) route.stage = "cross";

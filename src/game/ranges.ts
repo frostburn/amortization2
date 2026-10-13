@@ -24,7 +24,7 @@ import { RECOVERY_DISTRICT, RECOVERY_FIXTURES, RECOVERY_RAILS, RECOVERY_SITES, R
 import { FOREST_DISTRICT, FOREST_FIXTURES, FOREST_GROUND, FOREST_SITES } from "./forest";
 import type { HeightField } from "./height-field";
 
-export type RangeId = "forest" | "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
+export type RangeId = "nightforest" | "forest" | "receiving" | "crossing" | "handling" | "escort" | "priority" | "recovery" | "proving" | "long" | "arena" | "city" | "port" | "concourse";
 export const ARENA_ENTRIES = [
   { name: "NORTH", x: 0, z: -38, dx: 0, dz: 1 },
   { name: "EAST", x: 54, z: 0, dx: -1, dz: 0 },
@@ -35,6 +35,7 @@ export type TargetKind = (typeof TARGET_SPAWNS)[number]["kind"] | "precision";
 type RangeDefinition = {
   name: string;
   contract?: boolean;
+  night?: boolean;
   pistolsOnly?: boolean;
   city?: CityDistrict;
   shelters?: RoofedArea[];
@@ -50,6 +51,11 @@ type RangeDefinition = {
 };
 
 export const RANGES: Record<RangeId, RangeDefinition> = {
+  nightforest: {
+    name: "08 · NIGHT SHIFT", contract: true, night: true, city: FOREST_DISTRICT, bounds: FOREST_DISTRICT.bounds,
+    ground: FOREST_GROUND, walkSurfaces: [], barriers: FOREST_FIXTURES, platforms: [],
+    players: [{ x: -9.1, z: 15.1 }, { x: -9.1, z: 12.9 }, { x: -6.9, z: 12.9 }, { x: -6.9, z: 15.1 }], targets: [], props: [],
+  },
   forest: {
     name: "07 · TIMBER RIGHTS", contract: true, city: FOREST_DISTRICT, bounds: FOREST_DISTRICT.bounds,
     ground: FOREST_GROUND, walkSurfaces: [], barriers: FOREST_FIXTURES, platforms: [],

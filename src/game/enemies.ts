@@ -61,7 +61,8 @@ export function updateEnemy(sim: Simulation, a: Actor, living: Actor[], profile:
   }
   // Taking fire releases passive post limits; ordinary sight and weapon range still apply.
   const combatProfile = brain.alertPosition ? { ...profile, leash: undefined } : profile;
-  const candidates = profile.noticeRange === undefined ? living : living.filter(target =>
+  const seen = living.filter(target => sim.canSee(a, target));
+  const candidates = profile.noticeRange === undefined ? seen : seen.filter(target =>
     distance2(a.body.translation(), target.body.translation()) <= profile.noticeRange! + (a.hp < a.maxHp ? 8 : 0));
   if (!candidates.length) {
     brain.target = null;
