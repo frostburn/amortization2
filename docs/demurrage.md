@@ -71,3 +71,7 @@ operators, enemy interruption, finite arrivals, blocked-entry alternatives,
 loader resumption, light redirection, the elevated rifle post, real rifle hits,
 submersion, failure and recovery. Full playthrough replay files belong in
 `docs/replays/` and remain excluded from the automated pipeline.
+
+A complete [twin-minigun agent run](replays/demurrage-minigunner.json) recovers
+all four robots in 121.70 seconds. Its [capture notes](replays/README.md#demurrage-paired-crane-restart-and-contested-return)
+identify the exact gameplay source, input method and limits of the verification.
